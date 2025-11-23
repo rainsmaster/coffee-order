@@ -41,9 +41,4 @@ public class TeamService {
             teamRepository.save(t);
         });
     }
-
-    // 전체 개수
-    public long count() {
-        return teamRepository.count();
-    }
 }

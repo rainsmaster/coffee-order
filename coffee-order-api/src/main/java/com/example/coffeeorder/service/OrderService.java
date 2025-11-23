@@ -1,7 +1,9 @@
 package com.example.coffeeorder.service;
 
+import com.example.coffeeorder.dto.MenuSummaryDto;
 import com.example.coffeeorder.entity.Order;
 import com.example.coffeeorder.entity.Team;
+import com.example.coffeeorder.mapper.OrderMapper;
 import com.example.coffeeorder.repository.OrderRepository;
 import com.example.coffeeorder.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final TeamRepository teamRepository;
+    private final OrderMapper orderMapper;
 
     // 오늘 주문 전체 조회
     public List<Order> findTodayOrders() {
@@ -75,28 +78,23 @@ public class OrderService {
         });
     }
 
-    // 날짜별 메뉴 집계
+    // 날짜별 메뉴 집계 (MyBatis 사용)
     public Map<String, Object> getMenuSummaryByDate(LocalDate date) {
-        List<Object[]> results = orderRepository.findMenuSummaryByDate(date);
+        List<MenuSummaryDto> results = orderMapper.findMenuSummaryByDate(date);
 
         Map<String, Object> summary = new LinkedHashMap<>();
 
-        for (Object[] result : results) {
-            String menuName = (String) result[0];
-            String category = (String) result[1];
-            String personalOption = (String) result[2];
-            Long count = (Long) result[3];
-
-            String key = menuName;
-            if (personalOption != null && !personalOption.isEmpty()) {
-                key += " (옵션: " + personalOption + ")";
+        for (MenuSummaryDto dto : results) {
+            String key = dto.getMenuName();
+            if (dto.getPersonalOption() != null && !dto.getPersonalOption().isEmpty()) {
+                key += " (옵션: " + dto.getPersonalOption() + ")";
             }
 
             summary.put(key, Map.of(
-                "menuName", menuName,
-                "category", category,
-                "personalOption", personalOption != null ? personalOption : "",
-                "count", count
+                "menuName", dto.getMenuName(),
+                "category", dto.getCategory(),
+                "personalOption", dto.getPersonalOption() != null ? dto.getPersonalOption() : "",
+                "count", dto.getCount()
             ));
         }
 

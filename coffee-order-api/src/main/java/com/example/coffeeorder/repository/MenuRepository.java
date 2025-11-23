@@ -11,8 +11,6 @@ import java.util.List;
 
 @Repository
 public interface MenuRepository extends JpaRepository<Menu, Long> {
-    List<Menu> findByDelYn(String delYn);
-
     List<Menu> findByDelYnOrderByCategory(String delYn);
 
     // 최근 3개월 주문 많은 순으로 정렬

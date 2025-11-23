@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+    "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.coffeeorder.mapper.OrderMapper">
+
+    <!-- 날짜별 메뉴 집계 조회 -->
+    <select id="findMenuSummaryByDate" resultType="MenuSummaryDto">
+        SELECT
+            m.name AS menuName,
+            m.category,
+            o.personal_option AS personalOption,
+            COUNT(*) AS count
+        FROM orders o
+        INNER JOIN menu m ON o.menu_id = m.id
+        WHERE o.order_date = #{orderDate}
+          AND o.del_yn = 'N'
+        GROUP BY m.name, m.category, o.personal_option
+        ORDER BY m.category, m.name
+    </select>
+
+</mapper>

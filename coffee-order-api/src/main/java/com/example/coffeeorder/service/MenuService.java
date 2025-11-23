@@ -23,11 +23,6 @@ public class MenuService {
         return menuRepository.findAllOrderByRecentOrderCount(threeMonthsAgo);
     }
 
-    // 삭제되지 않은 전체 메뉴 조회 (카테고리별)
-    public List<Menu> findAllActiveByCategory() {
-        return menuRepository.findByDelYnOrderByCategory("N");
-    }
-
     // ID로 조회
     public Optional<Menu> findById(Long id) {
         return menuRepository.findById(id);
