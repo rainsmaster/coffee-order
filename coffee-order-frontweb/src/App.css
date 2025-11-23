@@ -70,12 +70,19 @@ body {
   right: 0;
   min-width: 45px;
   padding: 0.5rem 0.8rem;
-  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.App-nav button.settings-button:hover {
-  transform: rotate(30deg);
+.App-nav button.settings-button svg {
+  width: 24px;
+  height: 24px;
   transition: transform 0.3s;
+}
+
+.App-nav button.settings-button:hover svg {
+  transform: rotate(90deg);
 }
 
 /* 메인 컨텐츠 */
