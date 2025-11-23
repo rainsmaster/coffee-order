@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 커피 주문 서비스 Docker 빌드 및 내보내기 스크립트
-# Docker 이미지를 빌드하고 시놀로지 업로드용 tar 파일로 내보냅니다
+# Docker 이미지를 빌드하고 시놀로지 업로드용 tar 파일생성
 
 IMAGE_NAME="coffee-order-svc:latest"
 OUTPUT_FILE="coffee-order-svc.tar"
