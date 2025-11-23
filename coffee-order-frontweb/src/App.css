@@ -1,0 +1,117 @@
+/* 전체 레이아웃 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #e8e8e8;
+}
+
+.App {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 헤더 */
+.App-header {
+  background: linear-gradient(135deg, #4a4a4a 0%, #6a6a6a 100%);
+  color: white;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.App-header h1 {
+  margin: 0 0 1rem 0;
+  font-size: 1.5rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* 네비게이션 */
+.App-nav {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.App-nav button {
+  background-color: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.5rem 1.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  min-width: 90px;
+}
+
+.App-nav button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.App-nav button.active {
+  background-color: white;
+  color: #4a4a4a;
+  border-color: white;
+}
+
+/* 메인 컨텐츠 */
+.App-main {
+  flex: 1;
+  padding: 1rem;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+  .App-header h1 {
+    font-size: 1.25rem;
+  }
+
+  .App-nav button {
+    padding: 0.45rem 1rem;
+    font-size: 0.9rem;
+    min-width: 80px;
+  }
+
+  .App-main {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .App-header {
+    padding: 0.75rem;
+  }
+
+  .App-header h1 {
+    font-size: 1.1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .App-nav {
+    gap: 0.4rem;
+  }
+
+  .App-nav button {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    min-width: auto;
+    flex: 1;
+  }
+
+  .App-main {
+    padding: 0.5rem;
+  }
+}

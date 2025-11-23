@@ -1,0 +1,140 @@
+/* Alert Modal 오버레이 */
+.alert-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  animation: fadeIn 0.2s ease-in;
+}
+
+/* Alert Modal 컨텐츠 */
+.alert-modal-content {
+  background: white;
+  border-radius: 4px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.2s ease-out;
+}
+
+/* Alert Modal 헤더 */
+.alert-modal-header {
+  padding: 1rem 1.25rem 0.75rem 1.25rem;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.alert-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Alert Modal 본문 */
+.alert-modal-body {
+  padding: 1.25rem;
+  min-height: 60px;
+}
+
+.alert-modal-body p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* Alert Modal 푸터 */
+.alert-modal-footer {
+  padding: 0.75rem 1.25rem 1.25rem 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+/* Alert Modal 버튼 */
+.alert-modal-btn {
+  padding: 0.6rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+
+.alert-modal-btn-confirm {
+  background-color: #666;
+  color: white;
+}
+
+.alert-modal-btn-confirm:hover {
+  background-color: #555;
+}
+
+.alert-modal-btn-confirm:active {
+  transform: scale(0.98);
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+  .alert-modal-content {
+    width: 85%;
+    max-width: 350px;
+  }
+
+  .alert-modal-header {
+    padding: 0.9rem 1rem 0.65rem 1rem;
+  }
+
+  .alert-modal-header h3 {
+    font-size: 1rem;
+  }
+
+  .alert-modal-body {
+    padding: 1rem;
+    min-height: 50px;
+  }
+
+  .alert-modal-body p {
+    font-size: 0.9rem;
+  }
+
+  .alert-modal-footer {
+    padding: 0.65rem 1rem 1rem 1rem;
+  }
+
+  .alert-modal-btn {
+    padding: 0.55rem 1.3rem;
+    font-size: 0.9rem;
+    min-width: 70px;
+  }
+}

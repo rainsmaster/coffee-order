@@ -1,0 +1,260 @@
+.history-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* 헤더 */
+.history-header {
+  background: white;
+  border-radius: 4px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.history-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.date-selector {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.date-selector label {
+  font-weight: 500;
+  color: #555;
+  font-size: 0.95rem;
+}
+
+.date-selector input[type="date"] {
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.date-selector input[type="date"]:focus {
+  outline: none;
+  border-color: #666;
+}
+
+/* 토글 버튼 */
+.view-toggle {
+  display: flex;
+  gap: 0.5rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.view-toggle button {
+  flex: 1;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.view-toggle button:hover {
+  border-color: #666;
+  background-color: #f5f5f5;
+}
+
+.view-toggle button.active {
+  background-color: #666;
+  color: white;
+  border-color: #666;
+}
+
+/* 컨텐츠 */
+.history-content {
+  background: white;
+  border-radius: 4px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.history-content h3 {
+  margin: 0 0 1.25rem 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.loading {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  font-size: 1rem;
+}
+
+.no-data {
+  text-align: center;
+  padding: 3rem;
+  color: #999;
+  font-size: 0.95rem;
+}
+
+/* 개인별 보기 */
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.order-item {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  border-left: 3px solid #666;
+}
+
+.order-person {
+  min-width: 100px;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.order-details {
+  flex: 1;
+}
+
+.order-menu {
+  color: #333;
+  margin-bottom: 0.25rem;
+  font-size: 0.95rem;
+}
+
+.order-option {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* 메뉴별 보기 */
+.total-summary {
+  background-color: #f5f5f5;
+  padding: 0.75rem;
+  border-radius: 4px;
+  text-align: center;
+  font-size: 1rem;
+  margin-bottom: 1.25rem;
+  color: #555;
+}
+
+.total-summary strong {
+  color: #333;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.category-group {
+  margin-bottom: 1.25rem;
+}
+
+.category-header {
+  font-weight: 500;
+  color: #666;
+  font-size: 1rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #ccc;
+}
+
+.summary-item {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #eee;
+}
+
+.summary-item:last-child {
+  border-bottom: none;
+}
+
+.summary-main {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.summary-option {
+  margin-left: 1.5rem;
+  color: #888;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+  .history-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .date-selector {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .history-content {
+    padding: 1rem;
+  }
+
+  .order-item {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .order-person {
+    min-width: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .history-header h2 {
+    font-size: 1.1rem;
+  }
+
+  .date-selector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .date-selector input[type="date"] {
+    width: 100%;
+  }
+
+  .view-toggle {
+    padding: 0.75rem;
+  }
+
+  .view-toggle button {
+    font-size: 0.9rem;
+    padding: 0.5rem;
+  }
+
+  .total-summary {
+    font-size: 0.95rem;
+  }
+
+  .total-summary strong {
+    font-size: 1.2rem;
+  }
+}
