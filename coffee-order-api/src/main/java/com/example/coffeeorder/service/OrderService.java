@@ -1,9 +1,13 @@
 package com.example.coffeeorder.service;
 
 import com.example.coffeeorder.dto.MenuSummaryDto;
+import com.example.coffeeorder.dto.OrderCreateDto;
+import com.example.coffeeorder.dto.OrderResponseDto;
+import com.example.coffeeorder.entity.Menu;
 import com.example.coffeeorder.entity.Order;
 import com.example.coffeeorder.entity.Team;
 import com.example.coffeeorder.mapper.OrderMapper;
+import com.example.coffeeorder.repository.MenuRepository;
 import com.example.coffeeorder.repository.OrderRepository;
 import com.example.coffeeorder.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +25,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final TeamRepository teamRepository;
+    private final MenuRepository menuRepository;
     private final OrderMapper orderMapper;
 
     // 오늘 주문 전체 조회
@@ -53,6 +58,43 @@ public class OrderService {
         }
 
         return orderRepository.save(order);
+    }
+
+    // 주문 생성 (DTO 사용)
+    @Transactional
+    public Long createOrderFromDto(OrderCreateDto dto) throws Exception {
+        // Team과 Menu 조회
+        Team team = teamRepository.findById(dto.getTeamId())
+                .orElseThrow(() -> new Exception("팀원을 찾을 수 없습니다."));
+        Menu menu = menuRepository.findById(dto.getMenuId())
+                .orElseThrow(() -> new Exception("메뉴를 찾을 수 없습니다."));
+
+        // Order 날짜 설정
+        LocalDate orderDate = dto.getOrderDate() != null ? dto.getOrderDate() : LocalDate.now();
+
+        // 중복 체크
+        boolean exists = orderRepository.existsByTeamAndOrderDateAndDelYn(team, orderDate, "N");
+        if (exists) {
+            throw new Exception("이미 오늘 주문하셨습니다.");
+        }
+
+        // Order 엔티티 생성
+        Order order = new Order();
+        order.setTeam(team);
+        order.setMenu(menu);
+        order.setPersonalOption(dto.getPersonalOption());
+        order.setOrderDate(orderDate);
+
+        Order savedOrder = orderRepository.save(order);
+        // 저장된 ID만 반환 (사용자 입력으로부터 완전히 분리)
+        return savedOrder.getId();
+    }
+
+    // ID로 OrderResponseDto 조회
+    public OrderResponseDto getOrderResponseById(Long id) throws Exception {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new Exception("주문을 찾을 수 없습니다."));
+        return OrderResponseDto.from(order);
     }
 
     // 주문 수정

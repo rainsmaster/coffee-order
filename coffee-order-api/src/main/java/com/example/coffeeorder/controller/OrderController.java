@@ -1,8 +1,11 @@
 package com.example.coffeeorder.controller;
 
+import com.example.coffeeorder.dto.OrderCreateDto;
+import com.example.coffeeorder.dto.OrderResponseDto;
 import com.example.coffeeorder.entity.Order;
 import com.example.coffeeorder.service.OrderService;
 import com.example.coffeeorder.service.SettingsService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -47,25 +50,26 @@ public class OrderController {
 
     // 주문 생성
     @PostMapping
-    public ResponseEntity<?> createOrder(@RequestBody Order order) {
+    public ResponseEntity<OrderResponseDto> createOrder(@Valid @RequestBody OrderCreateDto orderDto) {
         // 주문 가능 시간 체크
         if (!settingsService.isOrderAvailable()) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", "주문 마감 시간이 지났습니다."));
+            throw new IllegalStateException("주문 마감 시간이 지났습니다.");
         }
 
         try {
-            Order savedOrder = orderService.createOrder(order);
-            return ResponseEntity.status(HttpStatus.CREATED).body(savedOrder);
+            Long orderId = orderService.createOrderFromDto(orderDto);
+
+            OrderResponseDto response = orderService.getOrderResponseById(orderId);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", e.getMessage()));
+            throw new IllegalArgumentException(e.getMessage());
         }
     }
 
     // 주문 수정
     @PutMapping("/{id}")
-    public ResponseEntity<?> updateOrder(@PathVariable Long id, @RequestBody Order order) {
+    public ResponseEntity<Object> updateOrder(@PathVariable Long id, @RequestBody Order order) {
         // 주문 가능 시간 체크
         if (!settingsService.isOrderAvailable()) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

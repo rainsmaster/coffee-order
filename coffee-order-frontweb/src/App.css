@@ -22,6 +22,7 @@ body {
   color: white;
   padding: 1rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  position: relative;
 }
 
 .App-header h1 {
@@ -37,7 +38,6 @@ body {
   justify-content: center;
   gap: 0.5rem;
   flex-wrap: wrap;
-  position: relative;
 }
 
 .App-nav button {
@@ -65,23 +65,41 @@ body {
 }
 
 /* 톱니바퀴 설정 버튼 */
-.App-nav button.settings-button {
+.App-header button.settings-button {
   position: absolute;
-  right: 0;
-  min-width: 45px;
-  padding: 0.5rem 0.8rem;
+  top: 1rem;
+  right: 1rem;
+  min-width: auto;
+  padding: 0.2rem 0.3rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.App-nav button.settings-button svg {
-  width: 24px;
-  height: 24px;
+.App-header button.settings-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.App-header button.settings-button.active {
+  background-color: white;
+  color: #4a4a4a;
+  border-color: white;
+}
+
+.App-header button.settings-button svg {
+  width: 14px;
+  height: 14px;
   transition: transform 0.3s;
 }
 
-.App-nav button.settings-button:hover svg {
+.App-header button.settings-button:hover svg {
   transform: rotate(90deg);
 }
 
