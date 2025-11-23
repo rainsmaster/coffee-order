@@ -37,6 +37,7 @@ body {
   justify-content: center;
   gap: 0.5rem;
   flex-wrap: wrap;
+  position: relative;
 }
 
 .App-nav button {
@@ -61,6 +62,20 @@ body {
   background-color: white;
   color: #4a4a4a;
   border-color: white;
+}
+
+/* 톱니바퀴 설정 버튼 */
+.App-nav button.settings-button {
+  position: absolute;
+  right: 0;
+  min-width: 45px;
+  padding: 0.5rem 0.8rem;
+  font-size: 1.2rem;
+}
+
+.App-nav button.settings-button:hover {
+  transform: rotate(30deg);
+  transition: transform 0.3s;
 }
 
 /* 메인 컨텐츠 */

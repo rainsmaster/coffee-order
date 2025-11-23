@@ -166,7 +166,7 @@ const ManagePage = () => {
           className={activeTab === 'settings' ? 'active' : ''}
           onClick={() => setActiveTab('settings')}
         >
-          설정
+          주문마감시간 설정
         </button>
       </div>
 

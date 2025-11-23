@@ -32,16 +32,16 @@ function App() {
             주문하기
           </button>
           <button
-            className={currentPage === 'manage' ? 'active' : ''}
-            onClick={() => setCurrentPage('manage')}
-          >
-            관리
-          </button>
-          <button
             className={currentPage === 'history' ? 'active' : ''}
             onClick={() => setCurrentPage('history')}
           >
             주문내역
+          </button>
+          <button
+            className={`settings-button ${currentPage === 'manage' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('manage')}
+          >
+            ⚙️
           </button>
         </nav>
       </header>
