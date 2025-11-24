@@ -50,10 +50,11 @@ public class OrderController {
 
     // 주문 생성
     @PostMapping
-    public ResponseEntity<OrderResponseDto> createOrder(@Valid @RequestBody OrderCreateDto orderDto) {
+    public ResponseEntity<Object> createOrder(@Valid @RequestBody OrderCreateDto orderDto) {
         // 주문 가능 시간 체크
         if (!settingsService.isOrderAvailable()) {
-            throw new IllegalStateException("주문 마감 시간이 지났습니다.");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "주문 마감 시간이 지났습니다."));
         }
 
         try {
@@ -63,7 +64,8 @@ public class OrderController {
 
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
-            throw new IllegalArgumentException(e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 

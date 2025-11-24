@@ -19,6 +19,8 @@ const OrderPage = () => {
   const [orderAvailable, setOrderAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [settings, setSettings] = useState(null);
 
   // 커스텀 모달 훅
   const {
@@ -35,6 +37,7 @@ const OrderPage = () => {
   // 데이터 로드
   useEffect(() => {
     loadData();
+    loadSettings();
     checkOrderAvailable();
 
     // 5초마다 주문 목록 및 주문 가능 여부 자동 새로고침 (폴링)
@@ -44,6 +47,15 @@ const OrderPage = () => {
     }, 5000);
 
     return () => clearInterval(interval);
+  }, []);
+
+  // 현재 시간 업데이트 (1초마다)
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   const loadData = async () => {
@@ -71,6 +83,15 @@ const OrderPage = () => {
       setOrders(ordersData);
     } catch (err) {
       console.error('주문 목록 새로고침 실패:', err);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const settingsData = await settingsAPI.get();
+      setSettings(settingsData);
+    } catch (err) {
+      console.error('설정 로드 실패:', err);
     }
   };
 
@@ -195,6 +216,21 @@ const OrderPage = () => {
       <div className="order-form-card">
         <h2>오늘의 커피 주문</h2>
         <p className="date-info">{new Date().toLocaleDateString('ko-KR')}</p>
+        <div className="time-info-box">
+          <p className="current-time">
+            현재 시간: {currentTime.toLocaleTimeString('ko-KR', { hour12: false })}
+          </p>
+          {settings && !settings.is24Hours && (
+            <p className="deadline-time">
+              주문 마감: {settings.orderDeadlineTime?.substring(0, 5)} {orderAvailable ? '주문가능합니다' : '주문이 마감되었습니다'}
+            </p>
+          )}
+          {settings && settings.is24Hours && (
+            <p className="deadline-time">
+              24시간 주문 가능 합니다
+            </p>
+          )}
+        </div>
 
         <div className="form-group">
           <label>이름 선택</label>

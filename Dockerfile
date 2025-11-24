@@ -20,6 +20,10 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jre-jammy
 WORKDIR /app
 
+# 타임존 설정 (한국 시간)
+ENV TZ=Asia/Seoul
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
 # 빌드된 JAR 파일 복사 (React 빌드 결과 포함)
 COPY --from=build /app/coffee-order-api/target/coffee-order-api-1.0.0.jar app.jar
 
@@ -29,5 +33,5 @@ RUN mkdir -p /app/data
 # 포트 노출
 EXPOSE 8080
 
-# 애플리케이션 실행
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# 애플리케이션 실행 (JVM 타임존도 명시적으로 설정)
+ENTRYPOINT ["java", "-Duser.timezone=Asia/Seoul", "-jar", "app.jar"]
