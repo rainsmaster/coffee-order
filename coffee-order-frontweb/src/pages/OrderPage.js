@@ -37,9 +37,10 @@ const OrderPage = () => {
     loadData();
     checkOrderAvailable();
 
-    // 5초마다 주문 목록 자동 새로고침 (폴링)
+    // 5초마다 주문 목록 및 주문 가능 여부 자동 새로고침 (폴링)
     const interval = setInterval(() => {
       loadOrders();
+      checkOrderAvailable();
     }, 5000);
 
     return () => clearInterval(interval);
@@ -91,8 +92,8 @@ const OrderPage = () => {
 
     try {
       const order = {
-        team: { id: parseInt(selectedTeam) },
-        menu: { id: parseInt(selectedMenu) },
+        teamId: parseInt(selectedTeam),
+        menuId: parseInt(selectedMenu),
         personalOption: personalOption || null,
         orderDate: new Date().toISOString().split('T')[0],
       };
