@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -28,9 +29,12 @@ public class OrderService {
     private final MenuRepository menuRepository;
     private final OrderMapper orderMapper;
 
+    // 한국 시간 기준 ZoneId
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
+
     // 오늘 주문 전체 조회
     public List<Order> findTodayOrders() {
-        return orderRepository.findByOrderDateAndDelYn(LocalDate.now(), "N");
+        return orderRepository.findByOrderDateAndDelYn(LocalDate.now(KOREA_ZONE), "N");
     }
 
     // 특정 날짜 주문 조회
@@ -69,8 +73,8 @@ public class OrderService {
         Menu menu = menuRepository.findById(dto.getMenuId())
                 .orElseThrow(() -> new Exception("메뉴를 찾을 수 없습니다."));
 
-        // Order 날짜 설정
-        LocalDate orderDate = dto.getOrderDate() != null ? dto.getOrderDate() : LocalDate.now();
+        // Order 날짜 설정 - 한국 시간 기준
+        LocalDate orderDate = dto.getOrderDate() != null ? dto.getOrderDate() : LocalDate.now(KOREA_ZONE);
 
         // 중복 체크
         boolean exists = orderRepository.existsByTeamAndOrderDateAndDelYn(team, orderDate, "N");
@@ -149,7 +153,7 @@ public class OrderService {
         if (team.isPresent()) {
             return orderRepository.findByTeamAndOrderDateAndDelYn(
                 team.get(),
-                LocalDate.now(),
+                LocalDate.now(KOREA_ZONE),
                 "N"
             );
         }

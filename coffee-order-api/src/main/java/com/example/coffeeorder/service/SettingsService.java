@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.util.Optional;
 
 @Service
@@ -15,6 +16,9 @@ import java.util.Optional;
 public class SettingsService {
 
     private final SettingsRepository settingsRepository;
+
+    // 한국 시간 기준 ZoneId
+    private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
     // 설정 조회 (단일 레코드)
     public Settings getSettings() {
@@ -47,9 +51,9 @@ public class SettingsService {
             return true;
         }
 
-        // 마감 시간이 설정되어 있으면 현재 시간과 비교
+        // 마감 시간이 설정되어 있으면 현재 시간과 비교 (한국 시간 기준)
         if (settings.getOrderDeadlineTime() != null) {
-            LocalTime now = LocalTime.now();
+            LocalTime now = LocalTime.now(KOREA_ZONE);
             return now.isBefore(settings.getOrderDeadlineTime());
         }
 
