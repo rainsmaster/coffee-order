@@ -116,7 +116,7 @@ const OrderPage = () => {
         teamId: parseInt(selectedTeam),
         menuId: parseInt(selectedMenu),
         personalOption: personalOption || null,
-        orderDate: new Date().toISOString().split('T')[0],
+        orderDate: new Date().toLocaleDateString('sv-SE'),
       };
 
       await orderAPI.create(order);

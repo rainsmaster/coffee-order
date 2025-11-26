@@ -4,8 +4,12 @@ import './HistoryPage.css';
 
 const HistoryPage = () => {
   const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
+    new Date().toLocaleDateString('sv-SE')
   );
+
+  const handleTodayClick = () => {
+    setSelectedDate(new Date().toLocaleDateString('sv-SE'));
+  };
   const [orders, setOrders] = useState([]);
   const [viewMode, setViewMode] = useState('individual'); // individual or summary
   const [loading, setLoading] = useState(false);
@@ -76,6 +80,9 @@ const HistoryPage = () => {
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
           />
+          <button className="today-button" onClick={handleTodayClick}>
+            오늘
+          </button>
         </div>
       </div>
 

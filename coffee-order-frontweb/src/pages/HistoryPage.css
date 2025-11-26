@@ -47,6 +47,21 @@
   border-color: #666;
 }
 
+.today-button {
+  padding: 0.6rem 1rem;
+  background-color: #4a90a4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.today-button:hover {
+  background-color: #3a7a94;
+}
+
 /* 토글 버튼 */
 .view-toggle {
   display: flex;
@@ -238,6 +253,10 @@
   }
 
   .date-selector input[type="date"] {
+    width: 100%;
+  }
+
+  .today-button {
     width: 100%;
   }
 
