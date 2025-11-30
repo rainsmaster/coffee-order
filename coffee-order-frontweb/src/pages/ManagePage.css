@@ -92,6 +92,32 @@
   border-left: 3px solid #666;
 }
 
+.list-item.current {
+  background-color: #e8f4e8;
+  border-left-color: #4caf50;
+}
+
+.current-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  background-color: #4caf50;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 3px;
+}
+
+.item-actions button:disabled {
+  background-color: #ddd;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.item-actions button:disabled:hover {
+  background-color: #ddd;
+}
+
 .item-category {
   font-size: 0.85rem;
   color: #888;
@@ -278,11 +304,30 @@
   color: #555;
 }
 
+.radio-label.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .radio-label input[type="radio"] {
   margin-right: 0.5rem;
   width: 18px;
   height: 18px;
   cursor: pointer;
+}
+
+.radio-label input[type="radio"]:disabled {
+  cursor: not-allowed;
+}
+
+.form-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffc107;
+  color: #856404;
+  padding: 0.75rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  margin-bottom: 0.75rem;
 }
 
 .checkbox-label {
@@ -313,18 +358,34 @@
   margin: 1.5rem 0;
 }
 
-/* 투썸 메뉴 스타일 */
-.sync-buttons {
-  display: flex;
-  gap: 0.5rem;
+/* 동기화 섹션 스타일 */
+.sync-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  border-left: 3px solid #5a7d9a;
 }
 
-.btn-sync-all {
+.btn-sync {
+  padding: 0.6rem 1.2rem;
   background-color: #5a7d9a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
-.btn-sync-all:hover {
+.btn-sync:hover {
   background-color: #4a6d8a;
+}
+
+.btn-sync:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
 }
 
 .btn-add:disabled {
@@ -384,56 +445,8 @@
 .sync-info {
   font-size: 0.85rem;
   color: #888;
-  margin-bottom: 1rem;
-}
-
-.empty-message {
-  color: #888;
-  text-align: center;
-  padding: 2rem;
-}
-
-.twosome-category {
-  margin-bottom: 1.5rem;
-}
-
-.twosome-category h3 {
-  font-size: 1rem;
-  color: #555;
-  margin-bottom: 0.75rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #eee;
-}
-
-.twosome-menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 0.75rem;
-}
-
-.twosome-menu-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  padding: 0.5rem;
-  background-color: #f9f9f9;
-  border-radius: 4px;
-}
-
-.twosome-menu-item img {
-  width: 80px;
-  height: 80px;
-  object-fit: cover;
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
-}
-
-.twosome-menu-item span {
-  font-size: 0.8rem;
-  color: #333;
-  word-break: keep-all;
-  line-height: 1.3;
+  margin-top: 0.5rem;
+  margin-bottom: 0;
 }
 
 /* 탭이 많아지면 반응형 조정 */
@@ -452,19 +465,5 @@
   .manage-tabs button {
     flex: 1 1 45%;
     font-size: 0.8rem;
-  }
-
-  .twosome-menu-grid {
-    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
-    gap: 0.5rem;
-  }
-
-  .twosome-menu-item img {
-    width: 60px;
-    height: 60px;
-  }
-
-  .twosome-menu-item span {
-    font-size: 0.75rem;
   }
 }

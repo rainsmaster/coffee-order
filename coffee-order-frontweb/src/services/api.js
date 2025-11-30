@@ -31,10 +31,36 @@ const fetchAPI = async (url, options = {}) => {
   }
 };
 
+// ==================== Department API ====================
+export const departmentAPI = {
+  // 전체 부서 조회
+  getAll: () => fetchAPI('/departments'),
+
+  // ID로 조회
+  getById: (id) => fetchAPI(`/departments/${id}`),
+
+  // 부서 생성
+  create: (department) => fetchAPI('/departments', {
+    method: 'POST',
+    body: JSON.stringify(department),
+  }),
+
+  // 부서 수정
+  update: (id, department) => fetchAPI(`/departments/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(department),
+  }),
+
+  // 부서 삭제
+  delete: (id) => fetchAPI(`/departments/${id}`, {
+    method: 'DELETE',
+  }),
+};
+
 // ==================== Team API ====================
 export const teamAPI = {
-  // 전체 팀원 조회
-  getAll: () => fetchAPI('/teams'),
+  // 전체 팀원 조회 (부서별 필터링)
+  getAll: (departmentId) => fetchAPI(departmentId ? `/teams?departmentId=${departmentId}` : '/teams'),
 
   // 팀원 생성
   create: (team) => fetchAPI('/teams', {
@@ -56,8 +82,8 @@ export const teamAPI = {
 
 // ==================== Menu API ====================
 export const menuAPI = {
-  // 전체 메뉴 조회 (카테고리별 그룹화)
-  getAll: () => fetchAPI('/menus'),
+  // 전체 메뉴 조회 (카테고리별 그룹화, 부서별 필터링)
+  getAll: (departmentId) => fetchAPI(departmentId ? `/menus?departmentId=${departmentId}` : '/menus'),
 
   // 메뉴 생성
   create: (menu) => fetchAPI('/menus', {
@@ -79,11 +105,15 @@ export const menuAPI = {
 
 // ==================== Order API ====================
 export const orderAPI = {
-  // 오늘 주문 조회
-  getToday: () => fetchAPI('/orders/today'),
+  // 오늘 주문 조회 (부서별 필터링)
+  getToday: (departmentId) => fetchAPI(departmentId ? `/orders/today?departmentId=${departmentId}` : '/orders/today'),
 
-  // 특정 날짜 주문 조회
-  getByDate: (date) => fetchAPI(`/orders?date=${date}`),
+  // 특정 날짜 주문 조회 (부서별 필터링)
+  getByDate: (date, departmentId) => {
+    const params = new URLSearchParams({ date });
+    if (departmentId) params.append('departmentId', departmentId);
+    return fetchAPI(`/orders?${params.toString()}`);
+  },
 
   // 주문 생성
   create: (order) => fetchAPI('/orders', {
@@ -92,10 +122,13 @@ export const orderAPI = {
   }),
 
   // 주문 수정
-  update: (id, order) => fetchAPI(`/orders/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(order),
-  }),
+  update: (id, order, departmentId) => {
+    const params = departmentId ? `?departmentId=${departmentId}` : '';
+    return fetchAPI(`/orders/${id}${params}`, {
+      method: 'PUT',
+      body: JSON.stringify(order),
+    });
+  },
 
   // 주문 삭제
   delete: (id) => fetchAPI(`/orders/${id}`, {
@@ -107,21 +140,27 @@ export const orderAPI = {
 
   // 특정 팀원의 오늘 주문 조회
   getTodayByTeam: (teamId) => fetchAPI(`/orders/team/${teamId}/today`),
+
+  // 특정 팀원의 최근 주문 조회
+  getLatestByTeam: (teamId) => fetchAPI(`/orders/team/${teamId}/latest`),
 };
 
 // ==================== Settings API ====================
 export const settingsAPI = {
-  // 설정 조회
-  get: () => fetchAPI('/settings'),
+  // 설정 조회 (부서별)
+  get: (departmentId) => fetchAPI(departmentId ? `/settings?departmentId=${departmentId}` : '/settings'),
 
-  // 설정 업데이트
-  update: (settings) => fetchAPI('/settings', {
-    method: 'PUT',
-    body: JSON.stringify(settings),
-  }),
+  // 설정 업데이트 (부서별)
+  update: (settings, departmentId) => {
+    const params = departmentId ? `?departmentId=${departmentId}` : '';
+    return fetchAPI(`/settings${params}`, {
+      method: 'PUT',
+      body: JSON.stringify(settings),
+    });
+  },
 
-  // 주문 가능 여부 체크
-  checkOrderAvailable: () => fetchAPI('/settings/order-available'),
+  // 주문 가능 여부 체크 (부서별)
+  checkOrderAvailable: (departmentId) => fetchAPI(departmentId ? `/settings/order-available?departmentId=${departmentId}` : '/settings/order-available'),
 };
 
 // ==================== Twosome Menu API ====================
@@ -173,34 +212,3 @@ export const twosomeMenuAPI = {
   isSyncInProgress: () => fetchAPI('/twosome-menus/sync/in-progress'),
 };
 
-// ==================== Personal Option API ====================
-export const personalOptionAPI = {
-  // 전체 옵션 조회 (카테고리별 그룹화)
-  getAll: () => fetchAPI('/personal-options'),
-
-  // 전체 옵션 조회 (리스트)
-  getAllList: () => fetchAPI('/personal-options/list'),
-
-  // ID로 조회
-  getById: (id) => fetchAPI(`/personal-options/${id}`),
-
-  // 카테고리별 조회
-  getByCategory: (category) => fetchAPI(`/personal-options/category/${category}`),
-
-  // 옵션 생성
-  create: (option) => fetchAPI('/personal-options', {
-    method: 'POST',
-    body: JSON.stringify(option),
-  }),
-
-  // 옵션 수정
-  update: (id, option) => fetchAPI(`/personal-options/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(option),
-  }),
-
-  // 옵션 삭제
-  delete: (id) => fetchAPI(`/personal-options/${id}`, {
-    method: 'DELETE',
-  }),
-};

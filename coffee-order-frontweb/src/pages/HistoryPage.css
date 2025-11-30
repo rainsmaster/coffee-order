@@ -62,52 +62,11 @@
   background-color: #3a7a94;
 }
 
-/* 토글 버튼 */
-.view-toggle {
-  display: flex;
-  gap: 0.5rem;
-  background: white;
-  padding: 1rem;
-  border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.view-toggle button {
-  flex: 1;
-  padding: 0.6rem;
-  border: 1px solid #ccc;
-  background: white;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.view-toggle button:hover {
-  border-color: #666;
-  background-color: #f5f5f5;
-}
-
-.view-toggle button.active {
-  background-color: #666;
-  color: white;
-  border-color: #666;
-}
-
 /* 컨텐츠 */
 .history-content {
-  background: white;
-  border-radius: 4px;
-  padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.history-content h3 {
-  margin: 0 0 1.25rem 0;
-  color: #333;
-  font-size: 1.1rem;
-  font-weight: 600;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .loading {
@@ -115,6 +74,9 @@
   padding: 3rem;
   color: #666;
   font-size: 1rem;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .no-data {
@@ -122,47 +84,26 @@
   padding: 3rem;
   color: #999;
   font-size: 0.95rem;
-}
-
-/* 개인별 보기 */
-.orders-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.order-item {
-  display: flex;
-  gap: 1rem;
-  padding: 0.75rem;
-  background-color: #f9f9f9;
+  background: white;
   border-radius: 4px;
-  border-left: 3px solid #666;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
-.order-person {
-  min-width: 100px;
-  font-weight: 500;
+/* 메뉴별 집계 섹션 */
+.summary-section {
+  background: white;
+  border-radius: 4px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.summary-section h3 {
+  margin: 0 0 1rem 0;
   color: #333;
-  font-size: 0.95rem;
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
-.order-details {
-  flex: 1;
-}
-
-.order-menu {
-  color: #333;
-  margin-bottom: 0.25rem;
-  font-size: 0.95rem;
-}
-
-.order-option {
-  font-size: 0.85rem;
-  color: #888;
-}
-
-/* 메뉴별 보기 */
 .total-summary {
   background-color: #f5f5f5;
   padding: 0.75rem;
@@ -181,6 +122,10 @@
 
 .category-group {
   margin-bottom: 1.25rem;
+}
+
+.category-group:last-child {
+  margin-bottom: 0;
 }
 
 .category-header {
@@ -215,6 +160,118 @@
   margin-top: 0.25rem;
 }
 
+/* 개인별 주문 내역 섹션 */
+.individual-section {
+  background: white;
+  border-radius: 4px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.individual-section h3 {
+  margin: 0 0 1rem 0;
+  color: #333;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.order-item {
+  display: flex;
+  gap: 1rem;
+  padding: 0.75rem;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  border-left: 3px solid #666;
+  align-items: center;
+}
+
+.order-person {
+  min-width: 80px;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.order-details {
+  flex: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.order-menu {
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.order-option {
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* 주문 취소 버튼 */
+.btn-cancel {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 4px;
+  background-color: #e74c3c;
+  color: white;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background-color: #c0392b;
+}
+
+.btn-cancel.disabled,
+.btn-cancel:disabled {
+  background-color: #ccc;
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* 미주문 섹션 */
+.unordered-section {
+  background: white;
+  border-radius: 4px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.unordered-section h3 {
+  margin: 0 0 1rem 0;
+  color: #666;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.unordered-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.unordered-member {
+  display: inline-block;
+  padding: 0.4rem 0.8rem;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
 /* 모바일 반응형 */
 @media (max-width: 768px) {
   .history-header {
@@ -228,17 +285,29 @@
     justify-content: space-between;
   }
 
-  .history-content {
+  .summary-section,
+  .individual-section,
+  .unordered-section {
     padding: 1rem;
   }
 
   .order-item {
     flex-direction: column;
+    align-items: flex-start;
     gap: 0.5rem;
   }
 
   .order-person {
     min-width: auto;
+  }
+
+  .order-details {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .btn-cancel {
+    align-self: flex-end;
   }
 }
 
@@ -258,15 +327,6 @@
 
   .today-button {
     width: 100%;
-  }
-
-  .view-toggle {
-    padding: 0.75rem;
-  }
-
-  .view-toggle button {
-    font-size: 0.9rem;
-    padding: 0.5rem;
   }
 
   .total-summary {

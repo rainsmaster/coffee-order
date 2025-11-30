@@ -12,6 +12,8 @@ import java.time.LocalDate;
 @AllArgsConstructor
 public class OrderCreateDto {
 
+    private Long departmentId;  // 부서 ID (선택)
+
     @NotNull(message = "팀 ID는 필수입니다.")
     private Long teamId;
 

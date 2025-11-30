@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/teams")
@@ -17,10 +18,16 @@ public class TeamController {
 
     private final TeamService teamService;
 
-    // 전체 팀원 조회 (삭제되지 않은 것만)
+    // 팀원 조회 (부서별)
     @GetMapping
-    public ResponseEntity<List<Team>> getAllTeams() {
-        List<Team> teams = teamService.findAllActive();
+    public ResponseEntity<List<Team>> getTeams(
+            @RequestParam(required = false) Long departmentId) {
+        List<Team> teams;
+        if (departmentId != null) {
+            teams = teamService.findByDepartmentId(departmentId);
+        } else {
+            teams = teamService.findAllActive();
+        }
         return ResponseEntity.ok(teams);
     }
 
@@ -34,8 +41,23 @@ public class TeamController {
 
     // 팀원 생성
     @PostMapping
-    public ResponseEntity<Team> createTeam(@RequestBody Team team) {
-        Team savedTeam = teamService.save(team);
+    public ResponseEntity<Team> createTeam(@RequestBody Map<String, Object> request) {
+        Long departmentId = request.get("departmentId") != null
+                ? Long.valueOf(request.get("departmentId").toString()) : null;
+        String name = (String) request.get("name");
+
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Team savedTeam;
+        if (departmentId != null) {
+            savedTeam = teamService.createWithDepartment(departmentId, name.trim());
+        } else {
+            Team team = new Team();
+            team.setName(name.trim());
+            savedTeam = teamService.save(team);
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(savedTeam);
     }
 

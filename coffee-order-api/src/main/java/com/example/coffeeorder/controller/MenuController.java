@@ -19,10 +19,16 @@ public class MenuController {
 
     private final MenuService menuService;
 
-    // 전체 메뉴 조회 (최근 3개월 주문 많은 순, 카테고리별 그룹화)
+    // 메뉴 조회 (부서별, 카테고리별 그룹화)
     @GetMapping
-    public ResponseEntity<Map<String, List<Menu>>> getAllMenus() {
-        List<Menu> menus = menuService.findAllActiveOrderByPopularity();
+    public ResponseEntity<Map<String, List<Menu>>> getMenus(
+            @RequestParam(required = false) Long departmentId) {
+        List<Menu> menus;
+        if (departmentId != null) {
+            menus = menuService.findByDepartmentIdOrderByPopularity(departmentId);
+        } else {
+            menus = menuService.findAllActiveOrderByPopularity();
+        }
 
         // 카테고리별로 그룹화
         Map<String, List<Menu>> groupedMenus = menus.stream()
@@ -41,8 +47,25 @@ public class MenuController {
 
     // 메뉴 생성
     @PostMapping
-    public ResponseEntity<Menu> createMenu(@RequestBody Menu menu) {
-        Menu savedMenu = menuService.save(menu);
+    public ResponseEntity<Menu> createMenu(@RequestBody Map<String, Object> request) {
+        Long departmentId = request.get("departmentId") != null
+                ? Long.valueOf(request.get("departmentId").toString()) : null;
+        String name = (String) request.get("name");
+        String category = (String) request.get("category");
+
+        if (name == null || name.trim().isEmpty() || category == null || category.trim().isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        Menu savedMenu;
+        if (departmentId != null) {
+            savedMenu = menuService.createWithDepartment(departmentId, name.trim(), category.trim());
+        } else {
+            Menu menu = new Menu();
+            menu.setName(name.trim());
+            menu.setCategory(category.trim());
+            savedMenu = menuService.save(menu);
+        }
         return ResponseEntity.status(HttpStatus.CREATED).body(savedMenu);
     }
 

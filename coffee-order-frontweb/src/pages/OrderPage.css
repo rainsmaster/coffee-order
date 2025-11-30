@@ -147,26 +147,30 @@
   cursor: not-allowed;
 }
 
-/* 퍼스널 옵션 */
-.option-button {
-  padding: 0.6rem 1.2rem;
-  border: 1px dashed #999;
-  background: white;
-  color: #666;
+/* 퍼스널 옵션 - 텍스트 입력 */
+.personal-option-input {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
   border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 400;
-  transition: all 0.2s;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+  background-color: white;
+  box-sizing: border-box;
 }
 
-.option-button:hover:not(:disabled) {
+.personal-option-input:focus {
+  outline: none;
+  border-color: #666;
+}
+
+.personal-option-input:disabled {
   background-color: #f5f5f5;
+  cursor: not-allowed;
 }
 
-.option-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.personal-option-input::placeholder {
+  color: #999;
 }
 
 .option-display {
@@ -179,19 +183,6 @@
   align-items: center;
   font-size: 0.9rem;
   color: #555;
-}
-
-.option-clear {
-  background: none;
-  border: none;
-  color: #999;
-  font-size: 1.1rem;
-  cursor: pointer;
-  padding: 0 0.5rem;
-}
-
-.option-clear:hover {
-  color: #666;
 }
 
 /* 주문 버튼 */
@@ -669,5 +660,225 @@
   .option-chip {
     font-size: 0.8rem;
     padding: 0.4rem 0.75rem;
+  }
+}
+
+/* 수정 모드 스타일 */
+.order-form-card.edit-mode {
+  border: 2px solid #5a7d9a;
+  box-shadow: 0 0 0 3px rgba(90, 125, 154, 0.15);
+}
+
+.edit-mode-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: linear-gradient(135deg, #e8f4fd 0%, #d6eaf8 100%);
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.edit-mode-icon {
+  font-size: 1.25rem;
+}
+
+.edit-mode-text {
+  flex: 1;
+  font-size: 0.95rem;
+  color: #2c3e50;
+}
+
+.edit-mode-text strong {
+  color: #1a5276;
+}
+
+.edit-mode-cancel {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid #5a7d9a;
+  border-radius: 4px;
+  background: white;
+  color: #5a7d9a;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.edit-mode-cancel:hover {
+  background: #5a7d9a;
+  color: white;
+}
+
+/* 수정 버튼 그룹 */
+.edit-buttons {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.edit-buttons .order-button {
+  flex: 1;
+}
+
+.order-button.edit-confirm {
+  background: #5a7d9a;
+}
+
+.order-button.edit-confirm:hover {
+  background: #4a6d8a;
+}
+
+.order-button.edit-cancel {
+  background: #95a5a6;
+}
+
+.order-button.edit-cancel:hover {
+  background: #7f8c8d;
+}
+
+/* 수정 모드 반응형 */
+@media (max-width: 480px) {
+  .edit-mode-banner {
+    flex-wrap: wrap;
+  }
+
+  .edit-mode-text {
+    flex: 1 1 100%;
+    order: 1;
+  }
+
+  .edit-mode-icon {
+    order: 0;
+  }
+
+  .edit-mode-cancel {
+    order: 2;
+    margin-left: auto;
+    margin-top: 0.5rem;
+  }
+
+  .edit-buttons {
+    flex-direction: column;
+  }
+}
+
+/* 최근 주문 박스 */
+.latest-order-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #f8f9fa;
+  border: 1px solid #e0e4e8;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  gap: 0.75rem;
+}
+
+.latest-order-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.latest-order-label {
+  font-size: 0.8rem;
+  color: #888;
+  font-weight: 500;
+  background-color: #e8e8e8;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.latest-order-mode-badge {
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+}
+
+.latest-order-mode-badge.twosome {
+  background-color: #e8f4fd;
+  color: #1976d2;
+}
+
+.latest-order-mode-badge.custom {
+  background-color: #f5f5f5;
+  color: #666;
+}
+
+.latest-order-date {
+  font-size: 0.85rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.latest-order-menu {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.latest-order-option {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.reorder-button {
+  padding: 0.5rem 0.9rem;
+  background-color: #4a90a4;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.reorder-button:hover {
+  background-color: #3a7a94;
+}
+
+.reorder-button:active {
+  transform: scale(0.98);
+}
+
+.reorder-button.disabled,
+.reorder-button:disabled {
+  background-color: #ccc;
+  color: #888;
+  cursor: not-allowed;
+}
+
+.reorder-button.disabled:hover,
+.reorder-button:disabled:hover {
+  background-color: #ccc;
+}
+
+/* 최근 주문 박스 비활성화 */
+.latest-order-box.disabled {
+  background-color: #f0f0f0;
+  border-color: #ddd;
+  opacity: 0.8;
+}
+
+.latest-order-box.disabled .latest-order-menu,
+.latest-order-box.disabled .latest-order-option {
+  color: #999;
+}
+
+/* 최근 주문 박스 반응형 */
+@media (max-width: 480px) {
+  .latest-order-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .reorder-button {
+    width: 100%;
+    margin-top: 0.5rem;
   }
 }

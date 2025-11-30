@@ -22,6 +22,11 @@ public class Team {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Department department;
+
     @Column(nullable = false, length = 100)
     private String name;
 

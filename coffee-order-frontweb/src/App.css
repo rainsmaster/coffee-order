@@ -32,6 +32,46 @@ body {
   font-weight: 600;
 }
 
+/* 헤더 왼쪽 영역 (부서 선택기) */
+.header-left {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+}
+
+.department-selector {
+  background-color: rgba(255, 255, 255, 0.15);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: 0.35rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.department-selector:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.department-selector:focus {
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+.department-selector option {
+  background-color: #4a4a4a;
+  color: white;
+}
+
+.department-loading {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
 /* 네비게이션 */
 .App-nav {
   display: flex;
@@ -128,6 +168,16 @@ body {
   .App-main {
     padding: 0.75rem;
   }
+
+  .header-left {
+    position: static;
+    margin-bottom: 0.5rem;
+    text-align: center;
+  }
+
+  .department-selector {
+    min-width: 150px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -153,5 +203,11 @@ body {
 
   .App-main {
     padding: 0.5rem;
+  }
+
+  .department-selector {
+    font-size: 0.8rem;
+    padding: 0.3rem 0.5rem;
+    min-width: 130px;
   }
 }

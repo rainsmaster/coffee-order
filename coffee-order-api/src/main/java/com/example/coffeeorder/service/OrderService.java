@@ -3,11 +3,13 @@ package com.example.coffeeorder.service;
 import com.example.coffeeorder.dto.MenuSummaryDto;
 import com.example.coffeeorder.dto.OrderCreateDto;
 import com.example.coffeeorder.dto.OrderResponseDto;
+import com.example.coffeeorder.entity.Department;
 import com.example.coffeeorder.entity.Menu;
 import com.example.coffeeorder.entity.Order;
 import com.example.coffeeorder.entity.Team;
 import com.example.coffeeorder.entity.TwosomeMenu;
 import com.example.coffeeorder.mapper.OrderMapper;
+import com.example.coffeeorder.repository.DepartmentRepository;
 import com.example.coffeeorder.repository.MenuRepository;
 import com.example.coffeeorder.repository.OrderRepository;
 import com.example.coffeeorder.repository.TeamRepository;
@@ -30,19 +32,31 @@ public class OrderService {
     private final TeamRepository teamRepository;
     private final MenuRepository menuRepository;
     private final TwosomeMenuRepository twosomeMenuRepository;
+    private final DepartmentRepository departmentRepository;
     private final OrderMapper orderMapper;
 
     // 한국 시간 기준 ZoneId
     private static final ZoneId KOREA_ZONE = ZoneId.of("Asia/Seoul");
 
-    // 오늘 주문 전체 조회
+    // 오늘 주문 전체 조회 (하위 호환용)
     public List<Order> findTodayOrders() {
         return orderRepository.findByOrderDateAndDelYn(LocalDate.now(KOREA_ZONE), "N");
     }
 
-    // 특정 날짜 주문 조회
+    // 부서별 오늘 주문 조회
+    public List<Order> findTodayOrdersByDepartment(Long departmentId) {
+        return orderRepository.findByDepartmentIdAndOrderDateAndDelYn(
+            departmentId, LocalDate.now(KOREA_ZONE), "N");
+    }
+
+    // 특정 날짜 주문 조회 (하위 호환용)
     public List<Order> findOrdersByDate(LocalDate date) {
         return orderRepository.findByOrderDateAndDelYn(date, "N");
+    }
+
+    // 부서별 특정 날짜 주문 조회
+    public List<Order> findOrdersByDepartmentAndDate(Long departmentId, LocalDate date) {
+        return orderRepository.findByDepartmentIdAndOrderDateAndDelYn(departmentId, date, "N");
     }
 
     // ID로 조회
@@ -89,6 +103,15 @@ public class OrderService {
         order.setPersonalOption(dto.getPersonalOption());
         order.setOrderDate(orderDate);
 
+        // 부서 설정 (팀의 부서를 따라가거나 직접 지정)
+        if (dto.getDepartmentId() != null) {
+            Department department = departmentRepository.findById(dto.getDepartmentId())
+                    .orElseThrow(() -> new Exception("부서를 찾을 수 없습니다."));
+            order.setDepartment(department);
+        } else if (team.getDepartment() != null) {
+            order.setDepartment(team.getDepartment());
+        }
+
         // 메뉴 타입에 따라 처리
         String menuType = dto.getMenuType() != null ? dto.getMenuType() : "CUSTOM";
         order.setMenuType(menuType);
@@ -131,7 +154,21 @@ public class OrderService {
         Optional<Order> existingOrder = orderRepository.findById(id);
         if (existingOrder.isPresent()) {
             Order order = existingOrder.get();
-            order.setMenu(updatedOrder.getMenu());
+
+            // 메뉴 타입 업데이트
+            if (updatedOrder.getMenuType() != null) {
+                order.setMenuType(updatedOrder.getMenuType());
+            }
+
+            // 메뉴 타입에 따라 적절한 메뉴 설정
+            if ("TWOSOME".equals(updatedOrder.getMenuType())) {
+                order.setTwosomeMenu(updatedOrder.getTwosomeMenu());
+                order.setMenu(null);
+            } else {
+                order.setMenu(updatedOrder.getMenu());
+                order.setTwosomeMenu(null);
+            }
+
             order.setPersonalOption(updatedOrder.getPersonalOption());
             return orderRepository.save(order);
         }
@@ -178,6 +215,18 @@ public class OrderService {
             return orderRepository.findByTeamAndOrderDateAndDelYn(
                 team.get(),
                 LocalDate.now(KOREA_ZONE),
+                "N"
+            );
+        }
+        return Optional.empty();
+    }
+
+    // 특정 팀원의 최근 주문 조회
+    public Optional<Order> findLatestOrderByTeam(Long teamId) {
+        Optional<Team> team = teamRepository.findById(teamId);
+        if (team.isPresent()) {
+            return orderRepository.findTopByTeamAndDelYnOrderByOrderDateDescCreatedTimeDesc(
+                team.get(),
                 "N"
             );
         }

@@ -25,21 +25,33 @@ public class OrderController {
     private final OrderService orderService;
     private final SettingsService settingsService;
 
-    // 오늘 주문 전체 조회
+    // 오늘 주문 전체 조회 (부서별 필터링 지원)
     @GetMapping("/today")
-    public ResponseEntity<List<OrderResponseDto>> getTodayOrders() {
-        List<Order> orders = orderService.findTodayOrders();
+    public ResponseEntity<List<OrderResponseDto>> getTodayOrders(
+            @RequestParam(required = false) Long departmentId) {
+        List<Order> orders;
+        if (departmentId != null) {
+            orders = orderService.findTodayOrdersByDepartment(departmentId);
+        } else {
+            orders = orderService.findTodayOrders();
+        }
         List<OrderResponseDto> response = orders.stream()
                 .map(OrderResponseDto::from)
                 .toList();
         return ResponseEntity.ok(response);
     }
 
-    // 특정 날짜 주문 조회
+    // 특정 날짜 주문 조회 (부서별 필터링 지원)
     @GetMapping
     public ResponseEntity<List<OrderResponseDto>> getOrdersByDate(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<Order> orders = orderService.findOrdersByDate(date);
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) Long departmentId) {
+        List<Order> orders;
+        if (departmentId != null) {
+            orders = orderService.findOrdersByDepartmentAndDate(departmentId, date);
+        } else {
+            orders = orderService.findOrdersByDate(date);
+        }
         List<OrderResponseDto> response = orders.stream()
                 .map(OrderResponseDto::from)
                 .toList();
@@ -57,8 +69,15 @@ public class OrderController {
     // 주문 생성
     @PostMapping
     public ResponseEntity<Object> createOrder(@Valid @RequestBody OrderCreateDto orderDto) {
-        // 주문 가능 시간 체크
-        if (!settingsService.isOrderAvailable()) {
+        // 부서별 주문 가능 시간 체크
+        boolean isAvailable;
+        if (orderDto.getDepartmentId() != null) {
+            isAvailable = settingsService.isOrderAvailableByDepartment(orderDto.getDepartmentId());
+        } else {
+            isAvailable = settingsService.isOrderAvailable();
+        }
+
+        if (!isAvailable) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "주문 마감 시간이 지났습니다."));
         }
@@ -77,9 +96,19 @@ public class OrderController {
 
     // 주문 수정
     @PutMapping("/{id}")
-    public ResponseEntity<Object> updateOrder(@PathVariable Long id, @RequestBody Order order) {
-        // 주문 가능 시간 체크
-        if (!settingsService.isOrderAvailable()) {
+    public ResponseEntity<Object> updateOrder(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long departmentId,
+            @RequestBody Order order) {
+        // 부서별 주문 가능 시간 체크
+        boolean isAvailable;
+        if (departmentId != null) {
+            isAvailable = settingsService.isOrderAvailableByDepartment(departmentId);
+        } else {
+            isAvailable = settingsService.isOrderAvailable();
+        }
+
+        if (!isAvailable) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "주문 마감 시간이 지났습니다."));
         }
@@ -114,6 +143,14 @@ public class OrderController {
     public ResponseEntity<Order> getTodayOrderByTeam(@PathVariable Long teamId) {
         return orderService.findTodayOrderByTeam(teamId)
                 .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // 특정 팀원의 최근 주문 조회
+    @GetMapping("/team/{teamId}/latest")
+    public ResponseEntity<OrderResponseDto> getLatestOrderByTeam(@PathVariable Long teamId) {
+        return orderService.findLatestOrderByTeam(teamId)
+                .map(order -> ResponseEntity.ok(OrderResponseDto.from(order)))
                 .orElse(ResponseEntity.notFound().build());
     }
 }

@@ -2,9 +2,47 @@ import React, { useState } from 'react';
 import OrderPage from './pages/OrderPage';
 import ManagePage from './pages/ManagePage';
 import HistoryPage from './pages/HistoryPage';
+import { DepartmentProvider, useDepartment } from './context/DepartmentContext';
 import './App.css';
 
-function App() {
+// 부서 선택 드롭다운 컴포넌트
+function DepartmentSelector() {
+  const { departments, selectedDepartment, setSelectedDepartment, loading } = useDepartment();
+
+  if (loading) {
+    return <span className="department-loading">로딩...</span>;
+  }
+
+  return (
+    <select
+      className="department-selector"
+      value={selectedDepartment?.id || ''}
+      onChange={(e) => {
+        const dept = departments.find(d => d.id === parseInt(e.target.value));
+        setSelectedDepartment(dept);
+      }}
+    >
+      {departments.map((dept) => (
+        <option key={dept.id} value={dept.id}>
+          {dept.name}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+// 헤더 타이틀 컴포넌트
+function HeaderTitle() {
+  const { selectedDepartment, loading } = useDepartment();
+
+  if (loading) {
+    return <h1>커피주문</h1>;
+  }
+
+  return <h1>{selectedDepartment?.name || ''} 커피주문</h1>;
+}
+
+function AppContent() {
   const [currentPage, setCurrentPage] = useState('order');
 
   const renderPage = () => {
@@ -23,7 +61,10 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>상품서비스개발팀 커피주문</h1>
+        <div className="header-left">
+          <DepartmentSelector />
+        </div>
+        <HeaderTitle />
         <button
           className={`settings-button ${currentPage === 'manage' ? 'active' : ''}`}
           onClick={() => setCurrentPage('manage')}
@@ -68,6 +109,14 @@ function App() {
       </header>
       <main className="App-main">{renderPage()}</main>
     </div>
+  );
+}
+
+function App() {
+  return (
+    <DepartmentProvider>
+      <AppContent />
+    </DepartmentProvider>
   );
 }
 

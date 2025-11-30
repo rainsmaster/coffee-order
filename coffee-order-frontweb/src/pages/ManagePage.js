@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { teamAPI, menuAPI, settingsAPI, personalOptionAPI, twosomeMenuAPI } from '../services/api';
+import { teamAPI, menuAPI, settingsAPI, twosomeMenuAPI, orderAPI, departmentAPI } from '../services/api';
+import { useDepartment } from '../context/DepartmentContext';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -7,12 +8,13 @@ import useModal from '../hooks/useModal';
 import './ManagePage.css';
 
 const ManagePage = () => {
+  const { selectedDepartmentId, refreshDepartments } = useDepartment();
   const [activeTab, setActiveTab] = useState('team');
   const [teams, setTeams] = useState([]);
   const [menus, setMenus] = useState([]);
+  const [departments, setDepartments] = useState([]);
   const [settings, setSettings] = useState(null);
-  const [personalOptions, setPersonalOptions] = useState([]);
-  const [twosomeMenus, setTwosomeMenus] = useState({});
+  const [todayOrderCount, setTodayOrderCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,8 +34,13 @@ const ManagePage = () => {
   } = useModal();
 
   useEffect(() => {
-    loadData();
-  }, [activeTab]);
+    // 부서 탭은 selectedDepartmentId 없이도 로드 가능
+    if (activeTab === 'department') {
+      loadData();
+    } else if (selectedDepartmentId) {
+      loadData();
+    }
+  }, [activeTab, selectedDepartmentId]);
 
   // 동기화 진행 상태 폴링
   useEffect(() => {
@@ -54,9 +61,6 @@ const ManagePage = () => {
             clearInterval(intervalId);
           }
           showAlert('동기화가 완료되었습니다.');
-          if (activeTab === 'twosomeMenu') {
-            loadData();
-          }
         } else if (status.status === 'FAILED') {
           // 실패 시 UI 리셋 및 알림
           setIsSyncing(false);
@@ -92,27 +96,27 @@ const ManagePage = () => {
         clearInterval(intervalId);
       }
     };
-  }, [isSyncing, activeTab]);
+  }, [isSyncing]);
 
   const loadData = async () => {
     try {
       if (activeTab === 'team') {
-        const data = await teamAPI.getAll();
+        const data = await teamAPI.getAll(selectedDepartmentId);
         setTeams(data);
       } else if (activeTab === 'menu') {
-        const data = await menuAPI.getAll();
+        const data = await menuAPI.getAll(selectedDepartmentId);
         // 카테고리별 그룹화된 데이터를 평면화
         const flatMenus = Object.values(data).flat();
         setMenus(flatMenus);
       } else if (activeTab === 'settings') {
-        const data = await settingsAPI.get();
+        const data = await settingsAPI.get(selectedDepartmentId);
         setSettings(data);
-      } else if (activeTab === 'personalOption') {
-        const data = await personalOptionAPI.getAllList();
-        setPersonalOptions(data);
-      } else if (activeTab === 'twosomeMenu') {
-        const data = await twosomeMenuAPI.getAll();
-        setTwosomeMenus(data);
+        // 오늘 주문 개수 확인
+        const todayOrders = await orderAPI.getToday(selectedDepartmentId);
+        setTodayOrderCount(todayOrders.length);
+      } else if (activeTab === 'department') {
+        const data = await departmentAPI.getAll();
+        setDepartments(data);
       }
     } catch (err) {
       console.error('데이터 로드 실패:', err);
@@ -135,7 +139,7 @@ const ManagePage = () => {
   const handleSaveTeam = async () => {
     try {
       if (modalMode === 'create') {
-        await teamAPI.create(formData);
+        await teamAPI.create({ ...formData, departmentId: selectedDepartmentId });
       } else {
         await teamAPI.update(formData.id, formData);
       }
@@ -173,7 +177,7 @@ const ManagePage = () => {
   const handleSaveMenu = async () => {
     try {
       if (modalMode === 'create') {
-        await menuAPI.create(formData);
+        await menuAPI.create({ ...formData, departmentId: selectedDepartmentId });
       } else {
         await menuAPI.update(formData.id, formData);
       }
@@ -195,52 +199,67 @@ const ManagePage = () => {
     });
   };
 
-  // 설정 관리
-  const handleSaveSettings = async () => {
-    try {
-      await settingsAPI.update(settings);
-      showAlert('설정이 저장되었습니다.');
-    } catch (err) {
-      showAlert('저장 실패했습니다.');
-    }
-  };
-
-  // 퍼스널 옵션 관리
-  const handleCreatePersonalOption = () => {
+  // 부서 관리
+  const handleCreateDepartment = () => {
     setModalMode('create');
-    setFormData({ name: '', category: '샷', sortOrd: 0 });
+    setFormData({ name: '' });
     setIsModalOpen(true);
   };
 
-  const handleEditPersonalOption = (option) => {
+  const handleEditDepartment = (department) => {
     setModalMode('edit');
-    setFormData(option);
+    setFormData(department);
     setIsModalOpen(true);
   };
 
-  const handleSavePersonalOption = async () => {
+  const handleSaveDepartment = async () => {
     try {
       if (modalMode === 'create') {
-        await personalOptionAPI.create(formData);
+        await departmentAPI.create(formData);
       } else {
-        await personalOptionAPI.update(formData.id, formData);
+        await departmentAPI.update(formData.id, formData);
       }
       setIsModalOpen(false);
       loadData();
+      refreshDepartments(); // 헤더의 부서 드롭다운도 업데이트
     } catch (err) {
       showAlert('저장 실패했습니다.');
     }
   };
 
-  const handleDeletePersonalOption = async (id) => {
-    showConfirm('삭제하시겠습니까?', async () => {
+  const handleDeleteDepartment = async (id) => {
+    if (id === selectedDepartmentId) {
+      showAlert('현재 선택된 부서는 삭제할 수 없습니다.');
+      return;
+    }
+    showConfirm('부서를 삭제하면 해당 부서의 모든 데이터(팀원, 메뉴, 주문, 설정)가 삭제됩니다. 삭제하시겠습니까?', async () => {
       try {
-        await personalOptionAPI.delete(id);
+        await departmentAPI.delete(id);
         loadData();
+        refreshDepartments(); // 헤더의 부서 드롭다운도 업데이트
       } catch (err) {
         showAlert('삭제 실패했습니다.');
       }
     });
+  };
+
+  // 메뉴 모드 변경 처리
+  const handleMenuModeChange = (newMode) => {
+    if (todayOrderCount > 0 && newMode !== settings.menuMode) {
+      showAlert(`오늘 주문 내역이 ${todayOrderCount}건 있습니다.\n주문이 있는 상태에서는 메뉴 모드를 변경할 수 없습니다.`);
+      return;
+    }
+    setSettings({ ...settings, menuMode: newMode });
+  };
+
+  // 설정 관리
+  const handleSaveSettings = async () => {
+    try {
+      await settingsAPI.update(settings, selectedDepartmentId);
+      showAlert('설정이 저장되었습니다.');
+    } catch (err) {
+      showAlert('저장 실패했습니다.');
+    }
   };
 
   // 투썸 메뉴 전체 동기화 (메뉴 + 이미지 + 옵션)
@@ -259,7 +278,6 @@ const ManagePage = () => {
 
       const result = await twosomeMenuAPI.sync();
       showAlert(result.message || '동기화가 완료되었습니다.');
-      loadData();
       setIsSyncing(false);
       setSyncProgress(null);
     } catch (err) {
@@ -288,6 +306,12 @@ const ManagePage = () => {
     <div className="manage-page">
       <div className="manage-tabs">
         <button
+          className={activeTab === 'department' ? 'active' : ''}
+          onClick={() => setActiveTab('department')}
+        >
+          부서 관리
+        </button>
+        <button
           className={activeTab === 'team' ? 'active' : ''}
           onClick={() => setActiveTab('team')}
         >
@@ -300,18 +324,6 @@ const ManagePage = () => {
           메뉴 관리
         </button>
         <button
-          className={activeTab === 'personalOption' ? 'active' : ''}
-          onClick={() => setActiveTab('personalOption')}
-        >
-          퍼스널 옵션
-        </button>
-        <button
-          className={activeTab === 'twosomeMenu' ? 'active' : ''}
-          onClick={() => setActiveTab('twosomeMenu')}
-        >
-          투썸 메뉴
-        </button>
-        <button
           className={activeTab === 'settings' ? 'active' : ''}
           onClick={() => setActiveTab('settings')}
         >
@@ -320,6 +332,37 @@ const ManagePage = () => {
       </div>
 
       <div className="manage-content">
+        {/* 부서 관리 */}
+        {activeTab === 'department' && (
+          <div>
+            <div className="section-header">
+              <h2>부서 목록</h2>
+              <button className="btn-add" onClick={handleCreateDepartment}>
+                + 부서 추가
+              </button>
+            </div>
+            <div className="list-grid">
+              {departments.map((dept) => (
+                <div key={dept.id} className={`list-item ${dept.id === selectedDepartmentId ? 'current' : ''}`}>
+                  <span>
+                    {dept.name}
+                    {dept.id === selectedDepartmentId && <span className="current-badge">현재</span>}
+                  </span>
+                  <div className="item-actions">
+                    <button onClick={() => handleEditDepartment(dept)}>수정</button>
+                    <button
+                      onClick={() => handleDeleteDepartment(dept.id)}
+                      disabled={dept.id === selectedDepartmentId}
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* 팀원 관리 */}
         {activeTab === 'team' && (
           <div>
@@ -369,99 +412,6 @@ const ManagePage = () => {
           </div>
         )}
 
-        {/* 퍼스널 옵션 관리 */}
-        {activeTab === 'personalOption' && (
-          <div>
-            <div className="section-header">
-              <h2>퍼스널 옵션 목록</h2>
-              <button className="btn-add" onClick={handleCreatePersonalOption}>
-                + 옵션 추가
-              </button>
-            </div>
-            <div className="list-grid">
-              {personalOptions.map((option) => (
-                <div key={option.id} className="list-item">
-                  <div>
-                    <strong>{option.name}</strong>
-                    <div className="item-category">{option.category}</div>
-                  </div>
-                  <div className="item-actions">
-                    <button onClick={() => handleEditPersonalOption(option)}>수정</button>
-                    <button onClick={() => handleDeletePersonalOption(option.id)}>삭제</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 투썸 메뉴 */}
-        {activeTab === 'twosomeMenu' && (
-          <div>
-            <div className="section-header">
-              <h2>투썸 메뉴 목록</h2>
-              <button
-                className="btn-add"
-                onClick={handleSyncTwosomeMenu}
-                disabled={isSyncing}
-              >
-                {isSyncing ? '동기화 중...' : '메뉴 동기화'}
-              </button>
-            </div>
-
-            {/* 동기화 진행률 표시 */}
-            {isSyncing && syncProgress && (
-              <div className="sync-progress-container">
-                <div className="sync-progress-header">
-                  <span className="sync-status">
-                    {syncProgress.status === 'RUNNING' && '🔄 '}
-                    {syncProgress.status === 'COMPLETED' && '✅ '}
-                    {syncProgress.status === 'FAILED' && '❌ '}
-                    {syncProgress.currentStepName || '동기화 진행 중...'}
-                  </span>
-                  <span className="sync-percentage">{syncProgress.overallProgress || 0}%</span>
-                </div>
-                <div className="sync-progress-bar">
-                  <div
-                    className="sync-progress-fill"
-                    style={{ width: `${syncProgress.overallProgress || 0}%` }}
-                  />
-                </div>
-                {syncProgress.processedCount > 0 && syncProgress.totalCount > 0 && (
-                  <div className="sync-progress-detail">
-                    처리 중: {syncProgress.processedCount} / {syncProgress.totalCount}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <p className="sync-info">
-              메뉴 정보, 이미지, 온도/사이즈 옵션을 동기화합니다. (약 3~5분 소요, 매일 새벽 3시 자동 실행)
-            </p>
-            {Object.keys(twosomeMenus).length === 0 ? (
-              <p className="empty-message">동기화된 메뉴가 없습니다. 메뉴 동기화 버튼을 클릭하세요.</p>
-            ) : (
-              Object.entries(twosomeMenus).map(([category, items]) => (
-                <div key={category} className="twosome-category">
-                  <h3>{category} ({items.length})</h3>
-                  <div className="twosome-menu-grid">
-                    {items.map((menu) => (
-                      <div key={menu.id} className="twosome-menu-item">
-                        <img
-                          src={menu.localImgPath || `https://mcdn.twosome.co.kr${menu.menuImg02 || menu.menuImg}`}
-                          alt={menu.menuNm}
-                          onError={(e) => { e.target.src = 'https://via.placeholder.com/80?text=No+Image'; }}
-                        />
-                        <span>{menu.menuNm}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-
         {/* 설정 */}
         {activeTab === 'settings' && settings && (
           <div>
@@ -470,28 +420,31 @@ const ManagePage = () => {
               {/* 메뉴 모드 선택 */}
               <div className="form-group">
                 <label className="form-label">메뉴 모드</label>
+                {todayOrderCount > 0 && (
+                  <p className="form-warning">
+                    오늘 주문이 {todayOrderCount}건 있어 메뉴 모드를 변경할 수 없습니다.
+                  </p>
+                )}
                 <div className="radio-group">
-                  <label className="radio-label">
+                  <label className={`radio-label ${todayOrderCount > 0 ? 'disabled' : ''}`}>
                     <input
                       type="radio"
                       name="menuMode"
                       value="CUSTOM"
                       checked={settings.menuMode === 'CUSTOM'}
-                      onChange={(e) =>
-                        setSettings({ ...settings, menuMode: e.target.value })
-                      }
+                      onChange={(e) => handleMenuModeChange(e.target.value)}
+                      disabled={todayOrderCount > 0}
                     />
                     커스텀 메뉴 (직접 관리)
                   </label>
-                  <label className="radio-label">
+                  <label className={`radio-label ${todayOrderCount > 0 ? 'disabled' : ''}`}>
                     <input
                       type="radio"
                       name="menuMode"
                       value="TWOSOME"
                       checked={settings.menuMode === 'TWOSOME'}
-                      onChange={(e) =>
-                        setSettings({ ...settings, menuMode: e.target.value })
-                      }
+                      onChange={(e) => handleMenuModeChange(e.target.value)}
+                      disabled={todayOrderCount > 0}
                     />
                     투썸 메뉴 (자동 동기화)
                   </label>
@@ -499,8 +452,50 @@ const ManagePage = () => {
                 <p className="form-hint">
                   {settings.menuMode === 'CUSTOM'
                     ? '메뉴 관리 탭에서 메뉴를 직접 추가/수정할 수 있습니다.'
-                    : '투썸 메뉴 탭에서 동기화된 메뉴를 확인할 수 있습니다.'}
+                    : '투썸 메뉴를 자동으로 동기화하여 사용합니다.'}
                 </p>
+
+                {/* 투썸 메뉴 동기화 버튼 (TWOSOME 모드일 때만 표시) */}
+                {settings.menuMode === 'TWOSOME' && (
+                  <div className="sync-section">
+                    <button
+                      className="btn-sync"
+                      onClick={handleSyncTwosomeMenu}
+                      disabled={isSyncing}
+                    >
+                      {isSyncing ? '동기화 중...' : '투썸 메뉴 동기화'}
+                    </button>
+                    <p className="sync-info">
+                      메뉴 정보, 이미지, 온도/사이즈 옵션을 동기화합니다. (약 3~5분 소요, 매일 새벽 3시 자동 실행)
+                    </p>
+
+                    {/* 동기화 진행률 표시 */}
+                    {isSyncing && syncProgress && (
+                      <div className="sync-progress-container">
+                        <div className="sync-progress-header">
+                          <span className="sync-status">
+                            {syncProgress.status === 'RUNNING' && '🔄 '}
+                            {syncProgress.status === 'COMPLETED' && '✅ '}
+                            {syncProgress.status === 'FAILED' && '❌ '}
+                            {syncProgress.currentStepName || '동기화 진행 중...'}
+                          </span>
+                          <span className="sync-percentage">{syncProgress.overallProgress || 0}%</span>
+                        </div>
+                        <div className="sync-progress-bar">
+                          <div
+                            className="sync-progress-fill"
+                            style={{ width: `${syncProgress.overallProgress || 0}%` }}
+                          />
+                        </div>
+                        {syncProgress.processedCount > 0 && syncProgress.totalCount > 0 && (
+                          <div className="sync-progress-detail">
+                            처리 중: {syncProgress.processedCount} / {syncProgress.totalCount}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <hr className="settings-divider" />
@@ -551,22 +546,32 @@ const ManagePage = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={
-          activeTab === 'team'
+          activeTab === 'department'
             ? modalMode === 'create'
-              ? '팀원 추가'
-              : '팀원 수정'
-            : activeTab === 'menu'
-            ? modalMode === 'create'
-              ? '메뉴 추가'
-              : '메뉴 수정'
-            : activeTab === 'personalOption'
-            ? modalMode === 'create'
-              ? '퍼스널 옵션 추가'
-              : '퍼스널 옵션 수정'
-            : ''
+              ? '부서 추가'
+              : '부서 수정'
+            : activeTab === 'team'
+              ? modalMode === 'create'
+                ? '팀원 추가'
+                : '팀원 수정'
+              : modalMode === 'create'
+                ? '메뉴 추가'
+                : '메뉴 수정'
         }
       >
         <div className="modal-form">
+          {activeTab === 'department' && (
+            <>
+              <label>부서명</label>
+              <input
+                type="text"
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="부서명을 입력하세요"
+              />
+            </>
+          )}
+
           {activeTab === 'team' && (
             <>
               <label>이름</label>
@@ -604,48 +609,15 @@ const ManagePage = () => {
             </>
           )}
 
-          {activeTab === 'personalOption' && (
-            <>
-              <label>옵션명</label>
-              <input
-                type="text"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="옵션명을 입력하세요"
-              />
-              <label>카테고리</label>
-              <select
-                value={formData.category || '샷'}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-              >
-                <option value="샷">샷</option>
-                <option value="시럽">시럽</option>
-                <option value="우유">우유</option>
-                <option value="휘핑">휘핑</option>
-                <option value="온도">온도</option>
-                <option value="기타">기타</option>
-              </select>
-              <label>정렬순서</label>
-              <input
-                type="number"
-                value={formData.sortOrd || 0}
-                onChange={(e) => setFormData({ ...formData, sortOrd: parseInt(e.target.value) || 0 })}
-                placeholder="정렬순서 (숫자)"
-              />
-            </>
-          )}
-
           <div className="modal-buttons">
             <button
               className="btn-primary"
               onClick={
-                activeTab === 'team'
-                  ? handleSaveTeam
-                  : activeTab === 'menu'
-                  ? handleSaveMenu
-                  : handleSavePersonalOption
+                activeTab === 'department'
+                  ? handleSaveDepartment
+                  : activeTab === 'team'
+                    ? handleSaveTeam
+                    : handleSaveMenu
               }
             >
               저장

@@ -21,6 +21,10 @@ public class Settings {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    private Department department;
+
     @Column(name = "order_deadline_time")
     private LocalTime orderDeadlineTime;
 

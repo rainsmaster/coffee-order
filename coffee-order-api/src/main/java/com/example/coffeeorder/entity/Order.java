@@ -23,12 +23,17 @@ public class Order {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "department_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Department department;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "menu_id")
+    @JoinColumn(name = "menu_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Menu menu;
 
