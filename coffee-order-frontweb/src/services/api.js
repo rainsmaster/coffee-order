@@ -82,7 +82,7 @@ export const teamAPI = {
 
 // ==================== Menu API ====================
 export const menuAPI = {
-  // 전체 메뉴 조회 (카테고리별 그룹화, 부서별 필터링)
+  // 전체 메뉴 조회 (부서별 필터링)
   getAll: (departmentId) => fetchAPI(departmentId ? `/menus?departmentId=${departmentId}` : '/menus'),
 
   // 메뉴 생성

@@ -9,7 +9,12 @@ import './ManagePage.css';
 
 const ManagePage = ({ initialTab }) => {
   const { selectedDepartment, selectedDepartmentId, setSelectedDepartment, refreshDepartments } = useDepartment();
-  const [activeTab, setActiveTab] = useState(initialTab || 'team');
+  // menu 탭은 더이상 없으므로 settings로 리다이렉트
+  const getInitialTab = () => {
+    if (initialTab === 'menu') return 'settings';
+    return initialTab || 'team';
+  };
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [teams, setTeams] = useState([]);
   const [menus, setMenus] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -19,6 +24,7 @@ const ManagePage = ({ initialTab }) => {
   const [syncProgress, setSyncProgress] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
+  const [modalType, setModalType] = useState(''); // 'department', 'team', 'menu'
   const [formData, setFormData] = useState({});
 
   // 커스텀 모달 훅
@@ -36,7 +42,8 @@ const ManagePage = ({ initialTab }) => {
   // initialTab props가 변경되면 activeTab 업데이트
   useEffect(() => {
     if (initialTab) {
-      setActiveTab(initialTab);
+      // menu 탭은 더이상 없으므로 settings로 리다이렉트
+      setActiveTab(initialTab === 'menu' ? 'settings' : initialTab);
     }
   }, [initialTab]);
 
@@ -110,16 +117,15 @@ const ManagePage = ({ initialTab }) => {
       if (activeTab === 'team') {
         const data = await teamAPI.getAll(selectedDepartmentId);
         setTeams(data);
-      } else if (activeTab === 'menu') {
-        const data = await menuAPI.getAll(selectedDepartmentId);
-        // 카테고리별 그룹화된 데이터를 평면화
-        const flatMenus = Object.values(data).flat();
-        setMenus(flatMenus);
       } else if (activeTab === 'settings') {
-        const data = await settingsAPI.get(selectedDepartmentId);
-        setSettings(data);
-        // 오늘 주문 개수 확인
-        const todayOrders = await orderAPI.getToday(selectedDepartmentId);
+        // 설정과 커스텀 메뉴 모두 로드
+        const [settingsData, menuData, todayOrders] = await Promise.all([
+          settingsAPI.get(selectedDepartmentId),
+          menuAPI.getAll(selectedDepartmentId),
+          orderAPI.getToday(selectedDepartmentId)
+        ]);
+        setSettings(settingsData);
+        setMenus(menuData);
         setTodayOrderCount(todayOrders.length);
       } else if (activeTab === 'department') {
         const data = await departmentAPI.getAll();
@@ -133,12 +139,14 @@ const ManagePage = ({ initialTab }) => {
   // 팀원 관리
   const handleCreateTeam = () => {
     setModalMode('create');
+    setModalType('team');
     setFormData({ name: '' });
     setIsModalOpen(true);
   };
 
   const handleEditTeam = (team) => {
     setModalMode('edit');
+    setModalType('team');
     setFormData(team);
     setIsModalOpen(true);
   };
@@ -171,12 +179,14 @@ const ManagePage = ({ initialTab }) => {
   // 메뉴 관리
   const handleCreateMenu = () => {
     setModalMode('create');
-    setFormData({ name: '', category: '커피' });
+    setModalType('menu');
+    setFormData({ name: '' });
     setIsModalOpen(true);
   };
 
   const handleEditMenu = (menu) => {
     setModalMode('edit');
+    setModalType('menu');
     setFormData(menu);
     setIsModalOpen(true);
   };
@@ -209,12 +219,14 @@ const ManagePage = ({ initialTab }) => {
   // 부서 관리
   const handleCreateDepartment = () => {
     setModalMode('create');
+    setModalType('department');
     setFormData({ name: '' });
     setIsModalOpen(true);
   };
 
   const handleEditDepartment = (department) => {
     setModalMode('edit');
+    setModalType('department');
     setFormData(department);
     setIsModalOpen(true);
   };
@@ -325,16 +337,10 @@ const ManagePage = ({ initialTab }) => {
           팀원 관리
         </button>
         <button
-          className={activeTab === 'menu' ? 'active' : ''}
-          onClick={() => setActiveTab('menu')}
-        >
-          메뉴 관리
-        </button>
-        <button
           className={activeTab === 'settings' ? 'active' : ''}
           onClick={() => setActiveTab('settings')}
         >
-          설정
+          주문 설정
         </button>
       </div>
 
@@ -403,37 +409,10 @@ const ManagePage = ({ initialTab }) => {
           </div>
         )}
 
-        {/* 메뉴 관리 */}
-        {activeTab === 'menu' && (
-          <div>
-            <div className="section-header">
-              <h2>메뉴 목록</h2>
-              <button className="btn-add" onClick={handleCreateMenu}>
-                + 메뉴 추가
-              </button>
-            </div>
-            <div className="list-grid">
-              {menus.map((menu) => (
-                <div key={menu.id} className="list-item">
-                  <div>
-                    <strong>{menu.name}</strong>
-                    <div className="item-category">{menu.category}</div>
-                  </div>
-                  <div className="item-actions">
-                    <button onClick={() => handleEditMenu(menu)}>수정</button>
-                    <button onClick={() => handleDeleteMenu(menu.id)}>삭제</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 설정 */}
+        {/* 주문 설정 */}
         {activeTab === 'settings' && settings && (
-          <div>
-            <h2>설정</h2>
-            <div className="settings-form">
+          <div className="settings-form">
+            <h2>주문 설정 <span className="department-badge">({selectedDepartment?.name})</span></h2>
               {/* 메뉴 모드 선택 */}
               <div className="form-group">
                 <label className="form-label">메뉴 모드</label>
@@ -442,75 +421,106 @@ const ManagePage = ({ initialTab }) => {
                     오늘 주문이 {todayOrderCount}건 있어 메뉴 모드를 변경할 수 없습니다.
                   </p>
                 )}
-                <div className="radio-group">
-                  <label className={`radio-label ${todayOrderCount > 0 ? 'disabled' : ''}`}>
-                    <input
-                      type="radio"
-                      name="menuMode"
-                      value="CUSTOM"
-                      checked={settings.menuMode === 'CUSTOM'}
-                      onChange={(e) => handleMenuModeChange(e.target.value)}
-                      disabled={todayOrderCount > 0}
-                    />
-                    커스텀 메뉴 (직접 관리)
-                  </label>
-                  <label className={`radio-label ${todayOrderCount > 0 ? 'disabled' : ''}`}>
-                    <input
-                      type="radio"
-                      name="menuMode"
-                      value="TWOSOME"
-                      checked={settings.menuMode === 'TWOSOME'}
-                      onChange={(e) => handleMenuModeChange(e.target.value)}
-                      disabled={todayOrderCount > 0}
-                    />
-                    투썸 메뉴 (자동 동기화)
-                  </label>
+
+                {/* 선택형 카드 UI */}
+                <div className="mode-card-group">
+                  <button
+                    type="button"
+                    className={`mode-card ${settings.menuMode === 'CUSTOM' ? 'selected' : ''} ${todayOrderCount > 0 ? 'disabled' : ''}`}
+                    onClick={() => handleMenuModeChange('CUSTOM')}
+                    disabled={todayOrderCount > 0}
+                  >
+                    <div className="mode-card-header">
+                      <span className="mode-card-title">커스텀 메뉴</span>
+                      {settings.menuMode === 'CUSTOM' && <span className="mode-card-check">✓</span>}
+                    </div>
+                    <p className="mode-card-desc">직접 메뉴를 등록하여 관리합니다</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={`mode-card ${settings.menuMode === 'TWOSOME' ? 'selected' : ''} ${todayOrderCount > 0 ? 'disabled' : ''}`}
+                    onClick={() => handleMenuModeChange('TWOSOME')}
+                    disabled={todayOrderCount > 0}
+                  >
+                    <div className="mode-card-header">
+                      <span className="mode-card-title">투썸 메뉴</span>
+                      {settings.menuMode === 'TWOSOME' && <span className="mode-card-check">✓</span>}
+                    </div>
+                    <p className="mode-card-desc">투썸플레이스 메뉴를 자동 동기화</p>
+                  </button>
                 </div>
-                <p className="form-hint">
-                  {settings.menuMode === 'CUSTOM'
-                    ? '메뉴 관리 탭에서 메뉴를 직접 추가/수정할 수 있습니다.'
-                    : '투썸 메뉴를 자동으로 동기화하여 사용합니다.'}
-                </p>
 
-                {/* 투썸 메뉴 동기화 버튼 (TWOSOME 모드일 때만 표시) */}
-                {settings.menuMode === 'TWOSOME' && (
-                  <div className="sync-section">
-                    <button
-                      className="btn-sync"
-                      onClick={handleSyncTwosomeMenu}
-                      disabled={isSyncing}
-                    >
-                      {isSyncing ? '동기화 중...' : '투썸 메뉴 동기화'}
-                    </button>
-                    <p className="sync-info">
-                      메뉴 정보, 이미지, 온도/사이즈 옵션을 동기화합니다. (약 3~5분 소요, 매일 새벽 3시 자동 실행)
-                    </p>
-
-                    {/* 동기화 진행률 표시 */}
-                    {isSyncing && syncProgress && (
-                      <div className="sync-progress-container">
-                        <div className="sync-progress-header">
-                          <span className="sync-status">
-                            {syncProgress.status === 'RUNNING' && '🔄 '}
-                            {syncProgress.status === 'COMPLETED' && '✅ '}
-                            {syncProgress.status === 'FAILED' && '❌ '}
-                            {syncProgress.currentStepName || '동기화 진행 중...'}
-                          </span>
-                          <span className="sync-percentage">{syncProgress.overallProgress || 0}%</span>
-                        </div>
-                        <div className="sync-progress-bar">
-                          <div
-                            className="sync-progress-fill"
-                            style={{ width: `${syncProgress.overallProgress || 0}%` }}
-                          />
-                        </div>
-                        {syncProgress.processedCount > 0 && syncProgress.totalCount > 0 && (
-                          <div className="sync-progress-detail">
-                            처리 중: {syncProgress.processedCount} / {syncProgress.totalCount}
-                          </div>
-                        )}
+                {/* 커스텀 메뉴 모드일 때: 메뉴 관리 UI */}
+                {settings.menuMode === 'CUSTOM' && (
+                  <div className="menu-mode-content">
+                    <div className="custom-menu-section">
+                      <div className="custom-menu-header">
+                        <span className="menu-count">등록된 메뉴 ({menus.length}개)</span>
                       </div>
-                    )}
+                      {menus.length > 0 ? (
+                        <div className="custom-menu-list">
+                          {menus.map((menu) => (
+                            <div key={menu.id} className="custom-menu-item">
+                              <span className="menu-name">{menu.name}</span>
+                              <div className="menu-actions">
+                                <button className="btn-edit" onClick={() => handleEditMenu(menu)}>수정</button>
+                                <button className="btn-delete" onClick={() => handleDeleteMenu(menu.id)}>삭제</button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="empty-menu-message">
+                          등록된 메뉴가 없습니다
+                        </div>
+                      )}
+                      <button className="btn-add-menu-bottom" onClick={handleCreateMenu}>
+                        + 메뉴 추가하기
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 투썸 메뉴 모드일 때: 동기화 UI */}
+                {settings.menuMode === 'TWOSOME' && (
+                  <div className="menu-mode-content">
+                    <div className="sync-section">
+                      <button
+                        className="btn-sync"
+                        onClick={handleSyncTwosomeMenu}
+                        disabled={isSyncing}
+                      >
+                        {isSyncing ? '동기화 중...' : '메뉴 동기화'}
+                      </button>
+                      <p className="sync-info">
+                        메뉴 정보, 이미지, 온도/사이즈 옵션을 동기화합니다.<br/>
+                        (약 3~5분 소요, 매일 새벽 3시 자동 실행)
+                      </p>
+
+                      {/* 동기화 진행률 표시 */}
+                      {isSyncing && syncProgress && (
+                        <div className="sync-progress-container">
+                          <div className="sync-progress-header">
+                            <span className="sync-status">
+                              {syncProgress.currentStepName || '동기화 진행 중...'}
+                            </span>
+                            <span className="sync-percentage">{syncProgress.overallProgress || 0}%</span>
+                          </div>
+                          <div className="sync-progress-bar">
+                            <div
+                              className="sync-progress-fill"
+                              style={{ width: `${syncProgress.overallProgress || 0}%` }}
+                            />
+                          </div>
+                          {syncProgress.processedCount > 0 && syncProgress.totalCount > 0 && (
+                            <div className="sync-progress-detail">
+                              처리 중: {syncProgress.processedCount} / {syncProgress.totalCount}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -553,7 +563,6 @@ const ManagePage = ({ initialTab }) => {
               <button className="btn-save" onClick={handleSaveSettings}>
                 설정 저장
               </button>
-            </div>
           </div>
         )}
       </div>
@@ -563,11 +572,11 @@ const ManagePage = ({ initialTab }) => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         title={
-          activeTab === 'department'
+          modalType === 'department'
             ? modalMode === 'create'
               ? '부서 추가'
               : '부서 수정'
-            : activeTab === 'team'
+            : modalType === 'team'
               ? modalMode === 'create'
                 ? '팀원 추가'
                 : '팀원 수정'
@@ -577,7 +586,7 @@ const ManagePage = ({ initialTab }) => {
         }
       >
         <div className="modal-form">
-          {activeTab === 'department' && (
+          {modalType === 'department' && (
             <>
               <label>부서명</label>
               <input
@@ -589,7 +598,7 @@ const ManagePage = ({ initialTab }) => {
             </>
           )}
 
-          {activeTab === 'team' && (
+          {modalType === 'team' && (
             <>
               <label>이름</label>
               <input
@@ -601,7 +610,7 @@ const ManagePage = ({ initialTab }) => {
             </>
           )}
 
-          {activeTab === 'menu' && (
+          {modalType === 'menu' && (
             <>
               <label>메뉴명</label>
               <input
@@ -610,19 +619,6 @@ const ManagePage = ({ initialTab }) => {
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="메뉴명을 입력하세요"
               />
-              <label>카테고리</label>
-              <select
-                value={formData.category || '커피'}
-                onChange={(e) =>
-                  setFormData({ ...formData, category: e.target.value })
-                }
-              >
-                <option value="커피">커피</option>
-                <option value="디카페인 커피">디카페인 커피</option>
-                <option value="음료">음료</option>
-                <option value="티/티라떼">티/티라떼</option>
-                <option value="아이스크림/빙수">아이스크림/빙수</option>
-              </select>
             </>
           )}
 
@@ -630,9 +626,9 @@ const ManagePage = ({ initialTab }) => {
             <button
               className="btn-primary"
               onClick={
-                activeTab === 'department'
+                modalType === 'department'
                   ? handleSaveDepartment
-                  : activeTab === 'team'
+                  : modalType === 'team'
                     ? handleSaveTeam
                     : handleSaveMenu
               }

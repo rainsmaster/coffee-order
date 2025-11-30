@@ -105,9 +105,10 @@ const HistoryPage = () => {
       const menuName = order.menuType === 'TWOSOME'
         ? order.twosomeMenuName
         : order.menuName;
+      // 투썸 메뉴만 카테고리가 있음
       const category = order.menuType === 'TWOSOME'
         ? order.twosomeMenuCategory
-        : order.menuCategory;
+        : '커스텀 메뉴';
 
       if (!menuName) return;
 

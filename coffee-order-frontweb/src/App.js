@@ -100,10 +100,15 @@ function AppContent() {
     setCurrentPage('manage');
   };
 
+  const handleAddMenu = () => {
+    setManageInitialTab('settings');
+    setCurrentPage('manage');
+  };
+
   const renderPage = () => {
     switch (currentPage) {
       case 'order':
-        return <OrderPage onAddTeamMember={handleAddTeamMember} />;
+        return <OrderPage onAddTeamMember={handleAddTeamMember} onAddMenu={handleAddMenu} />;
       case 'manage':
         return <ManagePage initialTab={manageInitialTab} />;
       case 'history':

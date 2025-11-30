@@ -15,13 +15,13 @@ import java.util.Optional;
 public interface MenuRepository extends JpaRepository<Menu, Long> {
     List<Menu> findByDelYn(String delYn);
 
-    List<Menu> findByDelYnOrderByCategory(String delYn);
+    List<Menu> findByDelYnOrderByNameAsc(String delYn);
 
     // 부서별 메뉴 조회
-    List<Menu> findByDepartmentAndDelYnOrderByCategory(Department department, String delYn);
+    List<Menu> findByDepartmentAndDelYnOrderByNameAsc(Department department, String delYn);
 
     // 부서 ID로 메뉴 조회
-    List<Menu> findByDepartmentIdAndDelYnOrderByCategory(Long departmentId, String delYn);
+    List<Menu> findByDepartmentIdAndDelYnOrderByNameAsc(Long departmentId, String delYn);
 
     // ID와 부서로 조회
     Optional<Menu> findByIdAndDepartment(Long id, Department department);

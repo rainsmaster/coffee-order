@@ -30,9 +30,6 @@ public class Menu {
     @Column(nullable = false, length = 100)
     private String name;
 
-    @Column(nullable = false, length = 50)
-    private String category;
-
     @Column(name = "del_yn", nullable = false, length = 1)
     private String delYn = "N";
 

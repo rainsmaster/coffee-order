@@ -32,9 +32,9 @@ public class MenuService {
         return menuRepository.findByDepartmentOrderByRecentOrderCount(departmentId, threeMonthsAgo);
     }
 
-    // 부서별 메뉴 조회 (카테고리 순)
+    // 부서별 메뉴 조회
     public List<Menu> findByDepartmentId(Long departmentId) {
-        return menuRepository.findByDepartmentIdAndDelYnOrderByCategory(departmentId, "N");
+        return menuRepository.findByDepartmentIdAndDelYnOrderByNameAsc(departmentId, "N");
     }
 
     // ID로 조회
@@ -50,14 +50,13 @@ public class MenuService {
 
     // 부서와 함께 메뉴 생성
     @Transactional
-    public Menu createWithDepartment(Long departmentId, String name, String category) {
+    public Menu createWithDepartment(Long departmentId, String name) {
         Department department = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new RuntimeException("부서를 찾을 수 없습니다."));
 
         Menu menu = new Menu();
         menu.setDepartment(department);
         menu.setName(name);
-        menu.setCategory(category);
         return menuRepository.save(menu);
     }
 

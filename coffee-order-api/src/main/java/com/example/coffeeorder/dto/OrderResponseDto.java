@@ -20,7 +20,6 @@ public class OrderResponseDto {
     private String teamName;
     private Long menuId;
     private String menuName;
-    private String menuCategory;
     private Long twosomeMenuId;
     private String twosomeMenuName;
     private String twosomeMenuCategory;
@@ -50,11 +49,9 @@ public class OrderResponseDto {
             dto.setTwosomeMenuCode(order.getTwosomeMenu().getMenuCd());
             dto.setMenuId(null);
             dto.setMenuName(null);
-            dto.setMenuCategory(null);
         } else if (order.getMenu() != null) {
             dto.setMenuId(order.getMenu().getId());
             dto.setMenuName(sanitize(order.getMenu().getName()));
-            dto.setMenuCategory(sanitize(order.getMenu().getCategory()));
             dto.setTwosomeMenuId(null);
             dto.setTwosomeMenuName(null);
             dto.setTwosomeMenuCategory(null);

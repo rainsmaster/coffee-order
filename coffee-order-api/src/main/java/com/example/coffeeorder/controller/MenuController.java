@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/menus")
@@ -19,9 +18,9 @@ public class MenuController {
 
     private final MenuService menuService;
 
-    // 메뉴 조회 (부서별, 카테고리별 그룹화)
+    // 메뉴 조회 (부서별)
     @GetMapping
-    public ResponseEntity<Map<String, List<Menu>>> getMenus(
+    public ResponseEntity<List<Menu>> getMenus(
             @RequestParam(required = false) Long departmentId) {
         List<Menu> menus;
         if (departmentId != null) {
@@ -30,11 +29,7 @@ public class MenuController {
             menus = menuService.findAllActiveOrderByPopularity();
         }
 
-        // 카테고리별로 그룹화
-        Map<String, List<Menu>> groupedMenus = menus.stream()
-                .collect(Collectors.groupingBy(Menu::getCategory));
-
-        return ResponseEntity.ok(groupedMenus);
+        return ResponseEntity.ok(menus);
     }
 
     // ID로 조회
@@ -51,19 +46,17 @@ public class MenuController {
         Long departmentId = request.get("departmentId") != null
                 ? Long.valueOf(request.get("departmentId").toString()) : null;
         String name = (String) request.get("name");
-        String category = (String) request.get("category");
 
-        if (name == null || name.trim().isEmpty() || category == null || category.trim().isEmpty()) {
+        if (name == null || name.trim().isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
 
         Menu savedMenu;
         if (departmentId != null) {
-            savedMenu = menuService.createWithDepartment(departmentId, name.trim(), category.trim());
+            savedMenu = menuService.createWithDepartment(departmentId, name.trim());
         } else {
             Menu menu = new Menu();
             menu.setName(name.trim());
-            menu.setCategory(category.trim());
             savedMenu = menuService.save(menu);
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(savedMenu);
@@ -75,7 +68,6 @@ public class MenuController {
         return menuService.findById(id)
                 .map(existingMenu -> {
                     existingMenu.setName(menu.getName());
-                    existingMenu.setCategory(menu.getCategory());
                     Menu updatedMenu = menuService.save(existingMenu);
                     return ResponseEntity.ok(updatedMenu);
                 })

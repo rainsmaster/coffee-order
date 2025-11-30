@@ -8,10 +8,10 @@ import ReorderModal from '../components/ReorderModal';
 import useModal from '../hooks/useModal';
 import './OrderPage.css';
 
-const OrderPage = ({ onAddTeamMember }) => {
+const OrderPage = ({ onAddTeamMember, onAddMenu }) => {
   const { selectedDepartmentId } = useDepartment();
   const [teams, setTeams] = useState([]);
-  const [menus, setMenus] = useState({});
+  const [menus, setMenus] = useState([]);
   const [twosomeMenus, setTwosomeMenus] = useState({});
   const [orders, setOrders] = useState([]);
   const [selectedTeam, setSelectedTeam] = useState('');
@@ -227,10 +227,8 @@ const OrderPage = ({ onAddTeamMember }) => {
       }
     } else if (selectedMenu) {
       // 커스텀 메뉴에서 찾기
-      for (const category of Object.values(menus)) {
-        const menu = category.find(m => m.id.toString() === selectedMenu);
-        if (menu) return menu.name;
-      }
+      const menu = menus.find(m => m.id.toString() === selectedMenu);
+      if (menu) return menu.name;
     }
     return '';
   };
@@ -378,19 +376,17 @@ const OrderPage = ({ onAddTeamMember }) => {
 
   // 현재 선택된 카테고리의 메뉴 목록
   const getCurrentMenus = () => {
-    if (!selectedCategory) return [];
     if (isTwosomeMode) {
+      if (!selectedCategory) return [];
       return twosomeMenus[selectedCategory] || [];
     }
-    return menus[selectedCategory] || [];
+    // 커스텀 모드: 메뉴 배열 반환
+    return menus;
   };
 
-  // 카테고리 목록
+  // 카테고리 목록 (투썸 메뉴만 사용)
   const getCategories = () => {
-    if (isTwosomeMode) {
-      return Object.keys(twosomeMenus);
-    }
-    return Object.keys(menus);
+    return Object.keys(twosomeMenus);
   };
 
   // 투썸 메뉴 선택 시 옵션 로드
@@ -543,71 +539,92 @@ const OrderPage = ({ onAddTeamMember }) => {
           );
         })()}
 
-        {/* 1단계: 카테고리 선택 */}
-        <div className="form-group">
-          <label>카테고리 선택 {isTwosomeMode && <span className="mode-badge">투썸 메뉴</span>}</label>
-          <div className="category-buttons">
-            {getCategories().map((category) => (
-              <button
-                key={category}
-                className={`category-btn ${selectedCategory === category ? 'selected' : ''}`}
-                onClick={() => handleCategorySelect(category)}
-                disabled={!orderAvailable}
-              >
-                {category}
-                {isTwosomeMode && twosomeMenus[category] && (
-                  <span className="category-count">({twosomeMenus[category].length})</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 2단계: 메뉴 선택 (카테고리 선택 후 표시) */}
-        {selectedCategory && (
+        {/* 커스텀 메뉴 모드 - 바로 메뉴 선택 */}
+        {!isTwosomeMode && (
           <div className="form-group">
             <label>메뉴 선택</label>
-
-            {/* CUSTOM 모드 */}
-            {!isTwosomeMode && (
-              <div className="menu-grid">
-                {getCurrentMenus().map((menu) => (
-                  <button
-                    key={menu.id}
-                    className={`menu-item ${
-                      selectedMenu === menu.id.toString() ? 'selected' : ''
-                    }`}
-                    onClick={() => setSelectedMenu(menu.id.toString())}
-                    disabled={!orderAvailable}
-                  >
-                    {menu.name}
-                  </button>
-                ))}
+            {getCurrentMenus().length === 0 ? (
+              <div className="empty-menu-notice">
+                <p>등록된 메뉴가 없습니다.</p>
+                <button
+                  className="btn-add-menu"
+                  onClick={() => onAddMenu && onAddMenu()}
+                >
+                  메뉴 추가하기
+                </button>
               </div>
+            ) : (
+              <>
+                <div className="menu-grid">
+                  {getCurrentMenus().map((menu) => (
+                    <button
+                      key={menu.id}
+                      className={`menu-item ${
+                        selectedMenu === menu.id.toString() ? 'selected' : ''
+                      }`}
+                      onClick={() => setSelectedMenu(menu.id.toString())}
+                      disabled={!orderAvailable}
+                    >
+                      {menu.name}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  className="btn-add-menu-inline"
+                  onClick={() => onAddMenu && onAddMenu()}
+                >
+                  + 메뉴 등록
+                </button>
+              </>
             )}
+          </div>
+        )}
 
-            {/* TWOSOME 모드 */}
-            {isTwosomeMode && (
-              <div className="twosome-card-grid">
-                {getCurrentMenus().map((menu) => (
-                  <button
-                    key={menu.id}
-                    className={`twosome-card ${
-                      selectedTwosomeMenu === menu.id.toString() ? 'selected' : ''
-                    }`}
-                    onClick={() => handleTwosomeMenuSelect(menu.id.toString(), menu.menuCd)}
-                    disabled={!orderAvailable}
-                  >
-                    <img
-                      src={menu.localImgPath || `https://mcdn.twosome.co.kr${menu.menuImg02 || menu.menuImg}`}
-                      alt={menu.menuNm}
-                      onError={(e) => { e.target.src = 'https://via.placeholder.com/120?text=No+Image'; }}
-                    />
-                    <span className="twosome-card-name">{menu.menuNm}</span>
-                  </button>
-                ))}
-              </div>
-            )}
+        {/* 투썸 메뉴 모드 - 1단계: 카테고리 선택 */}
+        {isTwosomeMode && (
+          <div className="form-group">
+            <label>메뉴 선택 <span className="mode-badge">투썸 메뉴</span></label>
+            <div className="category-buttons">
+              {getCategories().map((category) => (
+                <button
+                  key={category}
+                  className={`category-btn ${selectedCategory === category ? 'selected' : ''}`}
+                  onClick={() => handleCategorySelect(category)}
+                  disabled={!orderAvailable}
+                >
+                  {category}
+                  {twosomeMenus[category] && (
+                    <span className="category-count">({twosomeMenus[category].length})</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 투썸 메뉴 모드 - 2단계: 메뉴 선택 (카테고리 선택 후 표시) */}
+        {isTwosomeMode && selectedCategory && (
+          <div className="form-group">
+            <label>{selectedCategory} 메뉴</label>
+            <div className="twosome-card-grid">
+              {getCurrentMenus().map((menu) => (
+                <button
+                  key={menu.id}
+                  className={`twosome-card ${
+                    selectedTwosomeMenu === menu.id.toString() ? 'selected' : ''
+                  }`}
+                  onClick={() => handleTwosomeMenuSelect(menu.id.toString(), menu.menuCd)}
+                  disabled={!orderAvailable}
+                >
+                  <img
+                    src={menu.localImgPath || `https://mcdn.twosome.co.kr${menu.menuImg02 || menu.menuImg}`}
+                    alt={menu.menuNm}
+                    onError={(e) => { e.target.src = 'https://via.placeholder.com/120?text=No+Image'; }}
+                  />
+                  <span className="twosome-card-name">{menu.menuNm}</span>
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
