@@ -38,7 +38,7 @@ function HeaderTitle({ onTap }) {
 }
 
 // 부서 선택 바텀시트 내용
-function DepartmentList({ onSelect }) {
+function DepartmentList({ onSelect, onAddTeam }) {
   const { departments, selectedDepartment } = useDepartment();
 
   return (
@@ -55,6 +55,25 @@ function DepartmentList({ onSelect }) {
           )}
         </button>
       ))}
+      <button className="department-list-item add-team" onClick={onAddTeam}>
+        <span className="add-team-content">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+            className="add-icon"
+          >
+            <path
+              d="M12 5v14M5 12h14"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          부서 추가하기
+        </span>
+      </button>
     </>
   );
 }
@@ -67,6 +86,11 @@ function AppContent() {
   const handleDepartmentSelect = (dept) => {
     setSelectedDepartment(dept);
     setIsDepartmentSheetOpen(false);
+  };
+
+  const handleAddTeam = () => {
+    setIsDepartmentSheetOpen(false);
+    setCurrentPage('manage');
   };
 
   const renderPage = () => {
@@ -95,7 +119,7 @@ function AppContent() {
         onClose={() => setIsDepartmentSheetOpen(false)}
         title="부서 선택"
       >
-        <DepartmentList onSelect={handleDepartmentSelect} />
+        <DepartmentList onSelect={handleDepartmentSelect} onAddTeam={handleAddTeam} />
       </BottomSheet>
 
       {/* 하단 고정 네비게이션 */}

@@ -83,6 +83,28 @@
   font-size: 1.2rem;
 }
 
+/* 부서 추가하기 버튼 */
+.department-list-item.add-team {
+  border-top: 1px solid #eee;
+  margin-top: 0.5rem;
+  color: #666;
+}
+
+.department-list-item.add-team:hover {
+  color: #4a4a4a;
+}
+
+.add-team-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-team-content .add-icon {
+  width: 20px;
+  height: 20px;
+}
+
 /* 애니메이션 */
 @keyframes fadeIn {
   from {
@@ -93,6 +115,15 @@
   }
 }
 
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 @keyframes slideUpSheet {
   from {
     transform: translateY(100%);
@@ -100,4 +131,22 @@
   to {
     transform: translateY(0);
   }
+}
+
+@keyframes slideDownSheet {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* 닫힘 애니메이션 */
+.bottom-sheet-overlay.closing {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+
+.bottom-sheet-content.closing {
+  animation: slideDownSheet 0.3s ease-out forwards;
 }
