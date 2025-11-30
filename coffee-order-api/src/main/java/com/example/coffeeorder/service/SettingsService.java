@@ -30,15 +30,15 @@ public class SettingsService {
             .orElseGet(() -> {
                 // 설정이 없으면 기본값으로 생성
                 Settings defaultSettings = new Settings();
-                defaultSettings.setOrderDeadlineTime(LocalTime.of(9, 0)); // 기본 9시
-                defaultSettings.setIs24Hours(false);
-                defaultSettings.setMenuMode("CUSTOM");
+                defaultSettings.setOrderDeadlineTime(LocalTime.of(9, 0));
+                defaultSettings.setIs24Hours(true); // 기본: 24시간 주문 가능
+                defaultSettings.setMenuMode("TWOSOME"); // 기본: 투썸 메뉴
                 return settingsRepository.save(defaultSettings);
             });
 
         // 기존 데이터에 menuMode가 없는 경우 기본값 설정
         if (settings.getMenuMode() == null) {
-            settings.setMenuMode("CUSTOM");
+            settings.setMenuMode("TWOSOME");
         }
         return settings;
     }
@@ -50,7 +50,7 @@ public class SettingsService {
             .map(settings -> {
                 // 기존 데이터에 menuMode가 없는 경우 기본값 설정
                 if (settings.getMenuMode() == null) {
-                    settings.setMenuMode("CUSTOM");
+                    settings.setMenuMode("TWOSOME");
                 }
                 return settings;
             })
@@ -61,9 +61,9 @@ public class SettingsService {
 
                 Settings defaultSettings = new Settings();
                 defaultSettings.setDepartment(department);
-                defaultSettings.setOrderDeadlineTime(LocalTime.of(9, 0)); // 기본 9시
-                defaultSettings.setIs24Hours(false);
-                defaultSettings.setMenuMode("CUSTOM");
+                defaultSettings.setOrderDeadlineTime(LocalTime.of(9, 0));
+                defaultSettings.setIs24Hours(true); // 기본: 24시간 주문 가능
+                defaultSettings.setMenuMode("TWOSOME"); // 기본: 투썸 메뉴
                 return settingsRepository.save(defaultSettings);
             });
     }
@@ -74,7 +74,7 @@ public class SettingsService {
         Settings existingSettings = getSettings();
         existingSettings.setOrderDeadlineTime(settings.getOrderDeadlineTime());
         existingSettings.setIs24Hours(settings.getIs24Hours());
-        existingSettings.setMenuMode(settings.getMenuMode() != null ? settings.getMenuMode() : "CUSTOM");
+        existingSettings.setMenuMode(settings.getMenuMode() != null ? settings.getMenuMode() : "TWOSOME");
         return settingsRepository.save(existingSettings);
     }
 
@@ -84,7 +84,7 @@ public class SettingsService {
         Settings existingSettings = getSettingsByDepartment(departmentId);
         existingSettings.setOrderDeadlineTime(settings.getOrderDeadlineTime());
         existingSettings.setIs24Hours(settings.getIs24Hours());
-        existingSettings.setMenuMode(settings.getMenuMode() != null ? settings.getMenuMode() : "CUSTOM");
+        existingSettings.setMenuMode(settings.getMenuMode() != null ? settings.getMenuMode() : "TWOSOME");
         return settingsRepository.save(existingSettings);
     }
 
