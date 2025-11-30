@@ -318,11 +318,17 @@
 
   .date-selector {
     flex-direction: column;
-    align-items: flex-start;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .date-selector label {
+    text-align: left;
   }
 
   .date-selector input[type="date"] {
     width: 100%;
+    box-sizing: border-box;
   }
 
   .today-button {
