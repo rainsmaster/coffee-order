@@ -8,7 +8,7 @@ import useModal from '../hooks/useModal';
 import './ManagePage.css';
 
 const ManagePage = ({ initialTab }) => {
-  const { selectedDepartmentId, refreshDepartments } = useDepartment();
+  const { selectedDepartment, selectedDepartmentId, setSelectedDepartment, refreshDepartments } = useDepartment();
   const [activeTab, setActiveTab] = useState(initialTab || 'team');
   const [teams, setTeams] = useState([]);
   const [menus, setMenus] = useState([]);
@@ -350,12 +350,22 @@ const ManagePage = ({ initialTab }) => {
             </div>
             <div className="list-grid">
               {departments.map((dept) => (
-                <div key={dept.id} className={`list-item ${dept.id === selectedDepartmentId ? 'current' : ''}`}>
+                <div
+                  key={dept.id}
+                  className={`list-item clickable ${dept.id === selectedDepartmentId ? 'current' : ''}`}
+                  onClick={() => {
+                    const foundDept = departments.find(d => d.id === dept.id);
+                    if (foundDept) {
+                      setSelectedDepartment(foundDept);
+                      refreshDepartments();
+                    }
+                  }}
+                >
                   <span>
                     {dept.name}
                     {dept.id === selectedDepartmentId && <span className="current-badge">현재</span>}
                   </span>
-                  <div className="item-actions">
+                  <div className="item-actions" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => handleEditDepartment(dept)}>수정</button>
                     <button
                       onClick={() => handleDeleteDepartment(dept.id)}
@@ -374,7 +384,7 @@ const ManagePage = ({ initialTab }) => {
         {activeTab === 'team' && (
           <div>
             <div className="section-header">
-              <h2>팀원 목록</h2>
+              <h2>팀원 목록 ({selectedDepartment?.name || ''})</h2>
               <button className="btn-add" onClick={handleCreateTeam}>
                 + 팀원 추가
               </button>

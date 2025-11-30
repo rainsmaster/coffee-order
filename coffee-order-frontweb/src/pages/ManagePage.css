@@ -97,6 +97,19 @@
   border-left-color: #4caf50;
 }
 
+.list-item.clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.list-item.clickable:hover {
+  background-color: #f0f0f0;
+}
+
+.list-item.clickable.current:hover {
+  background-color: #dceadc;
+}
+
 .current-badge {
   display: inline-block;
   margin-left: 0.5rem;

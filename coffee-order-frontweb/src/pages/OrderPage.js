@@ -8,7 +8,7 @@ import ReorderModal from '../components/ReorderModal';
 import useModal from '../hooks/useModal';
 import './OrderPage.css';
 
-const OrderPage = () => {
+const OrderPage = ({ onAddTeamMember }) => {
   const { selectedDepartmentId } = useDepartment();
   const [teams, setTeams] = useState([]);
   const [menus, setMenus] = useState({});
@@ -479,7 +479,13 @@ const OrderPage = () => {
           <label>이름 선택</label>
           <select
             value={selectedTeam}
-            onChange={(e) => handleTeamSelect(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value === 'ADD_TEAM_MEMBER') {
+                if (onAddTeamMember) onAddTeamMember();
+              } else {
+                handleTeamSelect(e.target.value);
+              }
+            }}
             disabled={!orderAvailable}
           >
             <option value="">선택하세요</option>
@@ -488,6 +494,7 @@ const OrderPage = () => {
                 {team.name}
               </option>
             ))}
+            <option value="ADD_TEAM_MEMBER" className="add-team-option">+ 팀원 추가하기</option>
           </select>
         </div>
 
