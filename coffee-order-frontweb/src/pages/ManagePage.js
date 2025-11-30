@@ -7,9 +7,9 @@ import ConfirmModal from '../components/ConfirmModal';
 import useModal from '../hooks/useModal';
 import './ManagePage.css';
 
-const ManagePage = () => {
+const ManagePage = ({ initialTab }) => {
   const { selectedDepartmentId, refreshDepartments } = useDepartment();
-  const [activeTab, setActiveTab] = useState('team');
+  const [activeTab, setActiveTab] = useState(initialTab || 'team');
   const [teams, setTeams] = useState([]);
   const [menus, setMenus] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -32,6 +32,13 @@ const ManagePage = () => {
     showConfirm,
     closeConfirm,
   } = useModal();
+
+  // initialTab props가 변경되면 activeTab 업데이트
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
 
   useEffect(() => {
     // 부서 탭은 selectedDepartmentId 없이도 로드 가능
