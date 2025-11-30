@@ -3,47 +3,71 @@ import OrderPage from './pages/OrderPage';
 import ManagePage from './pages/ManagePage';
 import HistoryPage from './pages/HistoryPage';
 import { DepartmentProvider, useDepartment } from './context/DepartmentContext';
+import BottomSheet from './components/BottomSheet';
 import './App.css';
 
-// 부서 선택 드롭다운 컴포넌트
-function DepartmentSelector() {
-  const { departments, selectedDepartment, setSelectedDepartment, loading } = useDepartment();
-
-  if (loading) {
-    return <span className="department-loading">로딩...</span>;
-  }
-
-  return (
-    <select
-      className="department-selector"
-      value={selectedDepartment?.id || ''}
-      onChange={(e) => {
-        const dept = departments.find(d => d.id === parseInt(e.target.value));
-        setSelectedDepartment(dept);
-      }}
-    >
-      {departments.map((dept) => (
-        <option key={dept.id} value={dept.id}>
-          {dept.name}
-        </option>
-      ))}
-    </select>
-  );
-}
-
-// 헤더 타이틀 컴포넌트
-function HeaderTitle() {
+// 헤더 타이틀 컴포넌트 (터치하면 부서 선택 바텀시트 열림)
+function HeaderTitle({ onTap }) {
   const { selectedDepartment, loading } = useDepartment();
 
   if (loading) {
-    return <h1>커피주문</h1>;
+    return <h1 className="header-title">커피주문</h1>;
   }
 
-  return <h1>{selectedDepartment?.name || ''} 커피주문</h1>;
+  return (
+    <button className="header-title-button" onClick={onTap}>
+      <span className="header-title-text">
+        {selectedDepartment?.name || ''} 커피주문
+      </span>
+      <svg
+        className="header-title-arrow"
+        viewBox="0 0 24 24"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M6 9l6 6 6-6"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+// 부서 선택 바텀시트 내용
+function DepartmentList({ onSelect }) {
+  const { departments, selectedDepartment } = useDepartment();
+
+  return (
+    <>
+      {departments.map((dept) => (
+        <button
+          key={dept.id}
+          className={`department-list-item ${selectedDepartment?.id === dept.id ? 'selected' : ''}`}
+          onClick={() => onSelect(dept)}
+        >
+          <span>{dept.name}</span>
+          {selectedDepartment?.id === dept.id && (
+            <span className="check-icon">✓</span>
+          )}
+        </button>
+      ))}
+    </>
+  );
 }
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('order');
+  const [isDepartmentSheetOpen, setIsDepartmentSheetOpen] = useState(false);
+  const { setSelectedDepartment } = useDepartment();
+
+  const handleDepartmentSelect = (dept) => {
+    setSelectedDepartment(dept);
+    setIsDepartmentSheetOpen(false);
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -61,12 +85,18 @@ function AppContent() {
   return (
     <div className="App">
       <header className="App-header">
-        <div className="header-left">
-          <DepartmentSelector />
-        </div>
-        <HeaderTitle />
+        <HeaderTitle onTap={() => setIsDepartmentSheetOpen(true)} />
       </header>
       <main className="App-main">{renderPage()}</main>
+
+      {/* 부서 선택 바텀시트 */}
+      <BottomSheet
+        isOpen={isDepartmentSheetOpen}
+        onClose={() => setIsDepartmentSheetOpen(false)}
+        title="부서 선택"
+      >
+        <DepartmentList onSelect={handleDepartmentSelect} />
+      </BottomSheet>
 
       {/* 하단 고정 네비게이션 */}
       <nav className="bottom-nav">

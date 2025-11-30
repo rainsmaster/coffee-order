@@ -1,0 +1,103 @@
+/* 바텀시트 오버레이 */
+.bottom-sheet-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* 바텀시트 컨텐츠 */
+.bottom-sheet-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 16px 16px 0 0;
+  max-height: 70vh;
+  overflow-y: auto;
+  animation: slideUpSheet 0.3s ease-out;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* 드래그 핸들 */
+.bottom-sheet-handle {
+  width: 40px;
+  height: 4px;
+  background-color: #ddd;
+  border-radius: 2px;
+  margin: 12px auto;
+}
+
+/* 바텀시트 타이틀 */
+.bottom-sheet-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #333;
+  text-align: center;
+  padding: 0 1rem 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+/* 바텀시트 본문 */
+.bottom-sheet-body {
+  padding: 0.5rem 0;
+}
+
+/* 부서 선택 리스트 아이템 */
+.department-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  background: none;
+  border: none;
+  font-size: 1rem;
+  color: #333;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  text-align: left;
+}
+
+.department-list-item:hover {
+  background-color: #f5f5f5;
+}
+
+.department-list-item:active {
+  background-color: #eee;
+}
+
+.department-list-item.selected {
+  color: #4a4a4a;
+  font-weight: 600;
+  background-color: #f8f8f8;
+}
+
+.department-list-item .check-icon {
+  color: #4a4a4a;
+  font-size: 1.2rem;
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideUpSheet {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
