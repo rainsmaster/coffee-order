@@ -110,6 +110,11 @@
   background-color: #dceadc;
 }
 
+/* 클릭 가능한 아이템의 텍스트 영역이 전체 공간을 차지하도록 */
+.list-item.clickable > span:first-child {
+  flex: 1;
+}
+
 .current-badge {
   display: inline-block;
   margin-left: 0.5rem;
