@@ -270,15 +270,25 @@
     width: 100%;
   }
 
-  .list-item {
+  .list-item:not(.clickable) {
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
   }
 
-  .item-actions {
+  .list-item:not(.clickable) .item-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  /* 클릭 가능한 아이템(부서 목록)은 한 줄 유지 */
+  .list-item.clickable {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .list-item.clickable .item-actions {
+    flex-shrink: 0;
   }
 }
 
