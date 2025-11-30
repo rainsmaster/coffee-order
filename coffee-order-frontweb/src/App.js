@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import OrderPage from './pages/OrderPage';
 import ManagePage from './pages/ManagePage';
 import HistoryPage from './pages/HistoryPage';
+import SuggestionPage from './pages/SuggestionPage';
 import { DepartmentProvider, useDepartment } from './context/DepartmentContext';
 import BottomSheet from './components/BottomSheet';
 import './App.css';
@@ -113,6 +114,8 @@ function AppContent() {
         return <ManagePage initialTab={manageInitialTab} />;
       case 'history':
         return <HistoryPage />;
+      case 'suggestion':
+        return <SuggestionPage />;
       default:
         return <OrderPage />;
     }
@@ -155,6 +158,15 @@ function AppContent() {
             <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span>내역</span>
+        </button>
+        <button
+          className={`nav-item ${currentPage === 'suggestion' ? 'active' : ''}`}
+          onClick={() => setCurrentPage('suggestion')}
+        >
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span>건의</span>
         </button>
         <button
           className={`nav-item ${currentPage === 'manage' ? 'active' : ''}`}

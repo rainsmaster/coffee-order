@@ -19,12 +19,17 @@ const fetchAPI = async (url, options = {}) => {
       throw new Error(error.error || `HTTP error! status: ${response.status}`);
     }
 
-    // 204 No Content는 빈 응답
+    // 204 No Content 또는 빈 응답 처리
     if (response.status === 204) {
       return null;
     }
 
-    return await response.json();
+    const text = await response.text();
+    if (!text) {
+      return null;
+    }
+
+    return JSON.parse(text);
   } catch (error) {
     console.error('API Error:', error);
     throw error;
@@ -210,5 +215,59 @@ export const twosomeMenuAPI = {
 
   // 동기화 진행 중인지 확인
   isSyncInProgress: () => fetchAPI('/twosome-menus/sync/in-progress'),
+};
+
+// ==================== Suggestion API ====================
+export const suggestionAPI = {
+  // 목록 조회 (페이징)
+  getList: (page = 0) => fetchAPI(`/suggestions?page=${page}`),
+
+  // 상세 조회
+  getById: (id) => fetchAPI(`/suggestions/${id}`),
+
+  // 작성
+  create: (suggestion) => fetchAPI('/suggestions', {
+    method: 'POST',
+    body: JSON.stringify(suggestion),
+  }),
+
+  // 수정
+  update: (id, suggestion) => fetchAPI(`/suggestions/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(suggestion),
+  }),
+
+  // 삭제
+  delete: (id, password) => fetchAPI(`/suggestions/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  }),
+
+  // 고정/해제 (관리자)
+  togglePin: (id, adminPassword) => fetchAPI(`/suggestions/${id}/pin`, {
+    method: 'POST',
+    body: JSON.stringify({ adminPassword }),
+  }),
+
+  // 댓글 목록 조회
+  getComments: (suggestionId) => fetchAPI(`/suggestions/${suggestionId}/comments`),
+
+  // 댓글 작성
+  createComment: (suggestionId, comment) => fetchAPI(`/suggestions/${suggestionId}/comments`, {
+    method: 'POST',
+    body: JSON.stringify(comment),
+  }),
+
+  // 댓글 수정
+  updateComment: (commentId, comment) => fetchAPI(`/suggestions/comments/${commentId}`, {
+    method: 'PUT',
+    body: JSON.stringify(comment),
+  }),
+
+  // 댓글 삭제
+  deleteComment: (commentId, password) => fetchAPI(`/suggestions/comments/${commentId}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ password }),
+  }),
 };
 
