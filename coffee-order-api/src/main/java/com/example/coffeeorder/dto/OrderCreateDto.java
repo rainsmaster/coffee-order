@@ -15,8 +15,11 @@ public class OrderCreateDto {
     @NotNull(message = "팀 ID는 필수입니다.")
     private Long teamId;
 
-    @NotNull(message = "메뉴 ID는 필수입니다.")
-    private Long menuId;
+    private Long menuId;  // 커스텀 메뉴 ID (CUSTOM 모드)
+
+    private Long twosomeMenuId;  // 투썸 메뉴 ID (TWOSOME 모드)
+
+    private String menuType = "CUSTOM";  // CUSTOM 또는 TWOSOME
 
     private String personalOption;
 

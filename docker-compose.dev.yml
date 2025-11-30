@@ -1,0 +1,16 @@
+# 로컬 개발용 Docker Compose
+# Redis만 실행하고, 애플리케이션은 IDE에서 실행
+
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: coffee-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    command: redis-server --appendonly yes
+
+volumes:
+  redis-dev-data:

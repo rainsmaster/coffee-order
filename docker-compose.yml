@@ -1,0 +1,45 @@
+# 시놀로지 NAS 배포용 Docker Compose
+# Container Manager > 프로젝트에서 사용
+
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: coffee-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - coffee-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: coffee-order-svc:latest
+    container_name: coffee-order
+    restart: always
+    ports:
+      - "8888:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - TZ=Asia/Seoul
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - coffee-network
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  coffee-network:
+    driver: bridge

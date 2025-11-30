@@ -1,342 +1,465 @@
 # 배포 가이드 (시놀로지 NAS Container Manager)
 
-## 프로젝트 포트 구조
+## 목차
+1. [로컬 개발 환경 테스트](#1-로컬-개발-환경-테스트)
+2. [Docker 이미지 빌드](#2-docker-이미지-빌드)
+3. [시놀로지 NAS 배포 (Docker Compose)](#3-시놀로지-nas-배포-docker-compose)
+4. [시놀로지 NAS 배포 (개별 컨테이너)](#4-시놀로지-nas-배포-개별-컨테이너)
+5. [업데이트 배포](#5-업데이트-배포)
+6. [트러블슈팅](#6-트러블슈팅)
+
+---
+
+## 프로젝트 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Docker Network                        │
+│  ┌─────────────────┐      ┌─────────────────────────┐   │
+│  │     Redis       │◄────►│    Coffee Order App     │   │
+│  │  (분산 락/캐시)  │      │   (Spring Boot + React) │   │
+│  │  Port: 6379     │      │   Port: 8080            │   │
+│  └─────────────────┘      └─────────────────────────┘   │
+│                                    │                     │
+└────────────────────────────────────┼─────────────────────┘
+                                     │
+                              Port: 8888 (외부)
+                                     │
+                              ┌──────▼──────┐
+                              │   Browser   │
+                              └─────────────┘
+```
 
 ### 개발 모드 (로컬)
-- 프론트엔드: http://localhost:3000 (React 개발 서버)
-  - Hot reload 지원
-  - API 요청은 자동으로 8080 포트로 프록시
+- 프론트엔드: http://localhost:3000 (React 개발 서버, Hot reload)
 - 백엔드: http://localhost:8080 (Spring Boot)
-  - REST API 제공 (/api/*)
-  - H2 Console: http://localhost:8080/h2-console
+- Redis: localhost:6379 (Docker)
+- H2 Console: http://localhost:8080/h2-console
 
 ### 프로덕션 모드 (시놀로지 NAS)
-- 단일 포트: 8080 (컨테이너 내부)
-- 매핑 포트: 8888 (외부 접속용)
+- 접속 URL: http://192.168.0.48:8888
 - Spring Boot가 React 정적 파일 + API 모두 제공
-- 브라우저 접속: http://192.168.0.48:8888
+- Redis: 같은 Docker 네트워크 내 컨테이너
 
-## Docker 이미지 빌드
+---
 
-### 1. Docker 이미지 빌드
+## 1. 로컬 개발 환경 테스트
+
+### 1-1. Redis 실행 (Docker)
 
 ```bash
 # 프로젝트 루트에서 실행
+cd /Users/gyuseonheo/Development/coffee-order
+
+# Redis 컨테이너 시작
+docker-compose -f docker-compose.dev.yml up -d
+
+# Redis 실행 확인
+docker ps | grep redis
+```
+
+**확인 방법:**
+```bash
+# Redis 연결 테스트
+docker exec coffee-redis-dev redis-cli ping
+# 응답: PONG
+```
+
+### 1-2. 백엔드 실행
+
+```bash
+# 프로젝트 루트에서
+cd coffee-order-api
+../mvnw spring-boot:run
+```
+
+또는 IntelliJ에서:
+- Run Configuration: `CoffeeOrderApplication [devtools]` 실행
+
+### 1-3. 프론트엔드 실행
+
+```bash
+# 새 터미널에서
+cd coffee-order-frontweb
+npm start
+```
+
+### 1-4. 테스트
+
+1. 브라우저에서 http://localhost:3000 접속
+2. 관리 페이지 > 투썸 메뉴 탭 이동
+3. "메뉴 동기화" 버튼 클릭
+4. 진행률 표시 확인
+
+**동시성 테스트:**
+- 브라우저 2개에서 동시에 동기화 버튼 클릭
+- 먼저 클릭한 쪽: 동기화 진행
+- 나중에 클릭한 쪽: "동기화가 이미 진행 중입니다" 메시지
+
+### 1-5. 로컬 테스트 종료
+
+```bash
+# Redis 중지
+docker-compose -f docker-compose.dev.yml down
+
+# Redis 데이터도 삭제하려면
+docker-compose -f docker-compose.dev.yml down -v
+```
+
+---
+
+## 2. Docker 이미지 빌드
+
+### 2-1. 이미지 빌드
+
+```bash
+# 프로젝트 루트에서 실행
+cd /Users/gyuseonheo/Development/coffee-order
+
+# 시놀로지 NAS용 이미지 빌드 (linux/amd64)
 docker buildx build --platform linux/amd64 -t coffee-order-svc:latest --load .
 ```
 
-설명:
-- --platform linux/amd64: 시놀로지 NAS 호환 (M1/M2 Mac에서도 동작)
-- -t coffee-order-svc:latest: 이미지 이름과 태그
-- --load: 빌드된 이미지를 로컬에 로드
+**참고:** M1/M2 Mac에서도 `--platform linux/amd64`로 빌드해야 시놀로지에서 동작합니다.
 
-### 2. 이미지 압축 파일 생성
+### 2-2. 이미지 압축
 
 ```bash
 docker save coffee-order-svc:latest | gzip > coffee-order-svc.tar.gz
 ```
 
-생성된 파일: coffee-order-svc.tar.gz
-
----
-
-## 시놀로지 NAS에서 배포하기
-
-### 3. Container Manager에서 이미지 가져오기
-
-1. 시놀로지 DSM 웹 인터페이스 접속
-   - http://192.168.0.48:5000 (또는 사용 중인 DSM 포트)
-
-2. Container Manager 앱 실행
-
-3. 이미지 탭으로 이동
-
-4. 추가 버튼 클릭 → 파일에서 추가 선택
-
-5. 파일 선택
-   - coffee-order-svc.tar.gz 파일 업로드
-   - 또는 시놀로지 File Station에 먼저 업로드한 후 경로 지정
-
-6. 이미지 가져오기 완료 대기
-   - 이미지 목록에 coffee-order-svc:latest 표시 확인
-
-### 4. 컨테이너 생성 및 실행
-
-#### 방법 1: Container Manager UI 사용 (권장)
-
-1. 이미지 탭에서 coffee-order-svc:latest 선택
-
-2. 실행 버튼 클릭
-
-3. 컨테이너 설정
-   - 컨테이너 이름: coffee-order-container
-   - 자동 재시작 활성화: 체크
-
-4. 포트 설정 탭
-   - 로컬 포트: 8888
-   - 컨테이너 포트: 8080
-   - 유형: TCP
-
-5. 볼륨 설정 탭 (데이터 영구 저장)
-   - 폴더 추가 클릭
-   - 파일/폴더: 시놀로지 폴더 선택 (예: /docker/coffee-order/data)
-     - 없으면 File Station에서 먼저 생성
-   - 마운트 경로: /app/data
-
-6. 환경 탭 (선택사항)
-   - 필요한 환경 변수 추가 (현재는 불필요)
-
-7. 완료 버튼 클릭
-
-8. 컨테이너 탭에서 실행 상태 확인
-   - 상태가 실행 중이면 성공
-
-#### 방법 2: SSH 접속 사용 (고급)
-
-시놀로지에 SSH 접속 후:
+### 2-3. 빠른 빌드 스크립트
 
 ```bash
-# 이미지 로드 (File Station에 업로드한 경우)
-gunzip -c /volume1/docker/coffee-order-svc.tar.gz | docker load
-
-# 기존 컨테이너 중지 및 제거
-docker stop coffee-order-container 2>/dev/null || true
-docker rm coffee-order-container 2>/dev/null || true
-
-# 새 컨테이너 실행
-docker run -d \
-  --name coffee-order-container \
-  -p 8888:8080 \
-  -v /volume1/docker/coffee-order/data:/app/data \
-  --restart unless-stopped \
-  coffee-order-svc:latest
-```
-
-### 5. 접속 확인
-
-브라우저에서 접속:
-```
-http://192.168.0.48:8888
-```
-
-## 빠른 빌드 스크립트
-
-Docker 이미지를 빌드하고 압축하는 스크립트:
-
-```bash
-#!/bin/bash
-# build.sh
-
-echo "Docker 이미지 빌드 중..."
-docker buildx build --platform linux/amd64 -t coffee-order-svc:latest --load .
-
-if [ $? -eq 0 ]; then
-  echo "이미지 빌드 완료!"
-
-  echo "이미지 압축 중..."
-  docker save coffee-order-svc:latest | gzip > coffee-order-svc.tar.gz
-
-  echo "압축 완료: coffee-order-svc.tar.gz"
-  echo ""
-  echo "다음 단계:"
-  echo "1. coffee-order-svc.tar.gz 파일을 시놀로지 File Station에 업로드"
-  echo "2. Container Manager > 이미지 > 추가 > 파일에서 추가"
-  echo "3. 업로드한 파일 선택하여 이미지 가져오기"
-  echo "4. 이미지 실행하여 컨테이너 생성"
-else
-  echo "이미지 빌드 실패"
-  exit 1
-fi
-```
-
-사용법:
-```bash
+# build.sh 실행
 chmod +x build.sh
 ./build.sh
 ```
 
 ---
 
-## Container Manager에서 로그 확인
+## 3. 시놀로지 NAS 배포 (Docker Compose) - 권장
 
-### UI에서 확인
-1. Container Manager 앱 실행
-2. 컨테이너 탭 선택
-3. coffee-order-container 선택
-4. 로그 버튼 클릭
+DSM 7.2 이상에서 Container Manager의 "프로젝트" 기능을 사용합니다.
 
-### SSH로 확인 (고급)
-```bash
-# 실시간 로그 확인
-docker logs -f coffee-order-container
+### 3-1. 사전 준비
 
-# 최근 100줄만 확인
-docker logs --tail 100 coffee-order-container
-```
+1. **폴더 생성** (File Station)
+   ```
+   /docker/coffee-order/
+   ├── data/           # H2 DB + 이미지 저장
+   └── docker-compose.yml
+   ```
 
-## Container Manager에서 컨테이너 관리
-
-### UI에서 관리
-1. Container Manager > 컨테이너 탭
-2. coffee-order-container 선택 후:
-   - 중지: 중지 버튼 클릭
-   - 시작: 시작 버튼 클릭
-   - 재시작: 동작 > 재시작 클릭
-   - 삭제: 중지 후 삭제 버튼 클릭
-
-### SSH로 관리 (고급)
-```bash
-# 컨테이너 중지
-docker stop coffee-order-container
-
-# 컨테이너 시작
-docker start coffee-order-container
-
-# 컨테이너 재시작
-docker restart coffee-order-container
-
-# 컨테이너 상태 확인
-docker ps -a | grep coffee-order
-```
-
-## 데이터베이스 백업
-
-H2 데이터베이스 파일은 컨테이너의 /app/data 디렉토리에 저장됩니다.
-
-### File Station에서 백업
-1. File Station 앱 실행
-2. 볼륨 마운트 설정한 폴더로 이동 (예: /docker/coffee-order/data)
-3. 폴더 우클릭 > 압축 또는 복사하여 백업
-
-### SSH로 백업 (고급)
-```bash
-# 시놀로지에서 백업
-cp -r /volume1/docker/coffee-order/data /volume1/docker/coffee-order/data-backup-$(date +%Y%m%d)
-```
-
-## 업데이트 배포
-
-코드 수정 후 재배포 절차:
-
-### 1. 새 이미지 빌드 및 압축
-```bash
-# 로컬에서 실행
-docker buildx build --platform linux/amd64 -t coffee-order-svc:latest --load .
-docker save coffee-order-svc:latest | gzip > coffee-order-svc.tar.gz
-```
-
-### 2. Container Manager에서 업데이트
-
-#### 방법 A: UI 사용 (권장)
-
-1. 이미지 업로드
-   - File Station에 coffee-order-svc.tar.gz 업로드
+2. **이미지 업로드**
+   - `coffee-order-svc.tar.gz` 파일을 시놀로지에 업로드
    - Container Manager > 이미지 > 추가 > 파일에서 추가
-   - 새 이미지 가져오기 (기존 이미지 덮어쓰기)
+   - 이미지 로드 완료 대기
 
-2. 기존 컨테이너 중지 및 삭제
-   - Container Manager > 컨테이너 탭
-   - coffee-order-container 선택
-   - 중지 버튼 클릭
-   - 삭제 버튼 클릭
+### 3-2. Docker Compose 파일 업로드
 
-3. 새 컨테이너 생성
-   - 이미지 탭에서 coffee-order-svc:latest 선택
-   - 실행 버튼 클릭
-   - 이전과 동일한 설정으로 컨테이너 생성
-     - 포트: 8888 → 8080
-     - 볼륨: /docker/coffee-order/data → /app/data
-     - 자동 재시작 활성화
+`docker-compose.yml` 파일을 `/docker/coffee-order/` 폴더에 업로드:
 
-#### 방법 B: SSH 사용 (고급)
+```yaml
+version: '3.8'
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: coffee-redis
+    restart: always
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - coffee-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: coffee-order-svc:latest
+    container_name: coffee-order
+    restart: always
+    ports:
+      - "8888:8080"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - SPRING_DATA_REDIS_HOST=redis
+      - SPRING_DATA_REDIS_PORT=6379
+      - TZ=Asia/Seoul
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - coffee-network
+
+volumes:
+  redis-data:
+    driver: local
+
+networks:
+  coffee-network:
+    driver: bridge
+```
+
+### 3-3. Container Manager에서 프로젝트 생성
+
+1. **Container Manager** 앱 실행
+
+2. **프로젝트** 탭 클릭
+
+3. **생성** 버튼 클릭
+
+4. **프로젝트 설정**
+   - 프로젝트 이름: `coffee-order`
+   - 경로: `/docker/coffee-order` 선택
+   - 소스: `docker-compose.yml 업로드` 또는 `기존 docker-compose.yml 사용`
+
+5. **다음** 클릭 후 설정 확인
+
+6. **완료** 클릭
+
+### 3-4. 프로젝트 실행 확인
+
+1. **프로젝트** 탭에서 `coffee-order` 선택
+2. 상태가 "실행 중"인지 확인
+3. 컨테이너 2개 실행 확인:
+   - `coffee-redis` (Redis)
+   - `coffee-order` (앱)
+
+### 3-5. 접속 테스트
+
+브라우저에서 접속:
+```
+http://192.168.0.48:8888
+```
+
+---
+
+## 4. 시놀로지 NAS 배포 (개별 컨테이너)
+
+Docker Compose를 사용하지 않고 개별 컨테이너로 배포하는 방법입니다.
+
+### 4-1. Redis 컨테이너 생성
+
+**Container Manager UI:**
+1. 레지스트리 > `redis` 검색 > `redis:7-alpine` 다운로드
+2. 이미지 탭 > `redis:7-alpine` 선택 > 실행
+3. 설정:
+   - 컨테이너 이름: `coffee-redis`
+   - 자동 재시작: 활성화
+   - 네트워크: bridge (기본값)
+4. 볼륨: (선택사항)
+   - `/docker/redis-data` → `/data`
+
+**SSH 방식:**
+```bash
+docker run -d \
+  --name coffee-redis \
+  --restart always \
+  redis:7-alpine redis-server --appendonly yes
+```
+
+### 4-2. Redis 컨테이너 IP 확인
 
 ```bash
-# File Station에 업로드한 이미지 로드
-gunzip -c /volume1/docker/coffee-order-svc.tar.gz | docker load
+# SSH 접속 후
+docker inspect coffee-redis | grep IPAddress
+# 예: "IPAddress": "172.17.0.2"
+```
 
-# 기존 컨테이너 중지 및 제거
-docker stop coffee-order-container
-docker rm coffee-order-container
+### 4-3. 앱 컨테이너 생성
 
-# 새 컨테이너 실행
+**Container Manager UI:**
+1. 이미지 탭 > `coffee-order-svc:latest` 선택 > 실행
+2. 설정:
+   - 컨테이너 이름: `coffee-order`
+   - 자동 재시작: 활성화
+3. 포트 설정:
+   - 로컬 포트: `8888`
+   - 컨테이너 포트: `8080`
+4. 볼륨 설정:
+   - `/docker/coffee-order/data` → `/app/data`
+5. 환경 변수:
+   - `SPRING_DATA_REDIS_HOST` = `172.17.0.2` (Redis IP)
+   - `SPRING_DATA_REDIS_PORT` = `6379`
+   - `TZ` = `Asia/Seoul`
+
+**SSH 방식:**
+```bash
+# Redis IP 확인
+REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' coffee-redis)
+
+# 앱 컨테이너 실행
 docker run -d \
-  --name coffee-order-container \
+  --name coffee-order \
   -p 8888:8080 \
   -v /volume1/docker/coffee-order/data:/app/data \
-  --restart unless-stopped \
+  -e SPRING_DATA_REDIS_HOST=$REDIS_IP \
+  -e SPRING_DATA_REDIS_PORT=6379 \
+  -e TZ=Asia/Seoul \
+  --restart always \
   coffee-order-svc:latest
 ```
 
-## 트러블슈팅
+---
 
-### 주문 마감 시간이 작동하지 않을 때
+## 5. 업데이트 배포
 
-**증상:** 관리 페이지에서 주문 마감 시간을 설정해도 항상 주문이 가능함
+### 5-1. 새 이미지 빌드
 
-**원인:** Docker 컨테이너의 타임존이 UTC로 설정되어 한국 시간과 9시간 차이 발생
-
-**해결 방법:**
-- 이미 Dockerfile에 타임존 설정이 포함되어 있습니다 (Asia/Seoul)
-- 최신 이미지로 재배포하면 자동으로 해결됩니다
-- 타임존 확인 방법 (SSH):
-  ```bash
-  docker exec coffee-order-container date
-  # 출력: Wed Nov 24 10:00:00 KST 2025 (KST로 표시되어야 함)
-  ```
-
-### 포트 충돌 시
-Container Manager에서 컨테이너 생성 시 다른 포트 번호 사용:
-- 로컬 포트: 9999 (또는 사용하지 않는 다른 포트)
-- 컨테이너 포트: 8080 (고정)
-
-### 컨테이너가 시작되지 않을 때
-
-1. Container Manager에서 로그 확인
-   - 컨테이너 탭 > 컨테이너 선택 > 로그 버튼
-
-2. SSH로 로그 확인
-   ```bash
-   docker logs coffee-order-container
-   ```
-
-3. 볼륨 경로 확인
-   - File Station에서 /docker/coffee-order/data 폴더 존재 확인
-   - 폴더 권한 확인
-
-### 이미지 크기 최적화
-현재 Dockerfile은 이미 최적화되어 있습니다:
-- 멀티 스테이지 빌드 사용
-- Build stage: Maven + Node.js (빌드 후 삭제)
-- Runtime stage: JRE만 포함
-- 최종 이미지 크기: 약 300-400MB
-
-## 주요 명령어 정리
-
-### 로컬 개발
 ```bash
-# 백엔드만 실행
-./mvnw spring-boot:run
-
-# 프론트엔드만 실행
-cd coffee-order-frontweb && npm start
-
-# 전체 빌드 (프로덕션)
-./mvnw clean package
-```
-
-### Docker 이미지 생성
-```bash
-# 이미지 빌드
+# 로컬에서
 docker buildx build --platform linux/amd64 -t coffee-order-svc:latest --load .
-
-# 이미지 압축
 docker save coffee-order-svc:latest | gzip > coffee-order-svc.tar.gz
 ```
 
-### 빠른 배포 체크리스트
-- [ ] 로컬에서 이미지 빌드 및 압축
-- [ ] File Station에 tar.gz 파일 업로드
+### 5-2. Docker Compose 사용 시 (권장)
+
+1. **이미지 업로드**
+   - `coffee-order-svc.tar.gz` 시놀로지에 업로드
+   - Container Manager > 이미지 > 추가 > 파일에서 추가
+
+2. **프로젝트 재시작**
+   - Container Manager > 프로젝트 > `coffee-order` 선택
+   - 동작 > 중지
+   - 동작 > 빌드 (새 이미지 적용)
+   - 동작 > 시작
+
+**SSH 방식:**
+```bash
+cd /volume1/docker/coffee-order
+docker-compose down
+docker-compose up -d
+```
+
+### 5-3. 개별 컨테이너 사용 시
+
+1. **이미지 업로드** (위와 동일)
+
+2. **앱 컨테이너만 재생성**
+   - Container Manager > 컨테이너 > `coffee-order` 선택
+   - 중지 > 삭제
+   - 이미지 탭에서 새 이미지로 컨테이너 재생성
+
+**SSH 방식:**
+```bash
+# 기존 컨테이너 중지/삭제
+docker stop coffee-order
+docker rm coffee-order
+
+# 새 이미지 로드
+gunzip -c /volume1/docker/coffee-order-svc.tar.gz | docker load
+
+# Redis IP 확인 후 재실행
+REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' coffee-redis)
+
+docker run -d \
+  --name coffee-order \
+  -p 8888:8080 \
+  -v /volume1/docker/coffee-order/data:/app/data \
+  -e SPRING_DATA_REDIS_HOST=$REDIS_IP \
+  -e SPRING_DATA_REDIS_PORT=6379 \
+  -e TZ=Asia/Seoul \
+  --restart always \
+  coffee-order-svc:latest
+```
+
+---
+
+## 6. 트러블슈팅
+
+### Redis 연결 오류
+
+**증상:** 앱 시작 시 Redis 연결 실패
+
+**확인:**
+```bash
+# Redis 컨테이너 상태 확인
+docker ps | grep redis
+
+# Redis 연결 테스트
+docker exec coffee-redis redis-cli ping
+
+# 앱에서 Redis 연결 확인 (로그)
+docker logs coffee-order | grep -i redis
+```
+
+**해결:**
+1. Redis 컨테이너가 실행 중인지 확인
+2. `SPRING_DATA_REDIS_HOST` 환경 변수가 올바른지 확인
+3. Docker Compose 사용 시: 서비스명 `redis` 사용
+4. 개별 컨테이너 시: Redis 컨테이너 IP 사용
+
+### 동기화 진행률이 표시되지 않음
+
+**증상:** 동기화 버튼 클릭 후 진행률 바가 안 보임
+
+**확인:**
+```bash
+# Redis에 진행 상태 저장되는지 확인
+docker exec coffee-redis redis-cli GET "twosome:sync:progress"
+```
+
+**해결:**
+1. Redis 연결 상태 확인
+2. 브라우저 개발자 도구에서 네트워크 탭 확인
+3. `/api/twosome-menus/sync/status` API 응답 확인
+
+### 포트 충돌
+
+**증상:** 컨테이너 시작 실패, 포트 사용 중
+
+**해결:**
+```bash
+# 8888 포트 사용 중인 프로세스 확인
+docker ps | grep 8888
+netstat -an | grep 8888
+
+# 다른 포트로 변경 (예: 9999)
+# docker-compose.yml에서 ports: "9999:8080"으로 수정
+```
+
+### 컨테이너 로그 확인
+
+```bash
+# 앱 로그 (실시간)
+docker logs -f coffee-order
+
+# 앱 로그 (최근 100줄)
+docker logs --tail 100 coffee-order
+
+# Redis 로그
+docker logs coffee-redis
+```
+
+### 데이터베이스 백업
+
+```bash
+# H2 DB 파일 백업
+cp -r /volume1/docker/coffee-order/data /volume1/docker/coffee-order/data-backup-$(date +%Y%m%d)
+```
+
+---
+
+## 빠른 체크리스트
+
+### 최초 배포
+- [ ] 로컬에서 `docker-compose.dev.yml`로 테스트
+- [ ] Docker 이미지 빌드 (`build.sh`)
+- [ ] 시놀로지에 `coffee-order-svc.tar.gz` 업로드
 - [ ] Container Manager에서 이미지 가져오기
-- [ ] 기존 컨테이너 중지/삭제
-- [ ] 새 컨테이너 생성 및 실행
-- [ ] 브라우저에서 접속 테스트 (http://192.168.0.48:8888)
+- [ ] `/docker/coffee-order/data` 폴더 생성
+- [ ] `docker-compose.yml` 업로드
+- [ ] Container Manager > 프로젝트 생성
+- [ ] http://192.168.0.48:8888 접속 테스트
+
+### 업데이트 배포
+- [ ] 로컬에서 새 이미지 빌드
+- [ ] 시놀로지에 tar.gz 업로드
+- [ ] Container Manager에서 이미지 가져오기
+- [ ] 프로젝트 재빌드/재시작
+- [ ] 접속 테스트

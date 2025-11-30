@@ -27,6 +27,9 @@ public class Settings {
     @Column(name = "is_24hours", nullable = false)
     private Boolean is24Hours = false;
 
+    @Column(name = "menu_mode", length = 20)
+    private String menuMode = "CUSTOM";  // CUSTOM 또는 TWOSOME
+
     @Column(name = "updated_date")
     private LocalDateTime updatedDate;
 
@@ -34,5 +37,8 @@ public class Settings {
     @PrePersist
     protected void onUpdate() {
         updatedDate = LocalDateTime.now();
+        if (menuMode == null) {
+            menuMode = "CUSTOM";
+        }
     }
 }

@@ -22,15 +22,22 @@ public class SettingsService {
 
     // 설정 조회 (단일 레코드)
     public Settings getSettings() {
-        return settingsRepository.findAll().stream()
+        Settings settings = settingsRepository.findAll().stream()
             .findFirst()
             .orElseGet(() -> {
                 // 설정이 없으면 기본값으로 생성
                 Settings defaultSettings = new Settings();
                 defaultSettings.setOrderDeadlineTime(LocalTime.of(9, 0)); // 기본 9시
                 defaultSettings.setIs24Hours(false);
+                defaultSettings.setMenuMode("CUSTOM");
                 return settingsRepository.save(defaultSettings);
             });
+
+        // 기존 데이터에 menuMode가 없는 경우 기본값 설정
+        if (settings.getMenuMode() == null) {
+            settings.setMenuMode("CUSTOM");
+        }
+        return settings;
     }
 
     // 설정 업데이트
@@ -39,6 +46,7 @@ public class SettingsService {
         Settings existingSettings = getSettings();
         existingSettings.setOrderDeadlineTime(settings.getOrderDeadlineTime());
         existingSettings.setIs24Hours(settings.getIs24Hours());
+        existingSettings.setMenuMode(settings.getMenuMode() != null ? settings.getMenuMode() : "CUSTOM");
         return settingsRepository.save(existingSettings);
     }
 

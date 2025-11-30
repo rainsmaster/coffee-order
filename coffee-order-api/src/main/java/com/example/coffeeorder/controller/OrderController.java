@@ -27,17 +27,23 @@ public class OrderController {
 
     // 오늘 주문 전체 조회
     @GetMapping("/today")
-    public ResponseEntity<List<Order>> getTodayOrders() {
+    public ResponseEntity<List<OrderResponseDto>> getTodayOrders() {
         List<Order> orders = orderService.findTodayOrders();
-        return ResponseEntity.ok(orders);
+        List<OrderResponseDto> response = orders.stream()
+                .map(OrderResponseDto::from)
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     // 특정 날짜 주문 조회
     @GetMapping
-    public ResponseEntity<List<Order>> getOrdersByDate(
+    public ResponseEntity<List<OrderResponseDto>> getOrdersByDate(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         List<Order> orders = orderService.findOrdersByDate(date);
-        return ResponseEntity.ok(orders);
+        List<OrderResponseDto> response = orders.stream()
+                .map(OrderResponseDto::from)
+                .toList();
+        return ResponseEntity.ok(response);
     }
 
     // ID로 조회

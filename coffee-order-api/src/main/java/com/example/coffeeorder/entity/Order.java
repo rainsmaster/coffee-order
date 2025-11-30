@@ -28,9 +28,17 @@ public class Order {
     private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "menu_id", nullable = false)
+    @JoinColumn(name = "menu_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Menu menu;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "twosome_menu_id")
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private TwosomeMenu twosomeMenu;
+
+    @Column(name = "menu_type", length = 20)
+    private String menuType = "CUSTOM";  // CUSTOM 또는 TWOSOME
 
     @Column(name = "personal_option", length = 500)
     private String personalOption;
@@ -52,6 +60,9 @@ public class Order {
         }
         if (delYn == null) {
             delYn = "N";
+        }
+        if (menuType == null) {
+            menuType = "CUSTOM";
         }
     }
 }

@@ -21,6 +21,10 @@ public class OrderResponseDto {
     private Long menuId;
     private String menuName;
     private String menuCategory;
+    private Long twosomeMenuId;
+    private String twosomeMenuName;
+    private String twosomeMenuCategory;
+    private String menuType;  // CUSTOM 또는 TWOSOME
     private String personalOption;
     private LocalDate orderDate;
     private LocalDateTime createdTime;
@@ -30,12 +34,30 @@ public class OrderResponseDto {
         dto.setId(order.getId());
         dto.setTeamId(order.getTeam().getId());
         dto.setTeamName(sanitize(order.getTeam().getName()));
-        dto.setMenuId(order.getMenu().getId());
-        dto.setMenuName(sanitize(order.getMenu().getName()));
-        dto.setMenuCategory(sanitize(order.getMenu().getCategory()));
+        // menuType이 null인 경우 CUSTOM으로 처리 (기존 데이터 호환)
+        String menuType = order.getMenuType() != null ? order.getMenuType() : "CUSTOM";
+        dto.setMenuType(menuType);
         dto.setPersonalOption(sanitize(order.getPersonalOption()));
         dto.setOrderDate(order.getOrderDate());
         dto.setCreatedTime(order.getCreatedTime());
+
+        // 메뉴 타입에 따라 처리
+        if ("TWOSOME".equals(menuType) && order.getTwosomeMenu() != null) {
+            dto.setTwosomeMenuId(order.getTwosomeMenu().getId());
+            dto.setTwosomeMenuName(sanitize(order.getTwosomeMenu().getMenuNm()));
+            dto.setTwosomeMenuCategory(sanitize(order.getTwosomeMenu().getMidNm()));
+            dto.setMenuId(null);
+            dto.setMenuName(null);
+            dto.setMenuCategory(null);
+        } else if (order.getMenu() != null) {
+            dto.setMenuId(order.getMenu().getId());
+            dto.setMenuName(sanitize(order.getMenu().getName()));
+            dto.setMenuCategory(sanitize(order.getMenu().getCategory()));
+            dto.setTwosomeMenuId(null);
+            dto.setTwosomeMenuName(null);
+            dto.setTwosomeMenuCategory(null);
+        }
+
         return dto;
     }
 

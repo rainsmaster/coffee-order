@@ -30,16 +30,23 @@ const HistoryPage = () => {
     }
   };
 
-  // 메뉴별 집계
+  // 메뉴별 집계 (투썸 메뉴 지원)
   const getMenuSummary = () => {
     const summary = {};
     orders.forEach((order) => {
-      const menuName = order.menu.name;
-      const category = order.menu.category;
+      // 메뉴 타입에 따라 메뉴 이름과 카테고리 가져오기
+      const menuName = order.menuType === 'TWOSOME'
+        ? order.twosomeMenuName
+        : order.menuName;
+      const category = order.menuType === 'TWOSOME'
+        ? order.twosomeMenuCategory
+        : order.menuCategory;
+
+      if (!menuName) return;
 
       if (!summary[menuName]) {
         summary[menuName] = {
-          category,
+          category: category || '기타',
           count: 0,
           options: {},
         };
@@ -115,9 +122,11 @@ const HistoryPage = () => {
                 <div className="orders-list">
                   {orders.map((order) => (
                     <div key={order.id} className="order-item">
-                      <div className="order-person">{order.team.name}</div>
+                      <div className="order-person">{order.teamName}</div>
                       <div className="order-details">
-                        <div className="order-menu">{order.menu.name}</div>
+                        <div className="order-menu">
+                          {order.menuType === 'TWOSOME' ? order.twosomeMenuName : order.menuName}
+                        </div>
                         {order.personalOption && (
                           <div className="order-option">
                             옵션: {order.personalOption}
