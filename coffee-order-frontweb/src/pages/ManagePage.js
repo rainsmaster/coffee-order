@@ -46,19 +46,38 @@ const ManagePage = () => {
 
         if (status.status === 'RUNNING') {
           setIsSyncing(true);
-        } else if (status.status === 'COMPLETED' || status.status === 'FAILED') {
+        } else if (status.status === 'COMPLETED') {
+          // 완료 시 UI 리셋 및 알림
           setIsSyncing(false);
-          // 완료 또는 실패 시 폴링 중지
+          setSyncProgress(null);
           if (intervalId) {
             clearInterval(intervalId);
           }
-          // 완료 시 메뉴 새로고침
-          if (status.status === 'COMPLETED' && activeTab === 'twosomeMenu') {
+          showAlert('동기화가 완료되었습니다.');
+          if (activeTab === 'twosomeMenu') {
             loadData();
+          }
+        } else if (status.status === 'FAILED') {
+          // 실패 시 UI 리셋 및 알림
+          setIsSyncing(false);
+          setSyncProgress(null);
+          if (intervalId) {
+            clearInterval(intervalId);
+          }
+          showAlert(status.errorMessage || '동기화에 실패했습니다.');
+        } else if (status.status === 'IDLE') {
+          // 대기 상태면 UI 리셋 (다른 사용자의 동기화가 완료된 경우)
+          setIsSyncing(false);
+          setSyncProgress(null);
+          if (intervalId) {
+            clearInterval(intervalId);
           }
         }
       } catch (err) {
         console.error('동기화 상태 조회 실패:', err);
+        // API 오류 시에도 UI 리셋
+        setIsSyncing(false);
+        setSyncProgress(null);
       }
     };
 
