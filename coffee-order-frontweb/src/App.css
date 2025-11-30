@@ -14,6 +14,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  padding-bottom: 60px; /* 하단 네비게이션 높이만큼 패딩 */
 }
 
 /* 헤더 */
@@ -26,7 +27,7 @@ body {
 }
 
 .App-header h1 {
-  margin: 0 0 1rem 0;
+  margin: 0;
   font-size: 1.5rem;
   text-align: center;
   font-weight: 600;
@@ -72,75 +73,82 @@ body {
   color: rgba(255, 255, 255, 0.7);
 }
 
-/* 네비게이션 */
-.App-nav {
+/* 하단 고정 네비게이션 */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 60px;
+  background-color: #ffffff;
   display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  border-top: 1px solid #e0e0e0;
+  z-index: 1000;
+  padding-bottom: env(safe-area-inset-bottom); /* iOS 노치 대응 */
 }
 
-.App-nav button {
-  background-color: transparent;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: 0.5rem 1.2rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  font-weight: 500;
-  transition: all 0.2s;
-  min-width: 90px;
-}
-
-.App-nav button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
-}
-
-.App-nav button.active {
-  background-color: white;
-  color: #4a4a4a;
-  border-color: white;
-}
-
-/* 톱니바퀴 설정 버튼 */
-.App-header button.settings-button {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  min-width: auto;
-  padding: 0.2rem 0.3rem;
+.bottom-nav .nav-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background-color: transparent;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 4px;
+  flex: 1;
+  height: 100%;
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: all 0.2s;
+  color: #888;
+  transition: all 0.2s ease;
+  padding: 8px 0;
+  gap: 4px;
 }
 
-.App-header button.settings-button:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 0.5);
+.bottom-nav .nav-item svg {
+  width: 24px;
+  height: 24px;
+  transition: all 0.2s ease;
 }
 
-.App-header button.settings-button.active {
-  background-color: white;
+.bottom-nav .nav-item span {
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.bottom-nav .nav-item:hover {
+  color: #555;
+}
+
+.bottom-nav .nav-item.active {
   color: #4a4a4a;
-  border-color: white;
 }
 
-.App-header button.settings-button svg {
-  width: 14px;
-  height: 14px;
-  transition: transform 0.3s;
+.bottom-nav .nav-item.active svg {
+  stroke-width: 2.5;
 }
 
-.App-header button.settings-button:hover svg {
-  transform: rotate(90deg);
+.bottom-nav .nav-item.active span {
+  font-weight: 600;
+}
+
+/* 활성 상태 인디케이터 */
+.bottom-nav .nav-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 3px;
+  background-color: #4a4a4a;
+  border-radius: 0 0 3px 3px;
+}
+
+.bottom-nav .nav-item {
+  position: relative;
 }
 
 /* 메인 컨텐츠 */
@@ -159,12 +167,6 @@ body {
     font-size: 1.25rem;
   }
 
-  .App-nav button {
-    padding: 0.45rem 1rem;
-    font-size: 0.9rem;
-    min-width: 80px;
-  }
-
   .App-main {
     padding: 0.75rem;
   }
@@ -181,24 +183,16 @@ body {
 }
 
 @media (max-width: 480px) {
+  .App {
+    padding-bottom: 56px;
+  }
+
   .App-header {
     padding: 0.75rem;
   }
 
   .App-header h1 {
     font-size: 1.1rem;
-    margin-bottom: 0.75rem;
-  }
-
-  .App-nav {
-    gap: 0.4rem;
-  }
-
-  .App-nav button {
-    padding: 0.4rem 0.8rem;
-    font-size: 0.85rem;
-    min-width: auto;
-    flex: 1;
   }
 
   .App-main {
@@ -209,5 +203,18 @@ body {
     font-size: 0.8rem;
     padding: 0.3rem 0.5rem;
     min-width: 130px;
+  }
+
+  .bottom-nav {
+    height: 56px;
+  }
+
+  .bottom-nav .nav-item svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .bottom-nav .nav-item span {
+    font-size: 10px;
   }
 }
