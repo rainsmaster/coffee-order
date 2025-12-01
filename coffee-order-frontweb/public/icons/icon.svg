@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 배경 원 -->
+  <circle cx="256" cy="256" r="256" fill="#6F4E37"/>
+
+  <!-- 커피 컵 본체 -->
+  <path d="M140 180 L155 380 C158 400 175 415 195 415 L295 415 C315 415 332 400 335 380 L350 180 Z" fill="#FFFFFF"/>
+
+  <!-- 컵 안의 커피 -->
+  <path d="M152 200 L165 365 C167 380 180 390 195 390 L295 390 C310 390 323 380 325 365 L338 200 Z" fill="#3E2723"/>
+
+  <!-- 커피 거품/크레마 -->
+  <ellipse cx="245" cy="200" rx="88" ry="15" fill="#8D6E63"/>
+
+  <!-- 컵 손잡이 -->
+  <path d="M350 220 C390 220 410 260 410 300 C410 340 390 370 350 370" fill="none" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round"/>
+
+  <!-- 증기 1 -->
+  <path d="M200 140 C200 120 215 110 215 90 C215 70 200 60 200 40" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- 증기 2 -->
+  <path d="M245 130 C245 110 260 100 260 80 C260 60 245 50 245 30" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.7"/>
+
+  <!-- 증기 3 -->
+  <path d="M290 140 C290 120 305 110 305 90 C305 70 290 60 290 40" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round" opacity="0.7"/>
+</svg>

@@ -540,6 +540,28 @@
   margin-bottom: 0;
 }
 
+/* 메뉴 모드 변경 안내 메시지 */
+.mode-change-notice {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background-color: #fff8e6;
+  border: 1px solid #ffeeba;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.mode-change-notice p {
+  margin: 0;
+  color: #856404;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.mode-change-notice p:first-child {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
 /* 메뉴 모드 컨텐츠 영역 */
 .menu-mode-content {
   margin-top: 0.75rem;

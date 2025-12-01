@@ -22,6 +22,7 @@ const ManagePage = ({ initialTab }) => {
   const [todayOrderCount, setTodayOrderCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncProgress, setSyncProgress] = useState(null);
+  const [savedMenuMode, setSavedMenuMode] = useState(null); // 저장된 메뉴 모드 추적
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [modalType, setModalType] = useState(''); // 'department', 'team', 'menu'
@@ -125,6 +126,7 @@ const ManagePage = ({ initialTab }) => {
           orderAPI.getToday(selectedDepartmentId)
         ]);
         setSettings(settingsData);
+        setSavedMenuMode(settingsData.menuMode); // 저장된 메뉴 모드 기록
         setMenus(menuData);
         setTodayOrderCount(todayOrders.length);
       } else if (activeTab === 'department') {
@@ -275,11 +277,15 @@ const ManagePage = ({ initialTab }) => {
   const handleSaveSettings = async () => {
     try {
       await settingsAPI.update(settings, selectedDepartmentId);
+      setSavedMenuMode(settings.menuMode); // 저장된 메뉴 모드 업데이트
       showAlert('설정이 저장되었습니다.');
     } catch (err) {
       showAlert('저장 실패했습니다.');
     }
   };
+
+  // 메뉴 모드가 변경되었는지 확인
+  const isMenuModeChanged = savedMenuMode !== null && settings?.menuMode !== savedMenuMode;
 
   // 투썸 메뉴 전체 동기화 (메뉴 + 이미지 + 옵션)
   const handleSyncTwosomeMenu = async () => {
@@ -451,8 +457,16 @@ const ManagePage = ({ initialTab }) => {
                   </button>
                 </div>
 
+                {/* 메뉴 모드 변경 시 안내 메시지 */}
+                {isMenuModeChanged && (
+                  <div className="mode-change-notice">
+                    <p>메뉴 모드가 변경되었습니다.</p>
+                    <p>설정 저장 후 메뉴 등록/관리가 가능합니다.</p>
+                  </div>
+                )}
+
                 {/* 커스텀 메뉴 모드일 때: 메뉴 관리 UI */}
-                {settings.menuMode === 'CUSTOM' && (
+                {settings.menuMode === 'CUSTOM' && !isMenuModeChanged && (
                   <div className="menu-mode-content">
                     <div className="custom-menu-section">
                       <div className="custom-menu-header">
@@ -483,7 +497,7 @@ const ManagePage = ({ initialTab }) => {
                 )}
 
                 {/* 투썸 메뉴 모드일 때: 동기화 UI */}
-                {settings.menuMode === 'TWOSOME' && (
+                {settings.menuMode === 'TWOSOME' && !isMenuModeChanged && (
                   <div className="menu-mode-content">
                     <div className="sync-section">
                       <button

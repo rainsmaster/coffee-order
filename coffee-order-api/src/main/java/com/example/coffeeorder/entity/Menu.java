@@ -1,5 +1,6 @@
 package com.example.coffeeorder.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -24,11 +25,14 @@ public class Menu {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "department_id")
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JsonIgnore
     private Department department;
 
     @Column(nullable = false, length = 100)
     private String name;
+
+    @Column(nullable = false, length = 50)
+    private String category = "커피";
 
     @Column(name = "del_yn", nullable = false, length = 1)
     private String delYn = "N";

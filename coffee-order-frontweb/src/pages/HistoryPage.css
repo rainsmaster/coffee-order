@@ -40,6 +40,10 @@
   border-radius: 4px;
   font-size: 0.95rem;
   cursor: pointer;
+  text-align: center;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: #f5f5f5;
 }
 
 .date-selector input[type="date"]:focus {
