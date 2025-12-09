@@ -451,6 +451,77 @@
   margin-left: 0.5rem;
 }
 
+/* 메뉴 검색 */
+.menu-search-container {
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.menu-search-input {
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.menu-search-input:focus {
+  outline: none;
+  border-color: #6F4E37;
+}
+
+.menu-search-input::placeholder {
+  color: #999;
+}
+
+.menu-search-input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+.menu-search-clear {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0.25rem;
+  line-height: 1;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.menu-search-clear:hover {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+/* 검색 결과 없음 */
+.empty-search-result {
+  padding: 2rem 1rem;
+  text-align: center;
+  color: #888;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+/* 검색 결과 카드의 카테고리 표시 */
+.twosome-card-category {
+  font-size: 0.7rem;
+  color: #888;
+  margin-top: 0.25rem;
+  background-color: #f0f0f0;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+}
+
 /* 카테고리 버튼 그룹 */
 .category-buttons {
   display: flex;

@@ -23,6 +23,7 @@ const OrderPage = ({ onAddTeamMember, onAddMenu }) => {
   const [selectedSize, setSelectedSize] = useState('');
   const [personalOption, setPersonalOption] = useState(''); // 텍스트 입력 옵션
   const [orderAvailable, setOrderAvailable] = useState(true);
+  const [menuSearchQuery, setMenuSearchQuery] = useState(''); // 메뉴 검색어
 
   // 주문 변경 모달 상태
   const [isOrderChangeModalOpen, setIsOrderChangeModalOpen] = useState(false);
@@ -372,6 +373,32 @@ const OrderPage = ({ onAddTeamMember, onAddMenu }) => {
     setTwosomeMenuOptions(null);
     setSelectedTemperature('');
     setSelectedSize('');
+    setMenuSearchQuery(''); // 검색어 초기화
+  };
+
+  // 메뉴 검색 처리
+  const handleMenuSearch = (query) => {
+    setMenuSearchQuery(query);
+    if (query.trim()) {
+      setSelectedCategory(''); // 검색 시 카테고리 선택 해제
+    }
+  };
+
+  // 검색된 메뉴 목록 (투썸 모드 전용)
+  const getSearchedMenus = () => {
+    if (!menuSearchQuery.trim()) return [];
+    const query = menuSearchQuery.toLowerCase().trim();
+    const results = [];
+
+    Object.entries(twosomeMenus).forEach(([category, menuList]) => {
+      menuList.forEach((menu) => {
+        if (menu.menuNm.toLowerCase().includes(query)) {
+          results.push({ ...menu, category });
+        }
+      });
+    });
+
+    return results;
   };
 
   // 현재 선택된 카테고리의 메뉴 목록
@@ -384,9 +411,35 @@ const OrderPage = ({ onAddTeamMember, onAddMenu }) => {
     return menus;
   };
 
-  // 카테고리 목록 (투썸 메뉴만 사용)
+  // 카테고리 목록 (투썸 메뉴만 사용) - 순서 정렬
   const getCategories = () => {
-    return Object.keys(twosomeMenus);
+    const categoryOrder = [
+      '커피',
+      '음료',
+      '티/티라떼',
+      '아이스크림/빙수',
+      '베이커리',
+      '샌드위치',
+      '샐러드/기타',
+      '홀케이크',
+      '피스케이크',
+      '마카롱',
+      '스낵',
+      '카페용품',
+      '원두/티 상품'
+    ];
+
+    const categories = Object.keys(twosomeMenus);
+    return categories.sort((a, b) => {
+      const indexA = categoryOrder.indexOf(a);
+      const indexB = categoryOrder.indexOf(b);
+      // 둘 다 목록에 없으면 원래 순서 유지
+      if (indexA === -1 && indexB === -1) return 0;
+      // 목록에 없는 카테고리는 맨 뒤로
+      if (indexA === -1) return 1;
+      if (indexB === -1) return -1;
+      return indexA - indexB;
+    });
   };
 
   // 투썸 메뉴 선택 시 옵션 로드
@@ -580,25 +633,83 @@ const OrderPage = ({ onAddTeamMember, onAddMenu }) => {
           </div>
         )}
 
-        {/* 투썸 메뉴 모드 - 1단계: 카테고리 선택 */}
+        {/* 투썸 메뉴 모드 - 검색 및 카테고리 선택 */}
         {isTwosomeMode && (
           <div className="form-group">
             <label>메뉴 선택 <span className="mode-badge">투썸 메뉴</span></label>
-            <div className="category-buttons">
-              {getCategories().map((category) => (
+
+            {/* 메뉴 검색 입력 */}
+            <div className="menu-search-container">
+              <input
+                type="text"
+                className="menu-search-input"
+                placeholder="메뉴 검색 (예: 아메리카노, 라떼)"
+                value={menuSearchQuery}
+                onChange={(e) => handleMenuSearch(e.target.value)}
+                disabled={!orderAvailable}
+              />
+              {menuSearchQuery && (
                 <button
-                  key={category}
-                  className={`category-btn ${selectedCategory === category ? 'selected' : ''}`}
-                  onClick={() => handleCategorySelect(category)}
-                  disabled={!orderAvailable}
+                  className="menu-search-clear"
+                  onClick={() => setMenuSearchQuery('')}
+                  type="button"
                 >
-                  {category}
-                  {twosomeMenus[category] && (
-                    <span className="category-count">({twosomeMenus[category].length})</span>
-                  )}
+                  ✕
                 </button>
-              ))}
+              )}
             </div>
+
+            {/* 카테고리 버튼 (검색 중이 아닐 때만 표시) */}
+            {!menuSearchQuery && (
+              <div className="category-buttons">
+                {getCategories().map((category) => (
+                  <button
+                    key={category}
+                    className={`category-btn ${selectedCategory === category ? 'selected' : ''}`}
+                    onClick={() => handleCategorySelect(category)}
+                    disabled={!orderAvailable}
+                  >
+                    {category}
+                    {twosomeMenus[category] && (
+                      <span className="category-count">({twosomeMenus[category].length})</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 투썸 메뉴 모드 - 검색 결과 */}
+        {isTwosomeMode && menuSearchQuery && (
+          <div className="form-group">
+            <label>검색 결과 ({getSearchedMenus().length}건)</label>
+            {getSearchedMenus().length === 0 ? (
+              <div className="empty-search-result">
+                '{menuSearchQuery}'에 대한 검색 결과가 없습니다.
+              </div>
+            ) : (
+              <div className="twosome-card-grid">
+                {getSearchedMenus().map((menu) => (
+                  <button
+                    key={menu.id}
+                    className={`twosome-card ${
+                      selectedTwosomeMenu === menu.id.toString() ? 'selected' : ''
+                    }`}
+                    onClick={() => handleTwosomeMenuSelect(menu.id.toString(), menu.menuCd)}
+                    disabled={!orderAvailable}
+                  >
+                    <img
+                      src={menu.localImgPath || `https://mcdn.twosome.co.kr${menu.menuImg02 || menu.menuImg}`}
+                      alt={menu.menuNm}
+                      onError={(e) => { e.target.src = 'https://via.placeholder.com/120?text=No+Image'; }}
+                    />
+                    <span className="twosome-card-name">{menu.menuNm}</span>
+                    <span className="twosome-card-category">{menu.category}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
