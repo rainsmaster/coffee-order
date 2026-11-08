@@ -38,6 +38,7 @@ pipeline {
                 SPRING_DATASOURCE_URL = 'jdbc:h2:mem:jenkins_test;DB_CLOSE_DELAY=-1'
                 TWOSOME_KEEPALIVE_ENABLED = 'false'
                 TWOSOME_MENU_REFRESH_ENABLED = 'false'
+                CI = 'false'
             }
             steps {
                 sh 'docker rm -f coffee-test-redis >/dev/null 2>&1 || true'
