@@ -33,8 +33,22 @@ pipeline {
         }
 
         stage('Test') {
+            environment {
+                SPRING_DATA_REDIS_HOST = 'coffee-test-redis'
+                SPRING_DATASOURCE_URL = 'jdbc:h2:mem:jenkins_test;DB_CLOSE_DELAY=-1'
+                TWOSOME_KEEPALIVE_ENABLED = 'false'
+                TWOSOME_MENU_REFRESH_ENABLED = 'false'
+            }
             steps {
+                sh 'docker rm -f coffee-test-redis >/dev/null 2>&1 || true'
+                sh 'docker run --rm -d --name coffee-test-redis --network coffee-jenkins_default redis:7-alpine'
+                sh 'for attempt in $(seq 1 30); do if docker exec coffee-test-redis redis-cli ping; then exit 0; fi; sleep 1; done; exit 1'
                 sh './mvnw --batch-mode clean package'
+            }
+            post {
+                always {
+                    sh 'docker rm -f coffee-test-redis >/dev/null 2>&1 || true'
+                }
             }
         }
 
