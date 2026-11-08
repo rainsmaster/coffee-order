@@ -1,0 +1,31 @@
+name: coffee-jenkins
+
+services:
+  jenkins:
+    build:
+      context: .
+      pull: true
+      no_cache: true
+    image: coffee-order-jenkins:2.580.2
+    container_name: coffee-jenkins
+    restart: unless-stopped
+    user: root
+    ports:
+      - "18080:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - TZ=Asia/Seoul
+      - JAVA_OPTS=-Duser.timezone=Asia/Seoul
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/login"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+
+volumes:
+  jenkins-home:

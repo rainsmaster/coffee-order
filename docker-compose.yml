@@ -1,5 +1,5 @@
 # 시놀로지 NAS 배포용 Docker Compose
-# Container Manager > 프로젝트에서 사용
+# Jenkins 또는 Container Manager에서 사용
 
 services:
   redis:
@@ -24,7 +24,7 @@ services:
     ports:
       - "8888:8080"
     volumes:
-      - ./data:/app/data
+      - ${APP_DATA_DIR:-/volume1/docker/mywebsite/data}:/app/data
     environment:
       - SPRING_PROFILES_ACTIVE=mysql
       - DB_HOST=mysql
@@ -49,6 +49,12 @@ services:
         condition: service_started
     networks:
       - coffee-network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 60s
 
   mysql:
     image: mysql:8.4
@@ -77,8 +83,7 @@ services:
       start_period: 30s
 
   ocr:
-    build: ./ocr-service
-    image: coffee-order-ocr:main
+    image: ${OCR_IMAGE:-coffee-order-ocr:main}
     container_name: coffee-ocr
     restart: always
     ports:

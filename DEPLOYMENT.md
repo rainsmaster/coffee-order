@@ -181,9 +181,83 @@ MySQL 데이터는 Compose의 `mysql-data` Docker 볼륨에 저장된다. File S
 
 이 스크립트는 Flyway `db/migration`에 넣지 않는다. 이후 스키마 변경은 새 Flyway 버전으로 관리한다. 운영 `coffee` 계정에는 `coffee_order` 전체 권한이 있어 이 전환 SQL을 실행할 수 있다.
 
-## Container Manager 배포
+## Jenkins 수동 빌드·배포
 
-전환 검증이 끝난 후의 배포 순서:
+일반 배포는 Jenkins의 `Jenkinsfile`을 사용한다. GitHub 웹훅과 주기적 빌드는 설정하지 않으며, 관리자가 `Build with Parameters`로 직접 실행한다.
+
+- `DEPLOY=false`: 테스트와 앱·OCR 이미지 빌드만 수행한다.
+- `DEPLOY=true`: 빌드 후 별도 승인 화면을 거쳐 운영 앱·OCR만 교체한다.
+- 이미지 태그는 12자리 Git 커밋 해시다. 기존 이미지를 덮어쓰지 않는다.
+- 배포 스크립트는 현재 Compose 프로젝트를 자동으로 찾고 MySQL·Redis의 컨테이너 ID와 저장소가 바뀌지 않았는지 검증한다.
+- `/actuator/health`와 부서 조회 API가 성공해야 배포가 완료된다. 실패하면 이전 앱 이미지로 되돌린다.
+- DB 구조 변경이 있는 배포는 최신 백업과 롤백 가능 여부를 별도로 확인한다. 앱 이미지 롤백이 DB 롤백을 대신하지 않는다.
+
+### Jenkins 설치
+
+`jenkins/`의 파일을 NAS `/volume1/docker/jenkins`에 올린다. Container Manager에서 이 경로로 별도 프로젝트를 만들고 `docker-compose.yml`을 선택해 빌드한다. SSH를 사용한다면 다음과 같다.
+
+```bash
+cd /volume1/docker/jenkins
+docker compose up -d --build
+```
+
+Jenkins 설정은 `coffee-jenkins_jenkins-home` Docker 볼륨에 보존하고, NAS Docker 소켓을 사용해 이미지를 빌드한다. 컨테이너 시작 스크립트가 Docker 소켓 그룹을 설정한 뒤 Jenkins 실행 사용자를 `jenkins`로 전환한다. 운영 앱 Compose와 분리된 프로젝트이므로 `coffee-jenkins`만 생성된다. Jenkins 홈은 Synology ACL 영향이 없는 이름 볼륨을 사용한다. Jenkins 실행은 Java 21, 애플리케이션 빌드 결과는 Java 17을 사용한다. Jenkins base 이미지는 Dockerfile에 다이제스트로 고정하고, `pull`과 `no_cache`로 캐시된 구버전을 재사용하지 않는다.
+
+초기 관리자 설정은 외부 공개 전에 NAS와 같은 네트워크에서 완료하는 것을 권장한다. 외부 터널을 먼저 연 경우에도 Setup Wizard 잠금 해제와 관리자 생성 전에는 운영하지 않는다.
+
+```text
+http://192.168.0.48:18080
+```
+
+초기 관리자 비밀번호는 Container Manager의 `coffee-jenkins` 로그에서 확인한다. 설치 마법사에서 권장 플러그인을 다시 설치할 필요는 없다. 관리자 계정과 Jenkins URL을 설정한 뒤 로그인한다.
+
+### Jenkins Credentials
+
+`Manage Jenkins > Credentials > System > Global credentials`에서 다음 항목을 만든다. 값은 Git과 Jenkinsfile에 넣지 않는다.
+
+| ID | 종류 | 값 |
+| --- | --- | --- |
+| `coffee-mysql-password` | Secret text | 기존 MySQL `coffee` 계정 비밀번호 |
+| `coffee-mysql-root-password` | Secret text | 기존 MySQL root 비밀번호 |
+| `coffee-twosome-admin` | Username with password | 매장 메뉴 갱신용 투썸 관리자 계정 |
+| `coffee-twosome-crypto-key` | Secret text | 기존 대표 계정 암호화 키, Base64 32바이트 |
+| `coffee-admin-password` | Secret text | 허다방 관리자 비밀번호 |
+
+MySQL root 비밀번호를 Compose 값만 바꾼다고 실제 비밀번호가 변경되지는 않는다. Redis의 기존 암호화 키로 암호화한 대표 계정이 있으면 새 키를 만들지 말고 같은 키를 등록한다.
+
+### Pipeline 작업
+
+1. `New Item > Pipeline`에서 `coffee-order` 작업을 만든다.
+2. Pipeline 정의를 `Pipeline script from SCM`으로 선택한다.
+3. SCM은 `Git`, 저장소는 `https://github.com/rainsmaster/coffee-order.git`, 브랜치는 `*/main`으로 설정한다.
+4. Script Path는 `Jenkinsfile`로 설정한다.
+5. 빌드 트리거는 모두 끄고 저장한다.
+6. 첫 실행은 `DEPLOY`를 체크하지 않고 `Build with Parameters`를 눌러 이미지 빌드만 검증한다.
+7. 운영 배포는 최신 MySQL 백업을 확인한 뒤 `DEPLOY=true`로 실행하고 승인 화면에서 `배포 실행`을 누른다.
+
+Jenkins가 Git에서 `Jenkinsfile`을 읽으므로 파이프라인 변경은 해당 파일을 커밋·푸시한 뒤 실행해야 한다.
+
+### 외부 HTTPS 접속
+
+초기 설정이 끝난 후 `jenkins.heodabang.me`를 사용한다. 기존 `허다방` Cloudflare Tunnel을 재사용하므로 공유기/NAT에 18080 포트를 열 필요가 없다.
+
+1. Cloudflare Dashboard에서 `Networking > Tunnels > 허다방 > Routes > Add route`를 선택한다.
+2. `Published application`을 선택하고 다음을 입력한다.
+   - Subdomain: `jenkins`
+   - Domain: `heodabang.me`
+   - Service URL: `http://192.168.0.48:18080`
+3. `Add route`를 누륀다. `jenkins.heodabang.me` CNAME이 터널 주소로 자동 생성된다.
+4. `Manage Jenkins > System > Jenkins URL`을 `https://jenkins.heodabang.me/`로 설정한다.
+
+Cloudflare가 외부 HTTPS를 처리하고, tunnel은 NAS의 Jenkins HTTP 포트에 outbound 연결로 전달한다. DSM 리버스 프록시나 추가 인증서·포트 전달은 필요하지 않다.
+
+Jenkins 관리자와 Pipeline 설정 권한은 관리자에게만 허용한다. 익명 사용자의 읽기·빌드 권한과 가입 기능은 허용하지 않는다. Jenkins가 Docker 소켓을 사용하므로 외부 관리자 계정에는 강한 고유 비밀번호를 사용한다.
+
+운영 앱은 이제 Container Manager에서 다시 빌드하지 않고 Jenkins로만 배포한다. Container Manager에서는 상태와 로그를 확인한다.
+
+## Container Manager 수동 배포
+
+Jenkins를 사용하지 않는 예외 상황의 수동 배포 순서:
 
 1. 앱 이미지 tar와 OCR 관련 파일을 NAS에 업로드한다.
 2. Container Manager에서 이미지를 불러온다.
