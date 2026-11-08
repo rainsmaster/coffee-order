@@ -14,5 +14,6 @@ import java.util.List;
 @AllArgsConstructor
 public class TwosomeCartAddRequest {
 
+    private Long targetRepMemberId;
     private List<TwosomeCartItemRequest> items;
 }

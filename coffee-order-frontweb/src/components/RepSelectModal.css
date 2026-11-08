@@ -1,0 +1,58 @@
+.rep-select-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.rep-select-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 16px;
+  border: 1px solid #d8dee8;
+  border-radius: 10px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rep-select-item.selected {
+  border-color: #4b7b63;
+  background: #edf5ef;
+}
+
+.rep-select-item:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.rep-select-name {
+  font-weight: 600;
+}
+
+.rep-select-status {
+  font-size: 13px;
+}
+
+.rep-select-status.available {
+  color: #276749;
+}
+
+.rep-select-status.unavailable {
+  color: #7a4d4d;
+}
+
+.rep-select-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.rep-select-actions button {
+  min-height: 44px;
+}

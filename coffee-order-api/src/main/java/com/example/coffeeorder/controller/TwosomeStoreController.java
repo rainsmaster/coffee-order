@@ -4,8 +4,6 @@ import com.example.coffeeorder.dto.TwosomeAutoReloginResult;
 import com.example.coffeeorder.dto.TwosomeCaptchaResponse;
 import com.example.coffeeorder.dto.TwosomeCartAddRequest;
 import com.example.coffeeorder.dto.TwosomeCartAddResponse;
-import com.example.coffeeorder.dto.TwosomeCartCustomItemResponse;
-import com.example.coffeeorder.dto.TwosomeCartCustomListRequest;
 import com.example.coffeeorder.dto.TwosomeCartItemResponse;
 import com.example.coffeeorder.dto.TwosomeCartQtyAdjustRequest;
 import com.example.coffeeorder.dto.TwosomeHealthResponse;
@@ -31,14 +29,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * 투썸 연동 PoC 컨트롤러.
- * 관리자 1인 전용이므로 인증/권한 체크는 생략한다.
+ * 관리자 계정 연동과 메뉴 옵션 API.
+ * 대표별 실제 장바구니 요청은 RepController가 담당한다.
  */
 @Slf4j
 @RestController
@@ -225,33 +222,6 @@ public class TwosomeStoreController {
         return ResponseEntity.ok(result);
     }
 
-    // 장바구니 항목의 퍼스널 옵션(커스텀) 명세 조회 (읽기 전용, 관리자/대표 공통)
-    @PostMapping("/cart/custom-list")
-    public ResponseEntity<List<TwosomeCartCustomItemResponse>> getCartCustomList(
-            @RequestHeader(value = "X-Rep-Token", required = false) String repToken,
-            @RequestBody TwosomeCartCustomListRequest request) {
-        Long repMemberId = repAuthService.resolveMemberIdIfValid(repToken).orElse(null);
-        String sessionKey = twosomeStoreIntegrationService.resolveOptionSessionKey(repMemberId);
-        JsonNode list = twosomeStoreIntegrationService.getCartCustomList(
-                sessionKey, request.getCartNo(), request.getCartDtlNo());
-        List<TwosomeCartCustomItemResponse> result = new ArrayList<>();
-        if (list.isArray()) {
-            for (JsonNode node : list) {
-                result.add(new TwosomeCartCustomItemResponse(
-                        textOf(node, "CSTM_NM"),
-                        firstInt(node, null, "PRICE"),
-                        firstInt(node, null, "CSTM_ORD_CNT"),
-                        textOf(node, "CSTM_SEL_ID"),
-                        textOf(node, "CSTM_GRP_CD"),
-                        textOf(node, "TYPE_ADD_CD"),
-                        textOf(node, "CSTM_ADD_CD"),
-                        textOf(node, "TYPE_CHG_CD"),
-                        textOf(node, "CSTM_CHG_CD")));
-            }
-        }
-        return ResponseEntity.ok(result);
-    }
-
     // 투썸 장바구니 전체 비우기
     @PostMapping("/cart/clear")
     public ResponseEntity<Map<String, Object>> clearCart() {
@@ -261,21 +231,6 @@ public class TwosomeStoreController {
         result.put("deletedCount", deletedCount);
         result.put("message", String.format("장바구니 %d건이 삭제되었습니다.", deletedCount));
         return ResponseEntity.ok(result);
-    }
-
-    private static String textOf(JsonNode node, String fieldName) {
-        JsonNode value = node.get(fieldName);
-        return (value != null && value.isTextual()) ? value.asText() : null;
-    }
-
-    private static Integer firstInt(JsonNode node, Integer defaultValue, String... fieldNames) {
-        for (String fieldName : fieldNames) {
-            JsonNode value = node.get(fieldName);
-            if (value != null && value.isNumber()) {
-                return value.asInt();
-            }
-        }
-        return defaultValue;
     }
 
     // 세션 만료 공통 처리 (401 + JSON)

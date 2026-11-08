@@ -690,3 +690,42 @@
   color: #888;
   font-size: 0.85rem;
 }
+
+.manage-tabs {
+  flex-wrap: wrap;
+}
+
+.manage-tabs button {
+  flex: 1 1 120px;
+  min-height: 44px;
+}
+
+.store-settings-list {
+  margin: 1rem 0 0;
+}
+
+.store-settings-list > div {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: 1rem;
+  padding: 0.85rem 0;
+  border-bottom: 1px solid #eee;
+  line-height: 1.55;
+}
+
+.store-settings-list dt {
+  font-weight: 600;
+  color: #444;
+}
+
+.store-settings-list dd {
+  margin: 0;
+  color: #666;
+}
+
+@media (max-width: 600px) {
+  .store-settings-list > div {
+    grid-template-columns: 1fr;
+    gap: 0.25rem;
+  }
+}

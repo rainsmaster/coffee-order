@@ -14,5 +14,8 @@ public class RepPublicItem {
 
     private Long id;
     private String name;
+    private Long teamId;
     private String teamName;
+    private String twosomeStatus;
+    private String statusReason;
 }

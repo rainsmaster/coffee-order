@@ -20,7 +20,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // 부서 ID와 날짜로 주문 조회
     List<Order> findByDepartmentIdAndOrderDateAndDelYn(Long departmentId, LocalDate orderDate, String delYn);
 
-    Optional<Order> findByTeamAndOrderDateAndDelYn(Team team, LocalDate orderDate, String delYn);
+    List<Order> findByTeamAndOrderDateAndDelYn(Team team, LocalDate orderDate, String delYn);
 
     // 특정 날짜에 팀원이 이미 주문했는지 확인
     boolean existsByTeamAndOrderDateAndDelYn(Team team, LocalDate orderDate, String delYn);

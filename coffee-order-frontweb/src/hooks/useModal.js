@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 const useModal = () => {
   const [isAlertOpen, setIsAlertOpen] = useState(false);
@@ -7,10 +7,10 @@ const useModal = () => {
   const [confirmConfig, setConfirmConfig] = useState({ message: '', title: '확인', onConfirm: null });
 
   // Alert 모달 열기
-  const showAlert = (message, title = '알림') => {
+  const showAlert = useCallback((message, title = '알림') => {
     setAlertConfig({ message, title });
     setIsAlertOpen(true);
-  };
+  }, []);
 
   // Alert 모달 닫기
   const closeAlert = () => {

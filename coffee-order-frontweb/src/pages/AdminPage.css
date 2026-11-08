@@ -1,4 +1,4 @@
-/* 관리자 페이지 (/admin) */
+/* 설정 탭의 관리자 영역 */
 .admin-page {
   max-width: 860px;
   margin: 0 auto;
@@ -101,8 +101,7 @@
 
 /* 폼 카드 / 목록 카드 */
 .admin-form-card,
-.admin-list-card,
-.invite-result-card {
+.admin-list-card {
   margin-bottom: 1.25rem;
   padding: 1rem 1.25rem;
   background-color: #fff;
@@ -111,8 +110,7 @@
 }
 
 .admin-form-card h2,
-.admin-list-card h2,
-.invite-result-card h2 {
+.admin-list-card h2 {
   margin: 0 0 0.75rem;
   font-size: 1rem;
   color: #333;
@@ -172,34 +170,81 @@
   margin-right: 0;
 }
 
-/* 초대코드 결과 */
-.invite-result-card {
-  border-color: #2e7d32;
+.admin-page.embedded {
+  padding: 0;
 }
 
-.invite-warning {
-  margin: 0 0 0.9rem;
-  color: #c62828;
-  font-size: 0.85rem;
-  line-height: 1.5;
+.admin-table-scroll {
+  overflow-x: auto;
 }
 
-.invite-code-row {
+.admin-form-card label,
+.release-notes-admin > .admin-form-card > label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+  color: #555;
+  font-size: 0.88rem;
+}
+
+.release-notes-admin input,
+.release-notes-admin textarea {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.release-note-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 0.75rem;
+}
+
+.release-note-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+}
+
+.release-notes-admin .release-note-publish {
+  flex-direction: row;
+  align-items: center;
+}
+
+.release-notes-admin .release-note-publish input {
+  width: auto;
+}
+
+.release-note-admin-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 44px;
+  padding: 0.65rem 0;
+  border-bottom: 1px solid #eee;
 }
 
-.invite-code {
-  font-family: monospace;
-  font-size: 1.6rem;
-  letter-spacing: 0.25rem;
-  font-weight: 700;
-  color: #2e7d32;
-  padding: 0.4rem 0.8rem;
-  background-color: #f1f8f2;
-  border: 1px dashed #2e7d32;
-  border-radius: 6px;
+.release-note-admin-item p {
+  margin: 0.25rem 0 0;
+  color: #777;
+  font-size: 0.8rem;
+}
+
+@media (max-width: 600px) {
+  .release-note-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-login-card {
+    margin-top: 1rem;
+    padding: 1.25rem;
+  }
 }
 
 .no-data {

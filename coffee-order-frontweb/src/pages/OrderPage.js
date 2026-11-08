@@ -5,8 +5,10 @@ import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 import OrderChangeModal from '../components/OrderChangeModal';
 import ReorderModal from '../components/ReorderModal';
+import RepSelectModal from '../components/RepSelectModal';
 import Modal from '../components/Modal';
 import useModal from '../hooks/useModal';
+import { isWithinStoreHours } from '../utils/storeHours';
 import './OrderPage.css';
 
 const OrderPage = ({ onAddTeamMember }) => {
@@ -38,7 +40,6 @@ const OrderPage = ({ onAddTeamMember }) => {
   // 재주문 모달 상태
   const [latestOrder, setLatestOrder] = useState(null);
   const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
-  const [isReorderLoading, setIsReorderLoading] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,13 +49,15 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [isCombinedResultOpen, setIsCombinedResultOpen] = useState(false);
   const [isCartLoading, setIsCartLoading] = useState(false); // 주문~장바구니 통합 처리 중
 
-  // 팀 대표 로그인 상태 (1단계: 로그인 표시까지만, 주문 강제는 없음)
-  const [repInfo, setRepInfo] = useState(null); // {id, name, teamName}
-  const [orderCartMode, setOrderCartMode] = useState(null); // 'rep' | null (주문 버튼 라벨용, 대표 세션 전용)
+  const [repInfo, setRepInfo] = useState(null);
   const [isStoreOpen, setIsStoreOpen] = useState(false); // 폐점 게이팅용 개점 여부 (조회 실패 시 false=폐점 취급)
   const [repModalMode, setRepModalMode] = useState(null); // 'login' | 'setup' | 'change' | null
   const [repList, setRepList] = useState([]); // GET /api/reps
-  const [repForm, setRepForm] = useState({ memberId: '', pin: '', inviteCode: '', newPin: '', newPinConfirm: '', currentPin: '' });
+  const [repSelectOpen, setRepSelectOpen] = useState(false);
+  const [selectedTargetRepId, setSelectedTargetRepId] = useState(null);
+  const [pendingOrder, setPendingOrder] = useState(null);
+  const [pendingCartOrder, setPendingCartOrder] = useState(null);
+  const [repForm, setRepForm] = useState({ memberId: '', teamMemberId: '', pin: '', newPin: '', newPinConfirm: '', currentPin: '' });
   const [repLoading, setRepLoading] = useState(false);
   const [repTwosomeStatus, setRepTwosomeStatus] = useState('NONE'); // 대표 투썸 세션 상태
   const [repMe, setRepMe] = useState(null); // GET /api/rep/me (twosomeAccount 등)
@@ -76,7 +79,6 @@ const OrderPage = ({ onAddTeamMember }) => {
     closeAlert,
     isConfirmOpen,
     confirmConfig,
-    showConfirm,
     closeConfirm,
   } = useModal();
 
@@ -84,6 +86,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   useEffect(() => {
     if (selectedDepartmentId) {
       loadData();
+      loadRepList();
       resetOrderForm();
     }
 
@@ -95,6 +98,7 @@ const OrderPage = ({ onAddTeamMember }) => {
     }, 5000);
 
     return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDepartmentId]);
 
   const loadData = async () => {
@@ -125,6 +129,23 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
+  const loadRepList = async () => {
+    try {
+      const list = await repAPI.list(selectedDepartmentId) || [];
+      setRepList(list);
+      setSelectedTargetRepId((current) => {
+        const selected = list.find((rep) => rep.id === current && rep.twosomeStatus === 'ACTIVE');
+        return selected?.id || list.find((rep) => rep.twosomeStatus === 'ACTIVE')?.id || null;
+      });
+      return list;
+    } catch (err) {
+      setRepList([]);
+      setSelectedTargetRepId(null);
+      console.error('대표 목록 조회 실패:', err);
+      return [];
+    }
+  };
+
   // 팀원 선택 시 최근 주문 조회
   const handleTeamSelect = async (teamId) => {
     setSelectedTeam(teamId);
@@ -145,54 +166,34 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
-  // 재주문 처리 - 바로 주문하기
   const handleReorderConfirm = async () => {
     if (!latestOrder || !selectedTeam) return;
-
-    setIsReorderLoading(true);
-
-    try {
-      // 기존 주문이 있는지 확인
-      const existingOrder = orders.find(
-        (o) => o.teamId === parseInt(selectedTeam)
-      );
-
-      const orderData = {
-        departmentId: selectedDepartmentId,
-        teamId: parseInt(selectedTeam),
-        twosomeMenuId: latestOrder.twosomeMenuId,
-        personalOption: latestOrder.personalOption || null,
-        orderDate: new Date().toLocaleDateString('sv-SE'),
-      };
-
-      if (existingOrder) {
-        // 기존 주문이 있으면 수정
-        const updatedOrder = {
-          team: { id: parseInt(selectedTeam) },
-          menuType: 'TWOSOME',
-          twosomeMenu: latestOrder.twosomeMenuId
-            ? { id: latestOrder.twosomeMenuId }
-            : null,
-          personalOption: orderData.personalOption,
-          orderDate: existingOrder.orderDate,
-        };
-        await orderAPI.update(existingOrder.id, updatedOrder, selectedDepartmentId);
-        showAlert('주문이 변경되었습니다!');
-      } else {
-        // 새 주문 생성
-        await orderAPI.create(orderData);
-        showAlert('주문이 완료되었습니다!');
-      }
-
-      setIsReorderModalOpen(false);
-      setLatestOrder(null);
-      resetOrderForm();
-      loadOrders();
-    } catch (err) {
-      showAlert(err.message || '주문에 실패했습니다.');
-    } finally {
-      setIsReorderLoading(false);
+    const orderData = {
+      departmentId: selectedDepartmentId,
+      teamId: parseInt(selectedTeam, 10),
+      twosomeMenuId: latestOrder.twosomeMenuId,
+      personalOption: latestOrder.personalOption || null,
+      orderDate: new Date().toLocaleDateString('sv-SE'),
+      variantMenuCd: latestOrder.variantMenuCd || null,
+      variantOpts: latestOrder.variantOpts || null,
+      cstmInfo: latestOrder.cstmInfo || null,
+    };
+    const existingOrders = orders.filter((order) => order.teamId === orderData.teamId);
+    setIsReorderModalOpen(false);
+    setLatestOrder(null);
+    if (existingOrders.length > 0) {
+      setOrderChangeData({
+        teamName: getSelectedTeamName(),
+        existingOrders,
+        selectedExistingId: existingOrders[0].id,
+        new: { menuName: latestOrder.menuName, option: latestOrder.personalOption },
+        newOrderData: orderData,
+      });
+      setIsOrderChangeModalOpen(true);
+      return;
     }
+    resetOrderForm();
+    await createOrderAndMaybeCart(orderData);
   };
 
   // 재주문 버튼 클릭 시 모달 열기
@@ -251,20 +252,12 @@ const OrderPage = ({ onAddTeamMember }) => {
       finalOption = optionParts || personalOption;
     }
 
-    // 기존 주문이 있는지 확인
-    const existingOrder = orders.find(
-      (o) => o.teamId === parseInt(selectedTeam)
-    );
-
-    if (existingOrder) {
-      // 기존 주문이 있으면 비교 팝업 표시
+    const existingOrders = orders.filter((order) => order.teamId === parseInt(selectedTeam, 10));
+    if (existingOrders.length > 0) {
       setOrderChangeData({
-        existingOrder: existingOrder,
+        existingOrders,
+        selectedExistingId: existingOrders[0].id,
         teamName: getSelectedTeamName(),
-        existing: {
-          menuName: existingOrder.menuName,
-          option: existingOrder.personalOption || null
-        },
         new: {
           menuName: getSelectedMenuName(),
           option: finalOption || null
@@ -283,52 +276,25 @@ const OrderPage = ({ onAddTeamMember }) => {
       return;
     }
 
-    // 기존 주문이 없으면 새로 생성 후 이어서 장바구니 담기
+    await createOrderAndMaybeCart({
+      departmentId: selectedDepartmentId,
+      teamId: parseInt(selectedTeam),
+      twosomeMenuId: parseInt(selectedTwosomeMenu),
+      personalOption: finalOption || null,
+      orderDate: new Date().toLocaleDateString('sv-SE'),
+      variantMenuCd: variantInfo?.variantMenuCd ?? null,
+      variantOpts: getSelectedOptsList().join(',') || null,
+      cstmInfo: variantInfo?.variantMenuCd
+        ? (JSON.stringify(buildCartCstmInfo(variantInfo.variantMenuCd)) || null)
+        : null,
+    });
+  };
+
+  const createOrderAndMaybeCart = async (newOrderData) => {
     setIsCartLoading(true);
     try {
-      const order = {
-        departmentId: selectedDepartmentId,
-        teamId: parseInt(selectedTeam),
-        twosomeMenuId: parseInt(selectedTwosomeMenu),
-        personalOption: finalOption || null,
-        orderDate: new Date().toLocaleDateString('sv-SE'),
-        // 투썸 변형 정보 영속화 — 다른 기기에서도 변형 코드로 장바구니 담기 가능
-        variantMenuCd: variantInfo?.variantMenuCd ?? null,
-        variantOpts: getSelectedOptsList().join(',') || null,
-        // 투썸 퍼스널 옵션 (cartCstmInfo 배열 스냅샷)
-        cstmInfo: variantInfo?.variantMenuCd
-          ? (JSON.stringify(buildCartCstmInfo(variantInfo.variantMenuCd)) || null)
-          : null,
-      };
-
-      const createdOrder = await orderAPI.create(order);
-
-      // (b) 로그인 + 개점 상태일 때만 장바구니 담기 (폐점/비로그인은 팀 주문서 저장만)
-      const loggedIn = orderCartMode !== null;
-      let cartOutcome;
-      if (loggedIn && isStoreOpen) {
-        cartOutcome = await runCartStepAfterOrder();
-
-        // 장바구니 담기 성공 시 반영 마킹 (일괄 담기 대상에서 제외)
-        if (cartOutcome.type === 'cart' && cartOutcome.result?.success > 0 && createdOrder?.id) {
-          try {
-            await orderAPI.markCartReflected([createdOrder.id]);
-          } catch (markErr) {
-            console.error('장바구니 반영 마킹 실패 (무시):', markErr);
-          }
-        }
-      } else if (loggedIn && !isStoreOpen) {
-        cartOutcome = { type: 'store-closed' };
-      } else {
-        cartOutcome = { type: 'no-session' };
-      }
-
-      // (c) 통합 결과 모달
-      setCombinedResult({ cartOutcome });
-      setIsCombinedResultOpen(true);
-      if (loggedIn && !isStoreOpen) {
-        showAlert('매장이 닫혀 있어 장바구니 담기는 불가합니다. 팀 주문서에 담았으며, 개장 후 내역 페이지에서 일괄 담기할 수 있습니다.');
-      }
+      const createdOrder = await orderAPI.create(newOrderData);
+      await prepareCartOutcome(createdOrder);
       resetOrderForm();
       loadOrders();
     } catch (err) {
@@ -338,32 +304,125 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
-  // 주문 변경 확인 처리
-  const handleOrderChangeConfirm = async () => {
-    if (!orderChangeData) return;
+  const prepareCartOutcome = async (createdOrder) => {
+    const storeOpen = await loadStoreOpen();
+    if (!storeOpen) {
+      setCombinedResult({ cartOutcome: { type: 'store-closed' } });
+      setIsCombinedResultOpen(true);
+      return;
+    }
 
+    const latestReps = await loadRepList();
+    if (latestReps.length === 0) {
+      setPendingCartOrder(createdOrder);
+      setCombinedResult({ cartOutcome: { type: 'no-reps' } });
+      setIsCombinedResultOpen(true);
+      return;
+    }
+
+    if (latestReps.length === 1) {
+      const rep = latestReps[0];
+      if (rep.twosomeStatus !== 'ACTIVE') {
+        setPendingCartOrder(createdOrder);
+        setCombinedResult({ cartOutcome: { type: 'rep-login-required', owner: rep.name, repId: rep.id } });
+        setIsCombinedResultOpen(true);
+        return;
+      }
+      await executeCartForRep(rep, createdOrder);
+      return;
+    }
+
+    const activeRep = latestReps.find((rep) => rep.twosomeStatus === 'ACTIVE');
+    if (!activeRep) {
+      setPendingCartOrder(createdOrder);
+      setCombinedResult({ cartOutcome: { type: 'rep-login-required', owner: latestReps[0].name, repId: latestReps[0].id } });
+      setIsCombinedResultOpen(true);
+      return;
+    }
+    setPendingOrder(createdOrder);
+    setRepSelectOpen(true);
+  };
+
+  const executeCartForRep = async (rep, createdOrder) => {
+    if (!createdOrder) return;
+    setIsCartLoading(true);
     try {
-      const { existingOrder, newOrderData } = orderChangeData;
+      const outcome = await addOrdersToCart(rep.id, [createdOrder]);
+      if (outcome.type === 'cart' && outcome.result?.success > 0) {
+        try {
+          await orderAPI.markCartReflected([createdOrder.id], rep.id);
+        } catch (markErr) {
+          console.error('장바구니 반영 마킹 실패 (무시):', markErr);
+        }
+      }
+      setCombinedResult({ cartOutcome: { ...outcome, owner: rep.name } });
+    } catch (err) {
+      const expired = err.message === 'TWOSOME_SESSION_EXPIRED' || err.message === 'TARGET_REP_SESSION_REQUIRED';
+      if (expired) setPendingCartOrder(createdOrder);
+      setCombinedResult({
+        cartOutcome: {
+          type: expired ? 'rep-login-required' : 'cart-failed',
+          owner: rep.name,
+          repId: rep.id,
+          message: expired
+            ? '대표 투썸 세션이 만료되었습니다. 다시 로그인하면 방금 주문을 담을 수 있습니다.'
+            : (err.message || '장바구니 담기 중 오류가 발생했습니다.'),
+        },
+      });
+    } finally {
+      setIsCartLoading(false);
+      setIsCombinedResultOpen(true);
+    }
+  };
 
-      const updatedOrder = {
+  const handleTargetRepConfirm = async (rep) => {
+    const order = pendingOrder;
+    setRepSelectOpen(false);
+    setPendingOrder(null);
+    await executeCartForRep(rep, order);
+  };
+
+  const handleTargetRepCancel = () => {
+    setRepSelectOpen(false);
+    setPendingOrder(null);
+    setCombinedResult({ cartOutcome: { type: 'local-only' } });
+    setIsCombinedResultOpen(true);
+  };
+
+  const handleOrderAddConfirm = async () => {
+    setIsOrderChangeModalOpen(false);
+    await createOrderAndMaybeCart({
+      ...orderChangeData.newOrderData,
+      departmentId: selectedDepartmentId,
+      teamId: parseInt(selectedTeam, 10),
+      orderDate: new Date().toLocaleDateString('sv-SE'),
+    });
+  };
+
+  const handleOrderChangeConfirm = async (existingOrder) => {
+    if (!orderChangeData || !existingOrder) return;
+    setIsCartLoading(true);
+    setIsOrderChangeModalOpen(false);
+    try {
+      const { newOrderData } = orderChangeData;
+      await orderAPI.update(existingOrder.id, {
         team: { id: existingOrder.teamId },
         menuType: 'TWOSOME',
-        twosomeMenu: newOrderData.twosomeMenuId
-          ? { id: newOrderData.twosomeMenuId }
-          : null,
+        twosomeMenu: { id: newOrderData.twosomeMenuId },
         personalOption: newOrderData.personalOption,
         orderDate: existingOrder.orderDate,
         variantMenuCd: newOrderData.variantMenuCd,
         variantOpts: newOrderData.variantOpts,
         cstmInfo: newOrderData.cstmInfo,
-      };
-
-      await orderAPI.update(existingOrder.id, updatedOrder, selectedDepartmentId);
-      showAlert('주문이 변경되었습니다!');
+      }, selectedDepartmentId);
+      const freshOrders = await orderAPI.getToday(selectedDepartmentId);
+      setOrders(freshOrders);
       resetOrderForm();
-      loadOrders();
+      await prepareCartOutcome(freshOrders.find((order) => order.id === existingOrder.id));
     } catch (err) {
       showAlert(err.message || '주문 변경에 실패했습니다.');
+    } finally {
+      setIsCartLoading(false);
     }
   };
 
@@ -759,59 +818,21 @@ const OrderPage = ({ onAddTeamMember }) => {
     return null;
   };
 
-  // 팀 주문 항목을 집계해 대표 투썸 장바구니에 일괄 담기 (주문 저장 후 이어서 실행)
-  // 변형 정보는 Order 엔티티에 영속된 값 사용 (다른 기기에서도 변형 코드로 담김)
-  // 반환: {type:'cart', result} | {type:'no-items'} | 예외 throw
-  const addTeamOrdersToCart = async () => {
-    // 저장 직후 주문이므로 최신 목록을 다시 조회해 집계
-    const freshOrders = await orderAPI.getToday(selectedDepartmentId);
-
-    const itemMap = new Map();
-    for (const order of freshOrders) {
-      if (order.menuType !== 'TWOSOME' || !order.twosomeMenuCode) continue;
-      const variantMenuCd = order.variantMenuCd || null;
-      const key = variantMenuCd || order.twosomeMenuCode;
-      const existing = itemMap.get(key);
-      const cstmInfo = order.cstmInfo ? JSON.parse(order.cstmInfo) : null;
-      itemMap.set(key, {
+  const addOrdersToCart = async (targetRepMemberId, targetOrders) => {
+    const items = targetOrders
+      .filter((order) => order.menuType === 'TWOSOME' && order.twosomeMenuCode)
+      .map((order) => ({
         menuCd: order.twosomeMenuCode,
-        upMenuCd: order.twosomeMenuCode, // 원메뉴 코드는 기본 코드
-        midCd: existing?.midCd || findMidCdByMenuCd(order.twosomeMenuCode),
-        qty: (existing?.qty || 0) + 1,
-        opts: order.variantOpts ? order.variantOpts.split(',').map((o) => o.trim()).filter(Boolean) : null,
-        variantMenuCd,
-        cstmInfo,
-      });
-    }
-
-    if (itemMap.size === 0) {
-      return { type: 'no-items' };
-    }
-
-    const result = await repAPI.repAddToCart(Array.from(itemMap.values()));
+        upMenuCd: order.twosomeMenuCode,
+        midCd: findMidCdByMenuCd(order.twosomeMenuCode),
+        qty: 1,
+        opts: order.variantOpts ? order.variantOpts.split(',').map((option) => option.trim()).filter(Boolean) : null,
+        variantMenuCd: order.variantMenuCd || null,
+        cstmInfo: order.cstmInfo ? JSON.parse(order.cstmInfo) : null,
+      }));
+    if (items.length === 0) return { type: 'no-items' };
+    const result = await repAPI.repAddToCart(targetRepMemberId, items);
     return { type: 'cart', result };
-  };
-
-  // 주문 저장 후 이어지는 장바구니 담기 단계 — 대표 세션 전용 (관리자 세션 미사용)
-  // 반환: {type, owner?, ...}
-  const runCartStepAfterOrder = async () => {
-    if (repInfo && repTwosomeStatus === 'ACTIVE') {
-      try {
-        const outcome = await addTeamOrdersToCart();
-        return { ...outcome, owner: `${repInfo.name} 대표` };
-      } catch (err) {
-        const expired = err.message === 'TWOSOME_SESSION_EXPIRED';
-        if (expired) setRepTwosomeStatus('EXPIRED');
-        return {
-          type: 'cart-failed',
-          owner: `${repInfo.name} 대표`,
-          message: expired
-            ? '대표 투썸 세션이 만료되었습니다. 다시 로그인해주세요.'
-            : (err.message || '장바구니 담기 중 오류가 발생했습니다.'),
-        };
-      }
-    }
-    return { type: 'no-session' };
   };
 
   // ==================== 팀 대표 로그인 (1단계) ====================
@@ -835,50 +856,39 @@ const OrderPage = ({ onAddTeamMember }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 주문 버튼 라벨용 로그인 모드 판정 — 대표 세션(PIN 로그인) 전용, 관리자 세션은 사용하지 않음
   const detectOrderCartMode = async () => {
     if (localStorage.getItem('repToken')) {
       try {
         const repSession = await repAPI.twosomeSession();
         if (repSession.status === 'ACTIVE') {
-          const me = await repAPI.me(); // 대표 이름 1회 조회 (캐시)
-          setOrderCartMode({ mode: 'rep', label: me.name });
+          const me = await repAPI.me();
+          setRepMe(me);
+          setRepInfo({ id: me.id, name: me.name, teamName: me.teamName });
+          setRepTwosomeStatus('ACTIVE');
           return 'rep';
         }
       } catch (err) {
-        // 대표 세션 없음/만료 → 비로그인
+        // 대표 세션이 없으면 로컬 주문만 진행한다.
       }
     }
-    setOrderCartMode(null);
+    setRepTwosomeStatus('NONE');
     return null;
   };
 
-  // 폐점 게이팅용 개점 여부 판정. ordTime("07:30 ~ 20:50")과 현재 시각 비교.
-  // 로그인 모드가 있을 때만 조회, 실패 시 폐점(false)으로 취급해 담기를 차단한다.
-  const loadStoreOpen = async (mode) => {
-    if (!mode) {
-      setIsStoreOpen(false);
-      return;
-    }
+  // 매장 정보는 대표 로그인 여부와 무관하게 조회하며, 실패 시 외부 담기를 차단한다.
+  const loadStoreOpen = async () => {
     try {
       const info = await twosomeStoreAPI.getStoreInfo();
-      setIsStoreOpen(isWithinOrdTime(info));
+      const open = isWithinOrdTime(info);
+      setIsStoreOpen(open);
+      return open;
     } catch (err) {
       setIsStoreOpen(false);
+      return false;
     }
   };
 
-  // ordTime 파싱 → 개점 여부 (파싱 불가/응답 없으면 false)
-  const isWithinOrdTime = (info) => {
-    if (!info || !info.ordTime) return false;
-    const match = info.ordTime.match(/(\d{2}):(\d{2})\s*~\s*(\d{2}):(\d{2})/);
-    if (!match) return false;
-    const now = new Date();
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-    const openMinutes = parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
-    const closeMinutes = parseInt(match[3], 10) * 60 + parseInt(match[4], 10);
-    return nowMinutes >= openMinutes && nowMinutes < closeMinutes;
-  };
+  const isWithinOrdTime = (info) => isWithinStoreHours(info);
 
   // 페이지 로드 시 로그인 모드 + 개점 여부 조회
   useEffect(() => {
@@ -912,11 +922,47 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
-  const openRepTwosomeLoginModal = () => {
-    // 등록된 계정이 있으면 아이디 프리필 (수정 가능), 패스워드는 항상 빈칸
-    setRepTwosomeForm({ loginId: repMe?.twosomeId || '', loginPwd: '' });
+  const openRepTwosomeLoginModal = (account = null) => {
+    setRepTwosomeForm({ loginId: account?.twosomeId || repMe?.twosomeId || '', loginPwd: '' });
     setRepTwosomeModal('login');
     requestRepCaptcha();
+  };
+
+  const resumePendingCart = async (rep) => {
+    if (!pendingCartOrder || !rep) return;
+    const order = pendingCartOrder;
+    setPendingCartOrder(null);
+    setPendingOrder(null);
+    setCombinedResult(null);
+    setIsCombinedResultOpen(false);
+    await executeCartForRep({ ...rep, twosomeStatus: 'ACTIVE' }, order);
+  };
+
+  const handleCombinedLogin = async () => {
+    setIsCombinedResultOpen(false);
+    if (repList.length === 0) {
+      resetRepForm();
+      setRepModalMode('setup');
+      return;
+    }
+    await openRepLoginModal(combinedResult?.cartOutcome?.repId);
+  };
+
+  const completeRepLogin = async (result) => {
+    localStorage.setItem('repToken', result.token);
+    const me = await repAPI.me();
+    setRepMe(me);
+    setRepInfo({ id: me.id, name: me.name, teamName: me.teamName });
+    closeRepModal();
+    const session = await repAPI.twosomeSession();
+    setRepTwosomeStatus(session.status || 'NONE');
+    await loadRepList();
+    if (session.status === 'ACTIVE') {
+      await detectOrderCartMode();
+      await resumePendingCart({ id: me.id, name: me.name });
+    } else {
+      openRepTwosomeLoginModal(me);
+    }
   };
 
   // 통합 로그인 폼 제출: 아이디/패스워드+캡차 → 서버가 로그인 후 계정 저장
@@ -938,15 +984,14 @@ const OrderPage = ({ onAddTeamMember }) => {
         setRepTwosomeStatus('ACTIVE');
         setRepTwosomeModal(null);
         setRepCaptcha(null);
-        try {
-          const me = await repAPI.me();
-          setRepMe(me);
-        } catch (err) {
-          // me 갱신 실패 무시
-        }
-        const mode = await detectOrderCartMode();
-        await loadStoreOpen(mode);
-        showAlert('투썸 로그인되었습니다.');
+        const me = await repAPI.me();
+        setRepMe(me);
+        setRepInfo({ id: me.id, name: me.name, teamName: me.teamName });
+        await detectOrderCartMode();
+        await loadStoreOpen();
+        await loadRepList();
+        await resumePendingCart({ id: me.id, name: me.name });
+        if (!pendingCartOrder) showAlert('투썸 로그인되었습니다.');
       } else {
         showAlert(result.message || '투썸 로그인에 실패했습니다.');
         requestRepCaptcha();
@@ -972,19 +1017,14 @@ const OrderPage = ({ onAddTeamMember }) => {
     await loadStoreOpen(mode);
   };
 
-  const resetRepForm = () => {
-    setRepForm({ memberId: '', pin: '', inviteCode: '', newPin: '', newPinConfirm: '', currentPin: '' });
+  const resetRepForm = (memberId = '') => {
+    setRepForm({ memberId: memberId ? String(memberId) : '', teamMemberId: '', pin: '', newPin: '', newPinConfirm: '', currentPin: '' });
   };
 
-  const openRepLoginModal = async () => {
-    resetRepForm();
+  const openRepLoginModal = async (preferredMemberId = null) => {
     setRepModalMode('login');
-    try {
-      const list = await repAPI.list();
-      setRepList(list || []);
-    } catch (err) {
-      showAlert('대표 목록을 불러오지 못했습니다.');
-    }
+    const list = await loadRepList();
+    resetRepForm(preferredMemberId || list[0]?.id);
   };
 
   const closeRepModal = () => {
@@ -993,24 +1033,18 @@ const OrderPage = ({ onAddTeamMember }) => {
   };
 
   const handleRepLogin = async () => {
-    if (!repForm.memberId) {
-      showAlert('대표를 선택해주세요.');
-      return;
-    }
-    if (!repForm.pin) {
-      showAlert('PIN을 입력해주세요.');
+    if (!repForm.memberId || !repForm.pin) {
+      showAlert('대표와 PIN을 입력해주세요.');
       return;
     }
     setRepLoading(true);
     try {
-      const result = await repAPI.login(parseInt(repForm.memberId), repForm.pin);
-      localStorage.setItem('repToken', result.token);
-      setRepInfo({ id: parseInt(repForm.memberId), name: result.name, teamName: result.teamName });
-      closeRepModal();
+      const result = await repAPI.login(parseInt(repForm.memberId, 10), repForm.pin);
+      await completeRepLogin(result);
     } catch (err) {
       if (err.message === 'PIN_NOT_SET') {
-        // PIN 미설정 → 초대코드로 PIN 설정 모드 전환
-        showAlert('PIN이 아직 설정되지 않았습니다. 초대코드로 PIN을 설정해주세요.');
+        showAlert('대표 등록에서 본인 팀원을 선택하고 PIN을 생성해주세요.');
+        resetRepForm();
         setRepModalMode('setup');
       } else {
         showAlert(err.message || '로그인에 실패했습니다.');
@@ -1021,12 +1055,8 @@ const OrderPage = ({ onAddTeamMember }) => {
   };
 
   const handleRepPinSetup = async () => {
-    if (!repForm.memberId) {
-      showAlert('대표를 선택해주세요.');
-      return;
-    }
-    if (!repForm.inviteCode) {
-      showAlert('초대코드를 입력해주세요.');
+    if (!repForm.teamMemberId) {
+      showAlert('본인 팀원을 선택해주세요.');
       return;
     }
     if (!/^\d{6}$/.test(repForm.newPin)) {
@@ -1039,12 +1069,10 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
     setRepLoading(true);
     try {
-      await repAPI.setupPin(parseInt(repForm.memberId), repForm.inviteCode.trim(), repForm.newPin);
-      showAlert('PIN이 설정되었습니다. 로그인해주세요.');
-      setRepModalMode('login');
-      resetRepForm();
+      const result = await repAPI.register(parseInt(repForm.teamMemberId, 10), repForm.newPin);
+      await completeRepLogin(result);
     } catch (err) {
-      showAlert(err.message || 'PIN 설정에 실패했습니다.');
+      showAlert(err.message || '대표 등록에 실패했습니다.');
     } finally {
       setRepLoading(false);
     }
@@ -1093,28 +1121,24 @@ const OrderPage = ({ onAddTeamMember }) => {
         <h2>오늘의 커피 주문</h2>
         <p className="date-info">{new Date().toLocaleDateString('ko-KR')}</p>
 
-        {/* 팀 대표 로그인 상태 (1단계: 표시만) */}
+        <div className="rep-team-summary">
+          <strong>이 팀의 대표: {repList.length}명 · 장바구니 사용 가능 {repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length}명</strong>
+          <span>{repList.length > 0 ? repList.map((rep) => `${rep.name}(${rep.statusReason})`).join(', ') : '주문 후 대표 등록과 투썸 로그인을 진행할 수 있습니다.'}</span>
+          <span>매장 상태: {isStoreOpen ? '영업 중 · 실제 장바구니 담기 가능' : '매장 닫힘 또는 확인 불가 · 로컬 주문서만 저장'}</span>
+        </div>
         <div className="rep-auth-bar">
           {repInfo ? (
             <>
-              <span className="rep-auth-info">
-                {repInfo.name}({repInfo.teamName})
-                <span className={`rep-twosome-status ${repTwosomeStatus.toLowerCase()}`}>
-                  {repTwosomeStatus === 'ACTIVE' ? ' · 투썸 로그인됨' : ' · 투썸 미로그인'}
-                </span>
-              </span>
-              {repTwosomeStatus === 'ACTIVE' ? (
-                <button className="rep-auth-btn" onClick={handleRepTwosomeLogout}>투썸 로그아웃</button>
-              ) : (
-                <button className="rep-auth-btn primary" onClick={openRepTwosomeLoginModal}>투썸 로그인</button>
-              )}
-              <button className="rep-auth-btn" onClick={() => { resetRepForm(); setRepModalMode('change'); }}>
-                PIN 변경
-              </button>
-              <button className="rep-auth-btn" onClick={handleRepLogout}>로그아웃</button>
+              <span className="rep-auth-info">내 대표 계정: {repInfo.name}({repInfo.teamName})<span className={`rep-twosome-status ${repTwosomeStatus.toLowerCase()}`}>{repTwosomeStatus === 'ACTIVE' ? ' · 투썸 로그인됨' : ' · 투썸 미로그인'}</span></span>
+              {repTwosomeStatus === 'ACTIVE' ? <button className="rep-auth-btn" onClick={handleRepTwosomeLogout}>투썸 로그아웃</button> : <button className="rep-auth-btn primary" onClick={() => openRepTwosomeLoginModal()}>투썸 로그인</button>}
+              <button className="rep-auth-btn" onClick={() => { resetRepForm(); setRepModalMode('change'); }}>PIN 변경</button>
+              <button className="rep-auth-btn" onClick={handleRepLogout}>대표 로그아웃</button>
             </>
           ) : (
-            <button className="rep-auth-btn primary" onClick={openRepLoginModal}>대표 로그인</button>
+            <>
+              <button className="rep-auth-btn primary" onClick={() => openRepLoginModal()}>대표 로그인</button>
+              <button className="rep-auth-btn" onClick={() => { resetRepForm(); setRepModalMode('setup'); }}>대표 등록</button>
+            </>
           )}
         </div>
 
@@ -1466,11 +1490,13 @@ const OrderPage = ({ onAddTeamMember }) => {
           onClick={handleOrder}
           disabled={!orderAvailable || isCartLoading}
         >
-          {isCartLoading
-            ? '처리 중...'
-            : orderCartMode && isStoreOpen
-              ? `투썸 장바구니 담기 (${orderCartMode.label} 계정)`
-              : '팀 주문서에 담기'}
+          {isCartLoading ? '처리 중...' : !isStoreOpen
+            ? '팀 주문서에 담기 (매장 닫힘)'
+            : repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length === 1
+              ? `투썸 장바구니 담기 (${repList.find((rep) => rep.twosomeStatus === 'ACTIVE').name} 계정)`
+              : repList.some((rep) => rep.twosomeStatus === 'ACTIVE')
+                ? '대표 선택 후 투썸 장바구니 담기'
+                : '팀 주문서에 담기'}
         </button>
       </div>
 
@@ -1525,39 +1551,20 @@ const OrderPage = ({ onAddTeamMember }) => {
               {repLoading ? '로그인 중...' : '로그인'}
             </button>
             <button className="rep-auth-btn" onClick={() => { resetRepForm(); setRepModalMode('setup'); }}>
-              초대코드로 PIN 설정
+              본인 팀원으로 대표 등록
             </button>
           </div>
         </div>
       </Modal>
 
-      {/* PIN 설정 모달 (초대코드 필요) */}
-      <Modal
-        isOpen={repModalMode === 'setup'}
-        onClose={closeRepModal}
-        title="PIN 설정 (최초 1회)"
-      >
+      <Modal isOpen={repModalMode === 'setup'} onClose={closeRepModal} title="대표 등록 및 PIN 생성">
         <div className="rep-modal-form">
-          <label className="form-label">대표 선택</label>
-          <select
-            value={repForm.memberId}
-            onChange={(e) => setRepForm({ ...repForm, memberId: e.target.value })}
-          >
+          <p className="rep-twosome-guide">본인 팀원을 선택하고 본인만 아는 PIN을 만드세요. 기존 대표는 입력한 기존 PIN으로 로그인하며 PIN이 바뀌지는 않습니다.</p>
+          <label className="form-label">본인 팀원 선택</label>
+          <select value={repForm.teamMemberId} onChange={(e) => setRepForm({ ...repForm, teamMemberId: e.target.value })}>
             <option value="">선택해주세요</option>
-            {repList.map((rep) => (
-              <option key={rep.id} value={rep.id}>{rep.name} ({rep.teamName})</option>
-            ))}
+            {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
           </select>
-
-          <label className="form-label">초대코드 (8자리)</label>
-          <input
-            type="text"
-            value={repForm.inviteCode}
-            onChange={(e) => setRepForm({ ...repForm, inviteCode: e.target.value.trim().toUpperCase() })}
-            placeholder="관리자가 발급한 초대코드"
-            maxLength={8}
-          />
-
           <label className="form-label">새 PIN (숫자 6자리)</label>
           <input
             type="password"
@@ -1701,49 +1708,47 @@ const OrderPage = ({ onAddTeamMember }) => {
         </div>
       </Modal>
 
-      {/* 주문 변경 확인 모달 */}
       <OrderChangeModal
         isOpen={isOrderChangeModalOpen}
         onClose={() => setIsOrderChangeModalOpen(false)}
         onConfirm={handleOrderChangeConfirm}
+        onAdd={handleOrderAddConfirm}
         teamName={orderChangeData?.teamName}
-        existingOrder={orderChangeData?.existing}
+        existingOrders={orderChangeData?.existingOrders || []}
+        selectedExistingId={orderChangeData?.selectedExistingId}
+        onSelectExisting={(id) => setOrderChangeData((previous) => ({ ...previous, selectedExistingId: id }))}
         newOrder={orderChangeData?.new}
+        loading={isCartLoading}
       />
 
-      {/* 재주문 확인 모달 */}
       <ReorderModal
         isOpen={isReorderModalOpen}
         onClose={() => setIsReorderModalOpen(false)}
         onConfirm={handleReorderConfirm}
         latestOrder={latestOrder}
-        isLoading={isReorderLoading}
+        isLoading={isCartLoading}
       />
 
-      {/* 주문 통합 결과 모달 (주문 저장 + 장바구니 담기) */}
-      <Modal
-        isOpen={isCombinedResultOpen}
-        onClose={() => setIsCombinedResultOpen(false)}
-        title="주문 결과"
-      >
+      <RepSelectModal
+        isOpen={repSelectOpen}
+        reps={repList}
+        selectedId={selectedTargetRepId}
+        onSelect={setSelectedTargetRepId}
+        onConfirm={handleTargetRepConfirm}
+        onCancel={handleTargetRepCancel}
+        loading={isCartLoading}
+      />
+
+      <Modal isOpen={isCombinedResultOpen} onClose={() => setIsCombinedResultOpen(false)} title="주문 결과">
         {combinedResult && (
           <div className="cart-result">
-            <p className="cart-result-summary">주문 1건 저장</p>
-
+            <p className="cart-result-summary">로컬 주문서에 주문 1건을 저장했습니다.</p>
             {combinedResult.cartOutcome?.type === 'cart' && (
               <>
-                <p className="cart-result-summary">
-                  {combinedResult.cartOutcome.owner
-                    ? `${combinedResult.cartOutcome.owner} 장바구니에 담았습니다. `
-                    : ''}
-                  성공 {combinedResult.cartOutcome.result.success}건 / 실패 {combinedResult.cartOutcome.result.failed}건
-                </p>
+                <p className="cart-result-summary">{combinedResult.cartOutcome.owner}의 실제 투썸 장바구니 반영: 성공 {combinedResult.cartOutcome.result.success}건 / 실패 {combinedResult.cartOutcome.result.failed}건</p>
                 <ul className="cart-result-list">
-                  {combinedResult.cartOutcome.result.results.map((item, index) => (
-                    <li
-                      key={`${item.menuCd}-${index}`}
-                      className={item.success ? 'cart-result-success' : 'cart-result-failed'}
-                    >
+                  {(combinedResult.cartOutcome.result.results || []).map((item, index) => (
+                    <li key={`${item.menuCd}-${index}`} className={item.success ? 'cart-result-success' : 'cart-result-failed'}>
                       <span className="cart-result-status">{item.success ? '성공' : '실패'}</span>
                       <span className="cart-result-menu">{item.menuNm || item.menuCd}</span>
                       {item.message && <span className="cart-result-message">({item.message})</span>}
@@ -1752,29 +1757,22 @@ const OrderPage = ({ onAddTeamMember }) => {
                 </ul>
               </>
             )}
-
-            {combinedResult.cartOutcome?.type === 'no-items' && (
-              <p className="cart-result-summary">장바구니에 담을 투썸 주문 항목이 없습니다.</p>
+            {combinedResult.cartOutcome?.type === 'no-items' && <p>장바구니에 담을 투썸 주문 항목이 없습니다.</p>}
+            {combinedResult.cartOutcome?.type === 'store-closed' && <p>매장이 닫혀 있어 실제 투썸 장바구니에는 담지 않았습니다. 팀 주문서만 유지하며, 개장 후 내역에서 일괄 담기할 수 있습니다.</p>}
+            {combinedResult.cartOutcome?.type === 'local-only' && <p>팀 주문서만 유지합니다. 실제 투썸 장바구니에는 담지 않았습니다.</p>}
+            {combinedResult.cartOutcome?.type === 'no-reps' && (
+              <>
+                <p>로컬 주문서에 저장했습니다. 실제 투썸플레이스 앱 장바구니에 저장하려면 로그인이 필요합니다. 로그인 하시겠습니까?</p>
+                <div className="rep-modal-buttons"><button className="rep-auth-btn primary" onClick={handleCombinedLogin}>로그인하기</button><button className="rep-auth-btn" onClick={() => setIsCombinedResultOpen(false)}>취소</button></div>
+              </>
             )}
-
-            {combinedResult.cartOutcome?.type === 'store-closed' && (
-              <p className="cart-result-summary">
-                팀 주문서에 담았습니다. 매장이 닫혀 있어 장바구니 담기는 불가하며, 개장 후 내역 페이지에서 일괄 담기할 수 있습니다.
-              </p>
+            {combinedResult.cartOutcome?.type === 'rep-login-required' && (
+              <>
+                <p>{combinedResult.cartOutcome.message || `${combinedResult.cartOutcome.owner} 대표의 투썸 로그인이 필요합니다. 로그인 후 방금 주문을 장바구니에 담으시겠습니까?`}</p>
+                <div className="rep-modal-buttons"><button className="rep-auth-btn primary" onClick={handleCombinedLogin}>로그인하기</button><button className="rep-auth-btn" onClick={() => setIsCombinedResultOpen(false)}>취소</button></div>
+              </>
             )}
-
-            {combinedResult.cartOutcome?.type === 'no-session' && (
-              <p className="cart-result-summary">
-                대표 로그인 시 장바구니까지 담깁니다. (관리 페이지의 "투썸 연동" 탭에서 로그인)
-              </p>
-            )}
-
-            {combinedResult.cartOutcome?.type === 'cart-failed' && (
-              <p className="cart-result-summary cart-result-failed">
-                장바구니 담기 실패{combinedResult.cartOutcome.owner ? ` (${combinedResult.cartOutcome.owner})` : ''}:
-                {' '}{combinedResult.cartOutcome.message}
-              </p>
-            )}
+            {combinedResult.cartOutcome?.type === 'cart-failed' && <p className="cart-result-failed">로컬 주문은 저장했지만 {combinedResult.cartOutcome.owner} 장바구니 담기에 실패했습니다: {combinedResult.cartOutcome.message}</p>}
           </div>
         )}
       </Modal>

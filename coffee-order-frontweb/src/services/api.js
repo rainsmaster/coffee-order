@@ -118,9 +118,9 @@ export const orderAPI = {
   }),
 
   // 장바구니 반영 일시 일괄 마킹 (일괄 담기 성공 후)
-  markCartReflected: (orderIds) => fetchAPI('/orders/cart-reflected', {
+  markCartReflected: (orderIds, targetRepMemberId) => fetchAPI('/orders/cart-reflected', {
     method: 'POST',
-    body: JSON.stringify({ orderIds }),
+    body: JSON.stringify({ orderIds, targetRepMemberId }),
   }),
 
   // 날짜별 메뉴 집계
@@ -195,37 +195,11 @@ export const twosomeStoreAPI = {
     method: 'POST',
   }),
 
-  // 팀 주문 항목을 투썸 장바구니에 일괄 담기
-  addToCart: (items) => fetchAPI('/twosome/cart/add', {
-    method: 'POST',
-    body: JSON.stringify({ items }),
-  }),
-
-  // 투썸 장바구니 목록 조회
-  getCart: () => fetchAPI('/twosome/cart'),
-
-  // 투썸 장바구니 항목 삭제
-  removeCartItem: (cartNo, cartDtlNo) => fetchAPI(`/twosome/cart/items/${cartNo}?cartDtlNo=${encodeURIComponent(cartDtlNo)}`, {
-    method: 'DELETE',
-  }),
-
-  // 투썸 장바구니 항목 수량 조정 (삭제 + 재담기)
-  // 투썸 장바구니 항목 수량 조정 (삭제 + 재담기, 옵션 조합 + 퍼스널 옵션 복원 포함)
-  adjustCartItemQty: (cartNo, cartDtlNo, menuCd, qty, opts, cstmInfo) => fetchAPI(`/twosome/cart/items/${cartNo}/qty`, {
-    method: 'PUT',
-    body: JSON.stringify({ cartDtlNo, menuCd, qty, opts, cstmInfo }),
-  }),
-
-  // 투썸 장바구니 전체 비우기
-  clearCart: () => fetchAPI('/twosome/cart/clear', {
-    method: 'POST',
-  }),
-
-  // 장바구니 항목의 퍼스널 옵션(커스텀) 명세 조회 (읽기 전용)
-  getCartCustomList: (cartNo, cartDtlNo) => fetchAPI('/twosome/cart/custom-list', {
+  // 대표별 장바구니의 퍼스널 옵션(커스텀) 명세 조회 (읽기 전용)
+  getCartCustomList: (cartNo, cartDtlNo, targetRepMemberId) => fetchAPI('/rep/twosome/cart/custom-list', {
     method: 'POST',
     headers: repTokenHeaderIfAny(),
-    body: JSON.stringify({ cartNo, cartDtlNo }),
+    body: JSON.stringify({ cartNo, cartDtlNo, targetRepMemberId }),
   }),
 
   // 메뉴 옵션 그룹 조회 (상세 페이지 파싱 + 캐시, 관리자/대표 세션 필요)
@@ -261,7 +235,7 @@ export const twosomeStoreAPI = {
   getMenuRefreshDiff: () => fetchAPI('/twosome/menu-refresh/diff'),
 };
 
-// ==================== Admin API (/admin 전용 페이지) ====================
+// ==================== Admin API (설정의 관리자 탭) ====================
 const adminTokenHeader = () => ({
   'X-Admin-Token': localStorage.getItem('adminToken') || '',
 });
@@ -292,10 +266,18 @@ export const adminAPI = {
     headers: adminTokenHeader(),
   }),
 
-  // 초대코드 발급 (평문은 이 응답 1회만 제공)
-  issueInvite: (id) => fetchAPI(`/admin/reps/${id}/invite`, {
+  getReleaseNotes: () => fetchAPI('/admin/release-notes', { headers: adminTokenHeader() }),
+
+  createReleaseNote: (data) => fetchAPI('/admin/release-notes', {
     method: 'POST',
     headers: adminTokenHeader(),
+    body: JSON.stringify(data),
+  }),
+
+  updateReleaseNote: (id, data) => fetchAPI(`/admin/release-notes/${id}`, {
+    method: 'PUT',
+    headers: adminTokenHeader(),
+    body: JSON.stringify(data),
   }),
 };
 
@@ -304,19 +286,21 @@ const repTokenHeader = () => ({
   'X-Rep-Token': localStorage.getItem('repToken') || '',
 });
 
+const repTargetQuery = (targetRepMemberId) => targetRepMemberId
+  ? `targetRepMemberId=${encodeURIComponent(targetRepMemberId)}`
+  : '';
+
 export const repAPI = {
-  // 로그인 화면용 활성 대표 목록
-  list: () => fetchAPI('/reps'),
+  list: (departmentId) => fetchAPI(departmentId ? `/reps?departmentId=${departmentId}` : '/reps'),
+
+  register: (teamId, pin) => fetchAPI('/rep/register', {
+    method: 'POST',
+    body: JSON.stringify({ teamId, pin }),
+  }),
 
   login: (memberId, pin) => fetchAPI('/rep/login', {
     method: 'POST',
     body: JSON.stringify({ memberId, pin }),
-  }),
-
-  // 최초 PIN 설정 (초대코드 필요)
-  setupPin: (memberId, inviteCode, pin) => fetchAPI('/rep/pin/setup', {
-    method: 'POST',
-    body: JSON.stringify({ memberId, inviteCode, pin }),
   }),
 
   changePin: (currentPin, newPin) => fetchAPI('/rep/pin/change', {
@@ -327,22 +311,17 @@ export const repAPI = {
 
   me: () => fetchAPI('/rep/me', { headers: repTokenHeader() }),
 
-  // ==================== 대표 투썸 계정 / 개인 세션 ====================
-
-  // 투썸 계정 등록 (서버 AES-256-GCM 암호화 저장)
   registerTwosomeAccount: (twosomeId, twosomePw) => fetchAPI('/rep/twosome/account', {
     method: 'POST',
     headers: repTokenHeader(),
     body: JSON.stringify({ twosomeId, twosomePw }),
   }),
 
-  // 대표 투썸 로그인용 캡차 (수동 입력)
   twosomeCaptcha: () => fetchAPI('/rep/twosome/captcha', {
     method: 'POST',
     headers: repTokenHeader(),
   }),
 
-  // 통합 로그인 폼: 아이디/패스워드 입력 시 서버가 계정으로 저장, 미입력 시 저장된 계정 사용
   twosomeLogin: (contextId, answerCd, loginId, loginPwd) => fetchAPI('/rep/twosome/login', {
     method: 'POST',
     headers: repTokenHeader(),
@@ -356,31 +335,34 @@ export const repAPI = {
 
   twosomeSession: () => fetchAPI('/rep/twosome/session', { headers: repTokenHeader() }),
 
-  // ==================== 대표 세션 장바구니 ====================
-
-  repAddToCart: (items) => fetchAPI('/rep/twosome/cart/add', {
+  repAddToCart: (targetRepMemberId, items) => fetchAPI('/rep/twosome/cart/add', {
     method: 'POST',
     headers: repTokenHeader(),
-    body: JSON.stringify({ items }),
+    body: JSON.stringify({ targetRepMemberId, items }),
   }),
 
-  repGetCart: () => fetchAPI('/rep/twosome/cart', { headers: repTokenHeader() }),
+  repGetCart: (targetRepMemberId) => fetchAPI(`/rep/twosome/cart?${repTargetQuery(targetRepMemberId)}`, { headers: repTokenHeader() }),
 
-  repRemoveCartItem: (cartNo, cartDtlNo) => fetchAPI(`/rep/twosome/cart/items/${cartNo}?cartDtlNo=${encodeURIComponent(cartDtlNo)}`, {
+  repRemoveCartItem: (cartNo, cartDtlNo, targetRepMemberId) => fetchAPI(`/rep/twosome/cart/items/${cartNo}?cartDtlNo=${encodeURIComponent(cartDtlNo)}&${repTargetQuery(targetRepMemberId)}`, {
     method: 'DELETE',
     headers: repTokenHeader(),
   }),
 
-  repAdjustCartItemQty: (cartNo, cartDtlNo, menuCd, qty, opts, cstmInfo) => fetchAPI(`/rep/twosome/cart/items/${cartNo}/qty`, {
+  repAdjustCartItemQty: (cartNo, cartDtlNo, menuCd, qty, opts, cstmInfo, targetRepMemberId) => fetchAPI(`/rep/twosome/cart/items/${cartNo}/qty?${repTargetQuery(targetRepMemberId)}`, {
     method: 'PUT',
     headers: repTokenHeader(),
     body: JSON.stringify({ cartDtlNo, menuCd, qty, opts, cstmInfo }),
   }),
 
-  repClearCart: () => fetchAPI('/rep/twosome/cart/clear', {
+  repClearCart: (targetRepMemberId) => fetchAPI(`/rep/twosome/cart/clear?${repTargetQuery(targetRepMemberId)}`, {
     method: 'POST',
     headers: repTokenHeader(),
   }),
+};
+
+export const releaseNoteAPI = {
+  latest: () => fetchAPI('/release-notes/latest'),
+  getById: (id) => fetchAPI(`/release-notes/${id}`),
 };
 
 // ==================== Suggestion API ====================

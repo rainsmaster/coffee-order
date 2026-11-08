@@ -1,7 +1,6 @@
 package com.example.coffeeorder.controller;
 
 import com.example.coffeeorder.dto.AdminLoginRequest;
-import com.example.coffeeorder.dto.InviteCodeResponse;
 import com.example.coffeeorder.dto.RepAdminItem;
 import com.example.coffeeorder.dto.RepCreateRequest;
 import com.example.coffeeorder.entity.Member;
@@ -10,7 +9,6 @@ import com.example.coffeeorder.exception.AuthException;
 import com.example.coffeeorder.repository.MemberRepository;
 import com.example.coffeeorder.repository.TeamRepository;
 import com.example.coffeeorder.service.AdminAuthService;
-import com.example.coffeeorder.service.InviteCodeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -34,7 +32,6 @@ import java.util.Map;
 public class AdminController {
 
     private final AdminAuthService adminAuthService;
-    private final InviteCodeService inviteCodeService;
     private final MemberRepository memberRepository;
     private final TeamRepository teamRepository;
 
@@ -86,7 +83,7 @@ public class AdminController {
         return ResponseEntity.ok(toAdminItem(memberRepository.save(member)));
     }
 
-    // 팀 대표 삭제 (소프트 삭제 + 미사용 초대코드 무효화)
+    // 팀 대표 삭제 (소프트 삭제)
     @DeleteMapping("/reps/{id}")
     @Transactional
     public ResponseEntity<Map<String, Object>> deleteRep(
@@ -96,25 +93,12 @@ public class AdminController {
         Member member = requireMember(id);
         member.setDelYn("Y");
         memberRepository.save(member);
-        inviteCodeService.invalidateActiveCodes(member);
         log.info("Deleted rep memberId={}", id);
 
         Map<String, Object> result = new HashMap<>();
         result.put("status", "SUCCESS");
         result.put("message", "팀 대표가 삭제되었습니다.");
         return ResponseEntity.ok(result);
-    }
-
-    // 초대코드 발급 (평문은 이 응답 1회만 제공)
-    @PostMapping("/reps/{id}/invite")
-    public ResponseEntity<InviteCodeResponse> issueInvite(
-            @RequestHeader(value = "X-Admin-Token", required = false) String token,
-            @PathVariable Long id) {
-        adminAuthService.requireToken(token);
-        Member member = requireMember(id);
-        String code = inviteCodeService.issue(member);
-        return ResponseEntity.ok(new InviteCodeResponse(code,
-                "코드는 대표에게 전달한 후 즉시 폐기되며, 이 화면을 벗어나면 다시 확인할 수 없습니다."));
     }
 
     // ==================== 헬퍼 ====================

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { suggestionAPI } from '../services/api';
+import { suggestionAPI, releaseNoteAPI } from '../services/api';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 import './SuggestionPage.css';
 
-function SuggestionPage() {
+function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
   // 목록 상태
   const [pinnedSuggestions, setPinnedSuggestions] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -45,10 +45,10 @@ function SuggestionPage() {
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
 
-  // 로딩 상태
   const [loading, setLoading] = useState(false);
+  const [releaseNote, setReleaseNote] = useState(null);
+  const [releaseLoading, setReleaseLoading] = useState(false);
 
-  // 목록 조회
   const fetchSuggestions = useCallback(async (page = 0) => {
     try {
       setLoading(true);
@@ -68,6 +68,23 @@ function SuggestionPage() {
   useEffect(() => {
     fetchSuggestions();
   }, [fetchSuggestions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!releaseNoteId) {
+      setReleaseNote(null);
+      return undefined;
+    }
+    setReleaseLoading(true);
+    releaseNoteAPI.getById(releaseNoteId).then((note) => {
+      if (!cancelled) setReleaseNote(note);
+    }).catch(() => {
+      if (!cancelled) setAlertModal({ show: true, message: '릴리즈 노트를 찾을 수 없거나 아직 공개되지 않았습니다.' });
+    }).finally(() => {
+      if (!cancelled) setReleaseLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [releaseNoteId]);
 
   // 상세 조회
   const handleViewDetail = async (suggestion) => {
@@ -368,6 +385,19 @@ function SuggestionPage() {
         </button>
       </div>
 
+      {releaseLoading && <div className="release-note-detail-card"><h2>릴리즈 노트를 불러오는 중...</h2></div>}
+      {releaseNote && (
+        <article className="release-note-detail-card" aria-labelledby="release-note-detail-title">
+          <div className="release-note-detail-meta"><span>버전 {releaseNote.version}</span><span>{releaseNote.publishedAt ? new Date(releaseNote.publishedAt).toLocaleString('ko-KR') : ''}</span></div>
+          <h2 id="release-note-detail-title">{releaseNote.title}</h2>
+          <p className="release-note-detail-summary">{releaseNote.summary}</p>
+          <div className="release-note-detail-content">{releaseNote.content}</div>
+          <div className="release-note-detail-actions">
+            <button className="submit-btn" onClick={() => { resetForm(); setFormData((previous) => ({ ...previous, title: `[${releaseNote.version}] ` })); setShowWriteModal(true); }}>이 버전의 의견 남기기</button>
+            <button className="cancel-btn" onClick={() => { setReleaseNote(null); onReleaseNoteClosed?.(); window.history.replaceState(null, '', '/'); }}>상세 닫기</button>
+          </div>
+        </article>
+      )}
       {loading ? (
         <div className="loading">로딩 중...</div>
       ) : (

@@ -1,7 +1,7 @@
 package com.example.coffeeorder.controller;
 
 import com.example.coffeeorder.dto.PinChangeRequest;
-import com.example.coffeeorder.dto.PinSetupRequest;
+import com.example.coffeeorder.dto.RepRegisterRequest;
 import com.example.coffeeorder.dto.RepLoginRequest;
 import com.example.coffeeorder.dto.RepLoginResponse;
 import com.example.coffeeorder.dto.RepMeResponse;
@@ -9,6 +9,9 @@ import com.example.coffeeorder.dto.RepPublicItem;
 import com.example.coffeeorder.dto.RepTwosomeAccountRequest;
 import com.example.coffeeorder.dto.TwosomeCartAddRequest;
 import com.example.coffeeorder.dto.TwosomeCartAddResponse;
+import com.example.coffeeorder.dto.TwosomeCartCustomItemResponse;
+import com.example.coffeeorder.dto.TwosomeCartCustomListRequest;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.example.coffeeorder.dto.TwosomeCaptchaResponse;
 import com.example.coffeeorder.dto.TwosomeCartItemResponse;
 import com.example.coffeeorder.dto.TwosomeCartQtyAdjustRequest;
@@ -44,25 +47,36 @@ public class RepController {
     private final MemberRepository memberRepository;
     private final TwosomeStoreIntegrationService twosomeStoreIntegrationService;
 
-    // 로그인 화면용 활성 대표 목록 (id+이름+팀명만)
+    // 로그인 화면용 활성 대표 목록 (부서별 필터와 세션 상태)
     @GetMapping("/api/reps")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<RepPublicItem>> listReps() {
-        List<RepPublicItem> reps = memberRepository.findByDelYnOrderByIdAsc("N").stream()
-                .map(member -> new RepPublicItem(
-                        member.getId(), member.getName(), member.getTeam().getName()))
-                .toList();
+    public ResponseEntity<List<RepPublicItem>> listReps(
+            @RequestParam(required = false) Long departmentId) {
+        List<Member> members = departmentId != null
+                ? memberRepository.findByTeam_Department_IdAndDelYnOrderByIdAsc(departmentId, "N")
+                : memberRepository.findByDelYnOrderByIdAsc("N");
+        List<RepPublicItem> reps = members.stream().map(this::toPublicItem).toList();
         return ResponseEntity.ok(reps);
     }
 
-    // 최초 PIN 설정 (1회용 초대코드 필요)
-    @PostMapping("/api/rep/pin/setup")
-    public ResponseEntity<Map<String, Object>> setupPin(@RequestBody PinSetupRequest request) {
-        repAuthService.setupPin(request.getMemberId(), request.getInviteCode(), request.getPin());
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "SUCCESS");
-        result.put("message", "PIN이 설정되었습니다.");
-        return ResponseEntity.ok(result);
+    @PostMapping("/api/rep/register")
+    public ResponseEntity<RepLoginResponse> registerRep(@RequestBody RepRegisterRequest request) {
+        RepAuthService.RepLoginResult result = repAuthService.registerRep(request.getTeamId(), request.getPin());
+        return ResponseEntity.ok(new RepLoginResponse(
+                result.token(), result.name(), result.teamName(), result.teamId()));
+    }
+
+    private RepPublicItem toPublicItem(Member member) {
+        String status = twosomeStoreIntegrationService.getSessionStatus(
+                TwosomeStoreIntegrationService.repSessionKey(member.getId())).getStatus();
+        String reason = switch (status) {
+            case "ACTIVE" -> "사용 가능";
+            case "EXPIRED" -> "세션 만료 · 다시 로그인 필요";
+            default -> "로그인 필요";
+        };
+        return new RepPublicItem(
+                member.getId(), member.getName(), member.getTeam().getDepartment().getId(),
+                member.getTeam().getDepartment().getName(), status, reason);
     }
 
     // 대표 로그인. PIN 미설정 시 error=PIN_NOT_SET
@@ -179,27 +193,64 @@ public class RepController {
     public ResponseEntity<TwosomeCartAddResponse> addToCart(
             @RequestHeader(value = "X-Rep-Token", required = false) String token,
             @RequestBody TwosomeCartAddRequest request) {
-        Member member = repAuthService.resolveByToken(token);
+        Long memberId = resolveTargetMemberId(token, request.getTargetRepMemberId());
+        requireActiveSession(memberId);
         return ResponseEntity.ok(twosomeStoreIntegrationService.addItemsToCart(
-                TwosomeStoreIntegrationService.repSessionKey(member.getId()), request));
+                TwosomeStoreIntegrationService.repSessionKey(memberId), request));
+    }
+
+    @PostMapping("/api/rep/twosome/cart/custom-list")
+    public ResponseEntity<List<TwosomeCartCustomItemResponse>> getCartCustomList(
+            @RequestBody TwosomeCartCustomListRequest request) {
+        Long memberId = resolveTargetMemberId(null, request.getTargetRepMemberId());
+        requireActiveSession(memberId);
+        JsonNode list = twosomeStoreIntegrationService.getCartCustomList(
+                TwosomeStoreIntegrationService.repSessionKey(memberId),
+                request.getCartNo(), request.getCartDtlNo());
+        List<TwosomeCartCustomItemResponse> result = new java.util.ArrayList<>();
+        if (list.isArray()) {
+            for (JsonNode node : list) {
+                result.add(new TwosomeCartCustomItemResponse(
+                        textOf(node, "CSTM_NM"), firstInt(node, "PRICE"),
+                        firstInt(node, "CSTM_ORD_CNT"), textOf(node, "CSTM_SEL_ID"),
+                        textOf(node, "CSTM_GRP_CD"), textOf(node, "TYPE_ADD_CD"),
+                        textOf(node, "CSTM_ADD_CD"), textOf(node, "TYPE_CHG_CD"),
+                        textOf(node, "CSTM_CHG_CD")));
+            }
+        }
+        return ResponseEntity.ok(result);
+    }
+
+    private static String textOf(JsonNode node, String fieldName) {
+        JsonNode value = node.get(fieldName);
+        return value != null && value.isTextual() ? value.asText() : null;
+    }
+
+    private static Integer firstInt(JsonNode node, String fieldName) {
+        JsonNode value = node.get(fieldName);
+        return value != null && value.isNumber() ? value.asInt() : null;
     }
 
     @GetMapping("/api/rep/twosome/cart")
     public ResponseEntity<List<TwosomeCartItemResponse>> getCartItems(
-            @RequestHeader(value = "X-Rep-Token", required = false) String token) {
-        Member member = repAuthService.resolveByToken(token);
+            @RequestHeader(value = "X-Rep-Token", required = false) String token,
+            @RequestParam(required = false) Long targetRepMemberId) {
+        Long memberId = resolveTargetMemberId(token, targetRepMemberId);
+        requireActiveSession(memberId);
         return ResponseEntity.ok(twosomeStoreIntegrationService.getCartItems(
-                TwosomeStoreIntegrationService.repSessionKey(member.getId())));
+                TwosomeStoreIntegrationService.repSessionKey(memberId)));
     }
 
     @DeleteMapping("/api/rep/twosome/cart/items/{cartNo}")
     public ResponseEntity<Map<String, Object>> removeCartItem(
             @RequestHeader(value = "X-Rep-Token", required = false) String token,
             @PathVariable String cartNo,
-            @RequestParam String cartDtlNo) {
-        Member member = repAuthService.resolveByToken(token);
+            @RequestParam String cartDtlNo,
+            @RequestParam(required = false) Long targetRepMemberId) {
+        Long memberId = resolveTargetMemberId(token, targetRepMemberId);
+        requireActiveSession(memberId);
         twosomeStoreIntegrationService.removeCartItem(
-                TwosomeStoreIntegrationService.repSessionKey(member.getId()), cartNo, cartDtlNo);
+                TwosomeStoreIntegrationService.repSessionKey(memberId), cartNo, cartDtlNo);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "SUCCESS");
         result.put("message", "장바구니 항목이 삭제되었습니다.");
@@ -210,10 +261,12 @@ public class RepController {
     public ResponseEntity<Map<String, Object>> adjustCartItemQty(
             @RequestHeader(value = "X-Rep-Token", required = false) String token,
             @PathVariable String cartNo,
-            @RequestBody TwosomeCartQtyAdjustRequest request) {
-        Member member = repAuthService.resolveByToken(token);
+            @RequestBody TwosomeCartQtyAdjustRequest request,
+            @RequestParam(required = false) Long targetRepMemberId) {
+        Long memberId = resolveTargetMemberId(token, targetRepMemberId);
+        requireActiveSession(memberId);
         twosomeStoreIntegrationService.adjustCartItemQty(
-                TwosomeStoreIntegrationService.repSessionKey(member.getId()), cartNo, request);
+                TwosomeStoreIntegrationService.repSessionKey(memberId), cartNo, request);
         Map<String, Object> result = new HashMap<>();
         result.put("status", "SUCCESS");
         result.put("message", "수량이 조정되었습니다.");
@@ -222,15 +275,32 @@ public class RepController {
 
     @PostMapping("/api/rep/twosome/cart/clear")
     public ResponseEntity<Map<String, Object>> clearCart(
-            @RequestHeader(value = "X-Rep-Token", required = false) String token) {
-        Member member = repAuthService.resolveByToken(token);
+            @RequestHeader(value = "X-Rep-Token", required = false) String token,
+            @RequestParam(required = false) Long targetRepMemberId) {
+        Long memberId = resolveTargetMemberId(token, targetRepMemberId);
+        requireActiveSession(memberId);
         int deletedCount = twosomeStoreIntegrationService.clearCart(
-                TwosomeStoreIntegrationService.repSessionKey(member.getId()));
+                TwosomeStoreIntegrationService.repSessionKey(memberId));
         Map<String, Object> result = new HashMap<>();
         result.put("status", "SUCCESS");
         result.put("deletedCount", deletedCount);
         result.put("message", String.format("장바구니 %d건이 삭제되었습니다.", deletedCount));
         return ResponseEntity.ok(result);
+    }
+
+    private Long resolveTargetMemberId(String token, Long targetRepMemberId) {
+        if (targetRepMemberId != null) {
+            return repAuthService.requireActiveMember(targetRepMemberId).getId();
+        }
+        return repAuthService.resolveByToken(token).getId();
+    }
+
+    private void requireActiveSession(Long memberId) {
+        String status = twosomeStoreIntegrationService.getSessionStatus(
+                TwosomeStoreIntegrationService.repSessionKey(memberId)).getStatus();
+        if (!"ACTIVE".equals(status)) {
+            throw new AuthException("TARGET_REP_SESSION_REQUIRED", "선택한 대표의 투썸 로그인이 필요합니다.");
+        }
     }
 
     // 인증 실패 (401). PIN_NOT_SET은 프론트가 PIN 설정 모드로 전환하는 데 사용

@@ -1,9 +1,11 @@
 package com.example.coffeeorder.controller;
 
+import com.example.coffeeorder.dto.CartReflectedRequest;
 import com.example.coffeeorder.dto.OrderCreateDto;
 import com.example.coffeeorder.dto.OrderResponseDto;
 import com.example.coffeeorder.entity.Order;
 import com.example.coffeeorder.service.OrderService;
+import com.example.coffeeorder.service.RepAuthService;
 import com.example.coffeeorder.service.SettingsService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class OrderController {
 
     private final OrderService orderService;
     private final SettingsService settingsService;
+    private final RepAuthService repAuthService;
 
     // 오늘 주문 전체 조회 (부서별 필터링 지원)
     @GetMapping("/today")
@@ -123,8 +126,10 @@ public class OrderController {
     // 주문의 장바구니 반영 일시 일괄 갱신 (일괄 담기 성공 후 마킹용)
     @PostMapping("/cart-reflected")
     public ResponseEntity<Map<String, Object>> markCartReflected(
-            @RequestBody Map<String, List<Long>> request) {
-        int updatedCount = orderService.markCartReflected(request.get("orderIds"));
+            @Valid @RequestBody CartReflectedRequest request) {
+        repAuthService.requireActiveMember(request.getTargetRepMemberId());
+        int updatedCount = orderService.markCartReflected(
+                request.getOrderIds(), request.getTargetRepMemberId());
         return ResponseEntity.ok(Map.of("updatedCount", updatedCount));
     }
 
@@ -138,10 +143,8 @@ public class OrderController {
 
     // 특정 팀원의 오늘 주문 조회
     @GetMapping("/team/{teamId}/today")
-    public ResponseEntity<Order> getTodayOrderByTeam(@PathVariable Long teamId) {
-        return orderService.findTodayOrderByTeam(teamId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<List<Order>> getTodayOrderByTeam(@PathVariable Long teamId) {
+        return ResponseEntity.ok(orderService.findTodayOrderByTeam(teamId));
     }
 
     // 특정 팀원의 최근 주문 조회

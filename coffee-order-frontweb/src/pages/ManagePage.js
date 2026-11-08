@@ -4,76 +4,63 @@ import { useDepartment } from '../context/DepartmentContext';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
+import AdminPage from './AdminPage';
+import ReleaseNotesAdmin from './ReleaseNotesAdmin';
 import useModal from '../hooks/useModal';
+import { isWithinStoreHours } from '../utils/storeHours';
 import './ManagePage.css';
 
 const ManagePage = ({ initialTab }) => {
   const { selectedDepartment, selectedDepartmentId, setSelectedDepartment, refreshDepartments } = useDepartment();
-  // menu 탭은 더이상 없으므로 settings로 리다이렉트
-  const getInitialTab = () => {
-    if (initialTab === 'menu') return 'settings';
-    return initialTab || 'team';
-  };
+  const getInitialTab = () => initialTab === 'menu' ? 'settings' : (initialTab || 'team');
   const [activeTab, setActiveTab] = useState(getInitialTab());
   const [teams, setTeams] = useState([]);
   const [departments, setDepartments] = useState([]);
-
-  // 투썸 연동 (PoC) 상태
-  const [twosomeSession, setTwosomeSession] = useState(null); // {status, storeNm, lastUsedAt, remainingMinutes, source}
-  const [twosomeHealth, setTwosomeHealth] = useState(null); // {session, indicators, recentEvents}
-  const [menuRefreshDiff, setMenuRefreshDiff] = useState(null); // 최근 메뉴 새로고침 diff 리포트
+  const [twosomeSession, setTwosomeSession] = useState(null);
+  const [twosomeHealth, setTwosomeHealth] = useState(null);
+  const [menuRefreshDiff, setMenuRefreshDiff] = useState(null);
+  const [storeInfo, setStoreInfo] = useState(null);
   const [showTwosomeLogin, setShowTwosomeLogin] = useState(false);
-  const [captcha, setCaptcha] = useState(null); // {contextId, imageBase64}
+  const [captcha, setCaptcha] = useState(null);
   const [twosomeForm, setTwosomeForm] = useState({ loginId: '', loginPwd: '', answerCd: '' });
   const [isTwosomeLoading, setIsTwosomeLoading] = useState(false);
   const [twosomeNotice, setTwosomeNotice] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
-  const [modalType, setModalType] = useState(''); // 'department', 'team'
+  const [modalType, setModalType] = useState('');
   const [formData, setFormData] = useState({});
-
-  // 커스텀 모달 훅
   const {
-    isAlertOpen,
-    alertConfig,
-    showAlert,
-    closeAlert,
-    isConfirmOpen,
-    confirmConfig,
-    showConfirm,
-    closeConfirm,
+    isAlertOpen, alertConfig, showAlert, closeAlert,
+    isConfirmOpen, confirmConfig, showConfirm, closeConfirm,
   } = useModal();
 
-  // initialTab props가 변경되면 activeTab 업데이트
   useEffect(() => {
-    if (initialTab) {
-      // menu 탭은 더이상 없으므로 settings로 리다이렉트
-      setActiveTab(initialTab === 'menu' ? 'settings' : initialTab);
-    }
+    if (initialTab) setActiveTab(initialTab === 'menu' ? 'settings' : initialTab);
   }, [initialTab]);
 
   useEffect(() => {
-    // 부서/투썸 탭은 selectedDepartmentId 없이도 로드 가능
-    if (activeTab === 'department' || activeTab === 'twosome') {
-      loadData();
-    } else if (selectedDepartmentId) {
-      loadData();
-    }
+    if (['department', 'twosome', 'settings'].includes(activeTab) || selectedDepartmentId) loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedDepartmentId]);
 
   const loadData = async () => {
     try {
       if (activeTab === 'team') {
-        const data = await teamAPI.getAll(selectedDepartmentId);
-        setTeams(data);
+        setTeams(await teamAPI.getAll(selectedDepartmentId));
       } else if (activeTab === 'department') {
-        const data = await departmentAPI.getAll();
-        setDepartments(data);
+        setDepartments(await departmentAPI.getAll());
       } else if (activeTab === 'twosome') {
         await loadTwosomeSession();
+      } else if (activeTab === 'settings') {
+        const [info, health, diff] = await Promise.all([
+          twosomeStoreAPI.getStoreInfo(), twosomeStoreAPI.getHealth(), twosomeStoreAPI.getMenuRefreshDiff(),
+        ]);
+        setStoreInfo({ ...info, currentlyOpen: isWithinStoreHours(info) });
+        setTwosomeHealth(health);
+        setMenuRefreshDiff(diff && Object.keys(diff).length > 0 ? diff : null);
       }
     } catch (err) {
-      console.error('데이터 로드 실패:', err);
+      showAlert('설정 정보를 불러오지 못했습니다.');
     }
   };
 
@@ -218,12 +205,10 @@ const ManagePage = ({ initialTab }) => {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  // 유형별 지표를 성공/실패 이벤트 쌍으로 병합 (자동 로그인/메뉴 배치/장바구니 표시용)
   // 성공 유형의 ok만 본다: "마지막 이벤트가 성공" 규칙이 이미 실패 이력까지 반영함
-  const buildIndicatorSummary = (successType, failType) => {
+  const buildIndicatorSummary = (successType) => {
     const indicators = twosomeHealth?.indicators || [];
     const success = indicators.find((i) => i.eventType === successType);
-    const failure = indicators.find((i) => i.eventType === failType);
     const ok = success?.ok ?? true;
     const lastSuccessAt = success?.lastSuccessAt || null;
     return { ok, lastSuccessAt };
@@ -355,21 +340,10 @@ const ManagePage = ({ initialTab }) => {
         >
           팀원 관리
         </button>
-        <button
-          className={activeTab === 'settings' ? 'active' : ''}
-          onClick={() => setActiveTab('settings')}
-        >
-          주문 설정
-        </button>
-        <button
-          className={activeTab === 'twosome' ? 'active' : ''}
-          onClick={() => setActiveTab('twosome')}
-        >
-          투썸 연동
-        </button>
-        <button onClick={() => { window.location.href = '/admin'; }}>
-          대표 관리
-        </button>
+        <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>매장·주문 안내</button>
+        <button className={activeTab === 'twosome' ? 'active' : ''} onClick={() => setActiveTab('twosome')}>관리자 투썸 연동</button>
+        <button className={activeTab === 'reps' ? 'active' : ''} onClick={() => setActiveTab('reps')}>대표 관리</button>
+        <button className={activeTab === 'release-notes' ? 'active' : ''} onClick={() => setActiveTab('release-notes')}>릴리즈 노트</button>
       </div>
 
       <div className="manage-content">
@@ -437,17 +411,24 @@ const ManagePage = ({ initialTab }) => {
           </div>
         )}
 
-        {/* 주문 설정 */}
         {activeTab === 'settings' && (
-          <div className="settings-form">
-            <h2>주문 설정 <span className="department-badge">({selectedDepartment?.name})</span></h2>
-            <p className="settings-fixed-notice">
-              메뉴 모드는 투썸플레이스 메뉴로 고정되어 있습니다.
-            </p>
+          <div className="settings-form store-settings-panel">
+            <h2>매장·주문 안내 <span className="department-badge">({selectedDepartment?.name || '전체'})</span></h2>
+            <dl className="store-settings-list">
+              <div><dt>대상 매장</dt><dd>{storeInfo?.storeNm || 'CJENM커머스부문점'}</dd></div>
+              <div><dt>매장 영업시간</dt><dd>{storeInfo?.ordTime || '조회 실패'}</dd></div>
+              <div><dt>현재 영업 상태</dt><dd>{storeInfo?.currentlyOpen ? '영업 중 · 실제 장바구니 담기 가능' : '매장 닫힘 또는 확인 불가 · 로컬 주문서만 저장 가능'}<br />주문할 때마다 영업시간을 다시 확인합니다.</dd></div>
+              <div><dt>마지막 메뉴 갱신</dt><dd>{menuRefreshDiff?.executedAt ? `${formatDateTime(menuRefreshDiff.executedAt)} · ${menuRefreshDiff.success ? '성공' : '실패'}` : '갱신 기록 없음'}</dd></div>
+              <div><dt>자동 갱신 일정</dt><dd>관리자 계정으로 매일 오전 8시 30분에 실제 매장 메뉴를 갱신합니다.</dd></div>
+              <div><dt>로컬 주문서</dt><dd>대표 로그인이나 매장 영업 여부와 관계없이 항상 저장할 수 있습니다.</dd></div>
+              <div><dt>투썸 장바구니</dt><dd>매장이 닫혀 있으면 외부 담기를 막고, 개장 후 실시간 장바구니 탭에서 미반영 주문을 일괄 담을 수 있습니다.</dd></div>
+            </dl>
           </div>
         )}
+        {activeTab === 'reps' && <AdminPage embedded />}
+        {activeTab === 'release-notes' && <ReleaseNotesAdmin onError={showAlert} onSaved={showAlert} />}
 
-        {/* 투썸 연동 (PoC) */}
+        {/* 관리자 계정의 메뉴 갱신·세션 상태 */}
         {activeTab === 'twosome' && (
           <div className="twosome-section">
             <div className="section-header">
@@ -526,10 +507,7 @@ const ManagePage = ({ initialTab }) => {
               </div>
             )}
 
-            <p className="sync-info">
-              관리자의 투썸 계정으로 로그인하여 매장(CJENM커머스부문점) 메뉴로 메뉴 DB를 새로고치고,
-              팀 주문을 투썸 장바구니에 담는 PoC 기능입니다. (세션 유휴 30분 만료)
-            </p>
+            <p className="sync-info">관리자 계정은 CJENM커머스부문점의 실제 판매 메뉴를 매일 갱신하는 용도로만 사용합니다. 팀원이 선택하는 실제 장바구니는 각 대표의 계정으로 분리됩니다. 세션은 유휴 시 만료될 수 있습니다.</p>
 
             <div className="twosome-actions">
               {(!twosomeSession || twosomeSession.status !== 'ACTIVE') && !showTwosomeLogin && (

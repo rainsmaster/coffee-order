@@ -8,6 +8,6 @@ public class SpaController {
 
     @GetMapping({"/admin", "/admin/"})
     public String admin() {
-        return "forward:/index.html";
+        return "redirect:/?manageTab=reps";
     }
 }

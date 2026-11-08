@@ -62,20 +62,9 @@ public class OrderService {
         return orderRepository.findById(id);
     }
 
-    // 주문 생성 (중복 체크)
+    // 주문 생성
     @Transactional
     public Order createOrder(Order order) throws Exception {
-        // 같은 날짜에 같은 팀원이 이미 주문했는지 체크
-        boolean exists = orderRepository.existsByTeamAndOrderDateAndDelYn(
-            order.getTeam(),
-            order.getOrderDate(),
-            "N"
-        );
-
-        if (exists) {
-            throw new Exception("이미 오늘 주문하셨습니다.");
-        }
-
         return orderRepository.save(order);
     }
 
@@ -88,12 +77,6 @@ public class OrderService {
 
         // Order 날짜 설정 - 한국 시간 기준
         LocalDate orderDate = dto.getOrderDate() != null ? dto.getOrderDate() : LocalDate.now(KOREA_ZONE);
-
-        // 중복 체크
-        boolean exists = orderRepository.existsByTeamAndOrderDateAndDelYn(team, orderDate, "N");
-        if (exists) {
-            throw new Exception("이미 오늘 주문하셨습니다.");
-        }
 
         // Order 엔티티 생성
         Order order = new Order();
@@ -156,6 +139,7 @@ public class OrderService {
             order.setVariantOpts(updatedOrder.getVariantOpts());
             order.setCstmInfo(updatedOrder.getCstmInfo());
             order.setCartReflectedAt(null);
+            order.setCartReflectedBy(null);
 
             return orderRepository.save(order);
         }
@@ -168,7 +152,7 @@ public class OrderService {
      * @return 갱신 건수
      */
     @Transactional
-    public int markCartReflected(List<Long> orderIds) {
+    public int markCartReflected(List<Long> orderIds, Long repMemberId) {
         if (orderIds == null || orderIds.isEmpty()) {
             return 0;
         }
@@ -177,6 +161,7 @@ public class OrderService {
         for (Order order : orderRepository.findAllById(orderIds)) {
             if ("N".equals(order.getDelYn())) {
                 order.setCartReflectedAt(now);
+                order.setCartReflectedBy(repMemberId);
                 orderRepository.save(order);
                 updated++;
             }
@@ -218,16 +203,11 @@ public class OrderService {
     }
 
     // 특정 팀원의 오늘 주문 조회
-    public Optional<Order> findTodayOrderByTeam(Long teamId) {
-        Optional<Team> team = teamRepository.findById(teamId);
-        if (team.isPresent()) {
-            return orderRepository.findByTeamAndOrderDateAndDelYn(
-                team.get(),
-                LocalDate.now(KOREA_ZONE),
-                "N"
-            );
-        }
-        return Optional.empty();
+    public List<Order> findTodayOrderByTeam(Long teamId) {
+        return teamRepository.findById(teamId)
+                .map(team -> orderRepository.findByTeamAndOrderDateAndDelYn(
+                        team, LocalDate.now(KOREA_ZONE), "N"))
+                .orElseGet(List::of);
     }
 
     // 특정 팀원의 최근 주문 조회

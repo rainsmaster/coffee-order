@@ -51,6 +51,9 @@ public class Order {
     @Column(name = "cart_reflected_at")
     private LocalDateTime cartReflectedAt;
 
+    @Column(name = "cart_reflected_by")
+    private Long cartReflectedBy;
+
     // 투썸 변형 메뉴 코드 (옵션 조합 결과, 장바구니 담기의 MENU_CD)
     @Column(name = "variant_menu_cd", length = 20)
     private String variantMenuCd;

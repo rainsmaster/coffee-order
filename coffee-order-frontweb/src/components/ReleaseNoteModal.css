@@ -1,0 +1,30 @@
+.release-note-version {
+  margin-bottom: 12px;
+  color: #657080;
+  font-size: 14px;
+}
+
+.release-note-summary {
+  margin-bottom: 20px;
+  line-height: 1.65;
+  white-space: pre-line;
+}
+
+.release-note-detail {
+  display: inline-flex;
+  min-height: 40px;
+  padding: 0;
+  color: #315f9e;
+  font-weight: 600;
+}
+
+.release-note-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.release-note-actions button {
+  min-height: 44px;
+}

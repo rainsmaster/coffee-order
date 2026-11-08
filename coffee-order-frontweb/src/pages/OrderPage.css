@@ -1172,3 +1172,45 @@
 .twosome-card {
   position: relative;
 }
+
+.rep-team-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #e0e5e9;
+  border-radius: 6px;
+  background: #f8f9fa;
+  color: #59636e;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.rep-team-summary strong {
+  color: #303940;
+  font-size: 0.88rem;
+}
+
+.rep-auth-btn,
+.order-change-btn,
+.order-change-modal-footer button {
+  min-height: 44px;
+}
+
+.order-change-add-guide {
+  margin: 0.85rem 0 0;
+  color: #777;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .order-change-modal-footer {
+    flex-direction: column-reverse;
+  }
+
+  .order-change-modal-footer button {
+    width: 100%;
+  }
+}

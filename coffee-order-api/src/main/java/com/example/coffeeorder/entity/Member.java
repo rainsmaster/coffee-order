@@ -10,8 +10,8 @@ import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 
 /**
- * 팀 대표 (1단계). PIN은 해시+salt 저장으로 본인만 알 수 있다.
- * twosome_id/twosome_pw는 3단계 투썸 개인 연동 예약 필드.
+ * 팀 대표. PIN은 해시+salt 저장으로 본인만 알 수 있다.
+ * 투썸 아이디와 암호화된 자격증명은 대표별 장바구니 연동에 사용한다.
  */
 @Entity
 @Table(name = "member")
@@ -55,7 +55,7 @@ public class Member {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
-    // 3단계 예약: 투썸 개인 연동 자격증명 (twosome_pw는 추후 암호화 저장)
+    // 대표별 투썸 자격증명 (twosome_pw는 AES-256-GCM으로 암호화해 저장)
     @Column(name = "twosome_id", length = 100)
     private String twosomeId;
 

@@ -14,4 +14,8 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     List<Member> findByDelYnOrderByIdAsc(String delYn);
 
     Optional<Member> findByIdAndDelYn(Long id, String delYn);
+
+    Optional<Member> findByTeam_IdAndDelYn(Long teamId, String delYn);
+
+    List<Member> findByTeam_Department_IdAndDelYnOrderByIdAsc(Long departmentId, String delYn);
 }

@@ -1,8 +1,10 @@
 package com.example.coffeeorder.service;
 
 import com.example.coffeeorder.entity.Member;
+import com.example.coffeeorder.entity.Team;
 import com.example.coffeeorder.exception.AuthException;
 import com.example.coffeeorder.repository.MemberRepository;
+import com.example.coffeeorder.repository.TeamRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -30,24 +32,32 @@ public class RepAuthService {
     private static final Duration LOCK_DURATION = Duration.ofMinutes(10);
 
     private final MemberRepository memberRepository;
-    private final InviteCodeService inviteCodeService;
+    private final TeamRepository teamRepository;
     private final PinCrypto pinCrypto;
     private final TwosomeCredentialCrypto twosomeCredentialCrypto;
     private final StringRedisTemplate stringRedisTemplate;
 
-    /**
-     * 최초 PIN 설정 (1회용 초대코드 필요)
-     */
     @Transactional
-    public void setupPin(Long memberId, String inviteCode, String pin) {
-        Member member = requireActiveMember(memberId);
-        if (member.isPinSet()) {
-            throw new AuthException("이미 PIN이 설정되었습니다. PIN 변경을 이용해주세요.");
-        }
+    public RepLoginResult registerRep(Long teamId, String pin) {
+        Team team = teamRepository.findById(teamId)
+                .filter(t -> "N".equals(t.getDelYn()))
+                .orElseThrow(() -> new AuthException("팀원 정보를 찾을 수 없습니다."));
         if (!pinCrypto.isValidPinFormat(pin)) {
             throw new AuthException("PIN은 숫자 6자리여야 합니다.");
         }
-        inviteCodeService.verifyAndConsume(member, inviteCode);
+
+        Member member = memberRepository.findByTeam_IdAndDelYn(teamId, "N")
+                .orElseGet(() -> {
+                    Member created = new Member();
+                    created.setName(team.getName());
+                    created.setTeam(team);
+                    created.setRole("TEAM_REP");
+                    return created;
+                });
+
+        if (member.isPinSet()) {
+            return login(member.getId(), pin);
+        }
 
         member.setPinSalt(pinCrypto.newSalt());
         member.setPinHash(pinCrypto.hash(pin, member.getPinSalt()));
@@ -55,7 +65,8 @@ public class RepAuthService {
         member.setPinFailCount(0);
         member.setPinLockedUntil(null);
         memberRepository.save(member);
-        log.info("PIN set for memberId={}", memberId);
+        log.info("Registered team rep: memberId={}", member.getId());
+        return login(member.getId(), pin);
     }
 
     /**
@@ -67,7 +78,7 @@ public class RepAuthService {
         Member member = requireActiveMember(memberId);
 
         if (!member.isPinSet()) {
-            throw new AuthException("PIN_NOT_SET", "PIN이 설정되지 않았습니다. 초대코드로 PIN을 먼저 설정해주세요.");
+            throw new AuthException("PIN_NOT_SET", "PIN이 설정되지 않았습니다. 본인 팀원을 선택해 PIN을 생성해주세요.");
         }
         verifyPin(member, pin);
 
@@ -184,7 +195,7 @@ public class RepAuthService {
         throw new AuthException("PIN이 올바르지 않습니다.");
     }
 
-    private Member requireActiveMember(Long memberId) {
+    public Member requireActiveMember(Long memberId) {
         if (memberId == null) {
             throw new AuthException("대표 정보를 찾을 수 없습니다.");
         }

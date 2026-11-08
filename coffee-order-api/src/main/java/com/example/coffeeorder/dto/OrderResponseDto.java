@@ -28,6 +28,7 @@ public class OrderResponseDto {
     private LocalDate orderDate;
     private LocalDateTime createdTime;
     private LocalDateTime cartReflectedAt;  // 장바구니 반영 일시 (null이면 미반영)
+    private Long cartReflectedBy;
     private String variantMenuCd;
     private String variantOpts;
     private String cstmInfo;
@@ -44,6 +45,7 @@ public class OrderResponseDto {
         dto.setOrderDate(order.getOrderDate());
         dto.setCreatedTime(order.getCreatedTime());
         dto.setCartReflectedAt(order.getCartReflectedAt());
+        dto.setCartReflectedBy(order.getCartReflectedBy());
         dto.setVariantMenuCd(order.getVariantMenuCd());
         dto.setVariantOpts(order.getVariantOpts());
         dto.setCstmInfo(order.getCstmInfo());

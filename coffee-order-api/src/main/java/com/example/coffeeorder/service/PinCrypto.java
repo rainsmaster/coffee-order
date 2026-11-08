@@ -8,7 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 
 /**
- * PIN/초대코드 해시 유틸.
+ * 대표 PIN 해시 유틸.
  * SHA-256 + 멤버별 랜덤 salt, 비교는 MessageDigest.isEqual (constant-time).
  * 평문은 발급/검증 직후 즉시 폐기하는 것을 전제로 한다.
  */

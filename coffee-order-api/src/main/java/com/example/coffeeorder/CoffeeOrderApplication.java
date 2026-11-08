@@ -4,16 +4,13 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-import jakarta.annotation.PostConstruct;
 import java.util.TimeZone;
 
 @SpringBootApplication
 @EnableScheduling
 public class CoffeeOrderApplication {
 
-    @PostConstruct
-    public void init() {
-        // 애플리케이션 전체 타임존을 한국 시간으로 설정
+    static {
         TimeZone.setDefault(TimeZone.getTimeZone("Asia/Seoul"));
     }
 
