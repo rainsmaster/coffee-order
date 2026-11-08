@@ -1,0 +1,209 @@
+/* 관리자 페이지 (/admin) */
+.admin-page {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.admin-header-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-header h1 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #333;
+}
+
+.admin-principle {
+  margin: 0 0 1rem;
+  padding: 0.6rem 0.9rem;
+  background-color: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 6px;
+  color: #7a5c00;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+/* 로그인 카드 */
+.admin-login-card {
+  max-width: 380px;
+  margin: 4rem auto 0;
+  padding: 2rem;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 10px;
+  text-align: center;
+}
+
+.admin-login-card h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+  color: #333;
+}
+
+.admin-login-desc {
+  margin: 0 0 1.25rem;
+  color: #777;
+  font-size: 0.88rem;
+}
+
+.admin-login-card input {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  margin-bottom: 0.9rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+
+/* 공통 버튼 */
+.admin-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background-color: #fff;
+  color: #444;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.admin-btn.primary {
+  background-color: #2e7d32;
+  border-color: #2e7d32;
+  color: #fff;
+}
+
+.admin-btn.danger {
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.admin-btn.small {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.admin-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 폼 카드 / 목록 카드 */
+.admin-form-card,
+.admin-list-card,
+.invite-result-card {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+  background-color: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.admin-form-card h2,
+.admin-list-card h2,
+.invite-result-card h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.admin-form-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.admin-form-row input,
+.admin-form-row select {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.admin-form-row input {
+  flex: 1;
+  min-width: 140px;
+}
+
+.admin-form-row select {
+  min-width: 200px;
+}
+
+/* 목록 테이블 */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid #f0f0f0;
+  text-align: left;
+}
+
+.admin-table th {
+  color: #777;
+  font-weight: 600;
+}
+
+.admin-table-actions {
+  white-space: nowrap;
+}
+
+.admin-table-actions .admin-btn {
+  margin-right: 0.35rem;
+}
+
+.admin-table-actions .admin-btn:last-child {
+  margin-right: 0;
+}
+
+/* 초대코드 결과 */
+.invite-result-card {
+  border-color: #2e7d32;
+}
+
+.invite-warning {
+  margin: 0 0 0.9rem;
+  color: #c62828;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.invite-code-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.invite-code {
+  font-family: monospace;
+  font-size: 1.6rem;
+  letter-spacing: 0.25rem;
+  font-weight: 700;
+  color: #2e7d32;
+  padding: 0.4rem 0.8rem;
+  background-color: #f1f8f2;
+  border: 1px dashed #2e7d32;
+  border-radius: 6px;
+}
+
+.no-data {
+  color: #888;
+  font-size: 0.9rem;
+  padding: 1rem 0;
+}

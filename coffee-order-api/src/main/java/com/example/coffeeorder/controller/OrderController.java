@@ -70,12 +70,7 @@ public class OrderController {
     @PostMapping
     public ResponseEntity<Object> createOrder(@Valid @RequestBody OrderCreateDto orderDto) {
         // 부서별 주문 가능 시간 체크
-        boolean isAvailable;
-        if (orderDto.getDepartmentId() != null) {
-            isAvailable = settingsService.isOrderAvailableByDepartment(orderDto.getDepartmentId());
-        } else {
-            isAvailable = settingsService.isOrderAvailable();
-        }
+        boolean isAvailable = settingsService.isOrderAvailable(orderDto.getDepartmentId());
 
         if (!isAvailable) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -101,12 +96,7 @@ public class OrderController {
             @RequestParam(required = false) Long departmentId,
             @RequestBody Order order) {
         // 부서별 주문 가능 시간 체크
-        boolean isAvailable;
-        if (departmentId != null) {
-            isAvailable = settingsService.isOrderAvailableByDepartment(departmentId);
-        } else {
-            isAvailable = settingsService.isOrderAvailable();
-        }
+        boolean isAvailable = settingsService.isOrderAvailable(departmentId);
 
         if (!isAvailable) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
@@ -128,6 +118,14 @@ public class OrderController {
             return ResponseEntity.noContent().build();
         }
         return ResponseEntity.notFound().build();
+    }
+
+    // 주문의 장바구니 반영 일시 일괄 갱신 (일괄 담기 성공 후 마킹용)
+    @PostMapping("/cart-reflected")
+    public ResponseEntity<Map<String, Object>> markCartReflected(
+            @RequestBody Map<String, List<Long>> request) {
+        int updatedCount = orderService.markCartReflected(request.get("orderIds"));
+        return ResponseEntity.ok(Map.of("updatedCount", updatedCount));
     }
 
     // 날짜별 메뉴 집계

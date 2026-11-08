@@ -18,7 +18,8 @@ public class TwosomeMenuService {
 
     // 삭제되지 않은 전체 메뉴 조회
     public List<TwosomeMenu> findAllActive() {
-        return twosomeMenuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N");
+        // 매장 메뉴 기준만 반환 (매장 배치 저장분 + del_yn='N'). 시즌종료/정리된 메뉴는 제외
+        return twosomeMenuRepository.findStoreMenus();
     }
 
     // ID로 조회

@@ -33,23 +33,35 @@ public class Order {
     private Team team;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "menu_id", nullable = true)
-    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private Menu menu;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "twosome_menu_id")
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private TwosomeMenu twosomeMenu;
 
+    // 레거시 CUSTOM 주문 구분용 (런칭 초반 2025-11-30~12-02 6걸음). 신규 주문은 항상 TWOSOME
     @Column(name = "menu_type", length = 20)
-    private String menuType = "CUSTOM";  // CUSTOM 또는 TWOSOME
+    private String menuType = "TWOSOME";
 
     @Column(name = "personal_option", length = 500)
     private String personalOption;
 
     @Column(name = "order_date", nullable = false)
     private LocalDate orderDate;
+
+    // 장바구니 반영 일시 (null이면 미반영 — 일괄 담기 대상)
+    @Column(name = "cart_reflected_at")
+    private LocalDateTime cartReflectedAt;
+
+    // 투썸 변형 메뉴 코드 (옵션 조합 결과, 장바구니 담기의 MENU_CD)
+    @Column(name = "variant_menu_cd", length = 20)
+    private String variantMenuCd;
+
+    // 옵션 코드 콤마 조합 ("010H,020R,040A,051E")
+    @Column(name = "variant_opts", length = 100)
+    private String variantOpts;
+
+    // 투썸 퍼스널 옵션 JSON (cartCstmInfo 배열 스냅샷)
+    @Column(name = "cstm_info", columnDefinition = "TEXT")
+    private String cstmInfo;
 
     @Column(name = "del_yn", nullable = false, length = 1)
     private String delYn = "N";
@@ -67,7 +79,7 @@ public class Order {
             delYn = "N";
         }
         if (menuType == null) {
-            menuType = "CUSTOM";
+            menuType = "TWOSOME";
         }
     }
 }

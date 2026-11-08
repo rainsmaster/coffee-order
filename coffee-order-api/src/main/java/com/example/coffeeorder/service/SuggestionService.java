@@ -27,6 +27,7 @@ public class SuggestionService {
 
     private final SuggestionRepository suggestionRepository;
     private final SuggestionCommentRepository commentRepository;
+    private final PinCrypto pinCrypto;
 
     @Value("${app.admin.password:admin1234}")
     private String adminPassword;
@@ -80,7 +81,7 @@ public class SuggestionService {
         suggestion.setTitle(request.getTitle());
         suggestion.setContent(request.getContent());
         suggestion.setAuthor(request.getAuthor());
-        suggestion.setPassword(hashPassword(request.getPassword()));
+        setPassword(suggestion, request.getPassword());
         suggestion.setPinned(false);
 
         Suggestion saved = suggestionRepository.save(suggestion);
@@ -96,7 +97,8 @@ public class SuggestionService {
             throw new IllegalArgumentException("삭제된 건의사항입니다.");
         }
 
-        if (!verifyPassword(request.getPassword(), suggestion.getPassword())) {
+        if (!pinCrypto.matches(legacyPasswordInput(request.getPassword()),
+                suggestion.getPasswordSalt(), suggestion.getPasswordHash())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
@@ -118,7 +120,8 @@ public class SuggestionService {
 
         // 관리자 비밀번호 또는 작성자 비밀번호 확인
         boolean isAdmin = adminPassword.equals(password);
-        boolean isAuthor = verifyPassword(password, suggestion.getPassword());
+        boolean isAuthor = pinCrypto.matches(legacyPasswordInput(password),
+                suggestion.getPasswordSalt(), suggestion.getPasswordHash());
 
         if (!isAdmin && !isAuthor) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
@@ -186,7 +189,7 @@ public class SuggestionService {
         comment.setSuggestion(suggestion);
         comment.setContent(request.getContent());
         comment.setAuthor(request.getAuthor());
-        comment.setPassword(hashPassword(request.getPassword()));
+        setPassword(comment, request.getPassword());
 
         SuggestionComment saved = commentRepository.save(comment);
         return SuggestionCommentResponseDto.from(saved);
@@ -201,7 +204,8 @@ public class SuggestionService {
             throw new IllegalArgumentException("삭제된 댓글입니다.");
         }
 
-        if (!verifyPassword(request.getPassword(), comment.getPassword())) {
+        if (!pinCrypto.matches(legacyPasswordInput(request.getPassword()),
+                comment.getPasswordSalt(), comment.getPasswordHash())) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
         }
 
@@ -221,7 +225,8 @@ public class SuggestionService {
 
         // 관리자 비밀번호 또는 작성자 비밀번호 확인
         boolean isAdmin = adminPassword.equals(password);
-        boolean isAuthor = verifyPassword(password, comment.getPassword());
+        boolean isAuthor = pinCrypto.matches(legacyPasswordInput(password),
+                comment.getPasswordSalt(), comment.getPasswordHash());
 
         if (!isAdmin && !isAuthor) {
             throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
@@ -237,23 +242,35 @@ public class SuggestionService {
     }
 
     /**
-     * SHA-256 해싱
+     * 비밀번호 설정 (행별 랜덤 salt + SHA-256(salt 조합 해시), PIN 정책과 동일 패턴).
+     * 이관된 레거시 해시와 검증 방식을 맞추기 위해 입력값은
+     * 평문의 레거시 무salt 해시(base64 SHA-256)로 통일한다.
      */
-    private String hashPassword(String password) {
+    private void setPassword(Suggestion suggestion, String rawPassword) {
+        suggestion.setPasswordSalt(pinCrypto.newSalt());
+        suggestion.setPasswordHash(pinCrypto.hash(legacyPasswordInput(rawPassword),
+                suggestion.getPasswordSalt()));
+    }
+
+    private void setPassword(SuggestionComment comment, String rawPassword) {
+        comment.setPasswordSalt(pinCrypto.newSalt());
+        comment.setPasswordHash(pinCrypto.hash(legacyPasswordInput(rawPassword),
+                comment.getPasswordSalt()));
+    }
+
+    /**
+     * 레거시 무salt 해시 입력값: Base64(SHA-256(평문)).
+     * 기존 데이터는 이 값이 그대로 저장되어 있어, 이 값을 salt 해시의 입력으로 재사용하면
+     * 평문을 알지 못핸 채로 기존 비밀번호를 그대로 이관할 수 있다.
+     */
+    private String legacyPasswordInput(String rawPassword) {
         try {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
+            byte[] hash = digest.digest(rawPassword.getBytes(StandardCharsets.UTF_8));
             return Base64.getEncoder().encodeToString(hash);
         } catch (NoSuchAlgorithmException e) {
             throw new RuntimeException("SHA-256 알고리즘을 사용할 수 없습니다.", e);
         }
-    }
-
-    /**
-     * 비밀번호 검증
-     */
-    private boolean verifyPassword(String rawPassword, String hashedPassword) {
-        return hashPassword(rawPassword).equals(hashedPassword);
     }
 
     private void validateSuggestionRequest(SuggestionRequestDto request) {

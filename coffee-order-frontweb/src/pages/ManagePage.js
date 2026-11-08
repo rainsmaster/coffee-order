@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { teamAPI, menuAPI, settingsAPI, twosomeMenuAPI, orderAPI, departmentAPI } from '../services/api';
+import { teamAPI, departmentAPI, twosomeStoreAPI } from '../services/api';
 import { useDepartment } from '../context/DepartmentContext';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
@@ -16,16 +16,20 @@ const ManagePage = ({ initialTab }) => {
   };
   const [activeTab, setActiveTab] = useState(getInitialTab());
   const [teams, setTeams] = useState([]);
-  const [menus, setMenus] = useState([]);
   const [departments, setDepartments] = useState([]);
-  const [settings, setSettings] = useState(null);
-  const [todayOrderCount, setTodayOrderCount] = useState(0);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncProgress, setSyncProgress] = useState(null);
-  const [savedMenuMode, setSavedMenuMode] = useState(null); // 저장된 메뉴 모드 추적
+
+  // 투썸 연동 (PoC) 상태
+  const [twosomeSession, setTwosomeSession] = useState(null); // {status, storeNm, lastUsedAt, remainingMinutes, source}
+  const [twosomeHealth, setTwosomeHealth] = useState(null); // {session, indicators, recentEvents}
+  const [menuRefreshDiff, setMenuRefreshDiff] = useState(null); // 최근 메뉴 새로고침 diff 리포트
+  const [showTwosomeLogin, setShowTwosomeLogin] = useState(false);
+  const [captcha, setCaptcha] = useState(null); // {contextId, imageBase64}
+  const [twosomeForm, setTwosomeForm] = useState({ loginId: '', loginPwd: '', answerCd: '' });
+  const [isTwosomeLoading, setIsTwosomeLoading] = useState(false);
+  const [twosomeNotice, setTwosomeNotice] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
-  const [modalType, setModalType] = useState(''); // 'department', 'team', 'menu'
+  const [modalType, setModalType] = useState(''); // 'department', 'team'
   const [formData, setFormData] = useState({});
 
   // 커스텀 모달 훅
@@ -49,89 +53,24 @@ const ManagePage = ({ initialTab }) => {
   }, [initialTab]);
 
   useEffect(() => {
-    // 부서 탭은 selectedDepartmentId 없이도 로드 가능
-    if (activeTab === 'department') {
+    // 부서/투썸 탭은 selectedDepartmentId 없이도 로드 가능
+    if (activeTab === 'department' || activeTab === 'twosome') {
       loadData();
     } else if (selectedDepartmentId) {
       loadData();
     }
   }, [activeTab, selectedDepartmentId]);
 
-  // 동기화 진행 상태 폴링
-  useEffect(() => {
-    let intervalId;
-
-    const checkSyncStatus = async () => {
-      try {
-        const status = await twosomeMenuAPI.getSyncStatus();
-        setSyncProgress(status);
-
-        if (status.status === 'RUNNING') {
-          setIsSyncing(true);
-        } else if (status.status === 'COMPLETED') {
-          // 완료 시 UI 리셋 및 알림
-          setIsSyncing(false);
-          setSyncProgress(null);
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-          showAlert('동기화가 완료되었습니다.');
-        } else if (status.status === 'FAILED') {
-          // 실패 시 UI 리셋 및 알림
-          setIsSyncing(false);
-          setSyncProgress(null);
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-          showAlert(status.errorMessage || '동기화에 실패했습니다.');
-        } else if (status.status === 'IDLE') {
-          // 대기 상태면 UI 리셋 (다른 사용자의 동기화가 완료된 경우)
-          setIsSyncing(false);
-          setSyncProgress(null);
-          if (intervalId) {
-            clearInterval(intervalId);
-          }
-        }
-      } catch (err) {
-        console.error('동기화 상태 조회 실패:', err);
-        // API 오류 시에도 UI 리셋
-        setIsSyncing(false);
-        setSyncProgress(null);
-      }
-    };
-
-    // 동기화 중일 때만 폴링
-    if (isSyncing) {
-      checkSyncStatus(); // 즉시 한 번 실행
-      intervalId = setInterval(checkSyncStatus, 2000); // 2초마다 체크
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [isSyncing]);
-
   const loadData = async () => {
     try {
       if (activeTab === 'team') {
         const data = await teamAPI.getAll(selectedDepartmentId);
         setTeams(data);
-      } else if (activeTab === 'settings') {
-        // 설정과 커스텀 메뉴 모두 로드
-        const [settingsData, menuData, todayOrders] = await Promise.all([
-          settingsAPI.get(selectedDepartmentId),
-          menuAPI.getAll(selectedDepartmentId),
-          orderAPI.getToday(selectedDepartmentId)
-        ]);
-        setSettings(settingsData);
-        setSavedMenuMode(settingsData.menuMode); // 저장된 메뉴 모드 기록
-        setMenus(menuData);
-        setTodayOrderCount(todayOrders.length);
       } else if (activeTab === 'department') {
         const data = await departmentAPI.getAll();
         setDepartments(data);
+      } else if (activeTab === 'twosome') {
+        await loadTwosomeSession();
       }
     } catch (err) {
       console.error('데이터 로드 실패:', err);
@@ -171,46 +110,6 @@ const ManagePage = ({ initialTab }) => {
     showConfirm('삭제하시겠습니까?', async () => {
       try {
         await teamAPI.delete(id);
-        loadData();
-      } catch (err) {
-        showAlert('삭제 실패했습니다.');
-      }
-    });
-  };
-
-  // 메뉴 관리
-  const handleCreateMenu = () => {
-    setModalMode('create');
-    setModalType('menu');
-    setFormData({ name: '' });
-    setIsModalOpen(true);
-  };
-
-  const handleEditMenu = (menu) => {
-    setModalMode('edit');
-    setModalType('menu');
-    setFormData(menu);
-    setIsModalOpen(true);
-  };
-
-  const handleSaveMenu = async () => {
-    try {
-      if (modalMode === 'create') {
-        await menuAPI.create({ ...formData, departmentId: selectedDepartmentId });
-      } else {
-        await menuAPI.update(formData.id, formData);
-      }
-      setIsModalOpen(false);
-      loadData();
-    } catch (err) {
-      showAlert('저장 실패했습니다.');
-    }
-  };
-
-  const handleDeleteMenu = async (id) => {
-    showConfirm('삭제하시겠습니까?', async () => {
-      try {
-        await menuAPI.delete(id);
         loadData();
       } catch (err) {
         showAlert('삭제 실패했습니다.');
@@ -264,67 +163,181 @@ const ManagePage = ({ initialTab }) => {
     });
   };
 
-  // 메뉴 모드 변경 처리
-  const handleMenuModeChange = (newMode) => {
-    if (todayOrderCount > 0 && newMode !== settings.menuMode) {
-      showAlert(`오늘 주문 내역이 ${todayOrderCount}건 있습니다.\n주문이 있는 상태에서는 메뉴 모드를 변경할 수 없습니다.`);
+  // ==================== 투썸 연동 (PoC) ====================
+
+  const loadTwosomeSession = async () => {
+    try {
+      const session = await twosomeStoreAPI.getSession();
+      setTwosomeSession(session);
+    } catch (err) {
+      console.error('투썸 세션 조회 실패:', err);
+    }
+  };
+
+  // 연동 상태 패널 (헬스체크) 조회
+  const loadTwosomeHealth = async () => {
+    try {
+      const health = await twosomeStoreAPI.getHealth();
+      setTwosomeHealth(health);
+    } catch (err) {
+      console.error('투썸 연동 상태 조회 실패:', err);
+    }
+    try {
+      const diff = await twosomeStoreAPI.getMenuRefreshDiff();
+      setMenuRefreshDiff(diff && Object.keys(diff).length > 0 ? diff : null);
+    } catch (err) {
+      console.error('메뉴 새로고침 diff 조회 실패:', err);
+    }
+  };
+
+  // 투썸 연동 탭이 열린 동안 60초 간격으로 상태 패널 갱신
+  useEffect(() => {
+    if (activeTab !== 'twosome') {
+      return undefined;
+    }
+    loadTwosomeHealth();
+    const intervalId = setInterval(loadTwosomeHealth, 60000);
+    return () => clearInterval(intervalId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
+
+  // 마지막 성공 시각으로부터 경과 시간(분) 문자열
+  const formatMinutesAgo = (isoDateTime) => {
+    if (!isoDateTime) return '없음';
+    const minutes = Math.floor((Date.now() - new Date(isoDateTime).getTime()) / 60000);
+    if (minutes < 1) return '방금 전';
+    if (minutes < 60) return `${minutes}분 전`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}시간 전`;
+  };
+
+  const formatDateTime = (isoDateTime) => {
+    if (!isoDateTime) return '없음';
+    const d = new Date(isoDateTime);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+
+  // 유형별 지표를 성공/실패 이벤트 쌍으로 병합 (자동 로그인/메뉴 배치/장바구니 표시용)
+  // 성공 유형의 ok만 본다: "마지막 이벤트가 성공" 규칙이 이미 실패 이력까지 반영함
+  const buildIndicatorSummary = (successType, failType) => {
+    const indicators = twosomeHealth?.indicators || [];
+    const success = indicators.find((i) => i.eventType === successType);
+    const failure = indicators.find((i) => i.eventType === failType);
+    const ok = success?.ok ?? true;
+    const lastSuccessAt = success?.lastSuccessAt || null;
+    return { ok, lastSuccessAt };
+  };
+
+  const requestCaptcha = async () => {
+    setIsTwosomeLoading(true);
+    try {
+      const data = await twosomeStoreAPI.requestCaptcha();
+      setCaptcha(data);
+    } catch (err) {
+      showAlert('캡차를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsTwosomeLoading(false);
+    }
+  };
+
+  const handleTwosomeLoginClick = () => {
+    setTwosomeNotice('');
+    setTwosomeForm({ loginId: '', loginPwd: '', answerCd: '' });
+    setShowTwosomeLogin(true);
+    requestCaptcha();
+  };
+
+  const handleTwosomeLoginSubmit = async () => {
+    if (!captcha) {
+      showAlert('캡차를 먼저 불러와주세요.');
       return;
     }
-    setSettings({ ...settings, menuMode: newMode });
-  };
-
-  // 설정 관리
-  const handleSaveSettings = async () => {
-    try {
-      await settingsAPI.update(settings, selectedDepartmentId);
-      setSavedMenuMode(settings.menuMode); // 저장된 메뉴 모드 업데이트
-      showAlert('설정이 저장되었습니다.');
-    } catch (err) {
-      showAlert('저장 실패했습니다.');
+    if (!twosomeForm.loginId || !twosomeForm.loginPwd || !twosomeForm.answerCd) {
+      showAlert('아이디, 비밀번호, 캡차를 모두 입력해주세요.');
+      return;
     }
-  };
 
-  // 메뉴 모드가 변경되었는지 확인
-  const isMenuModeChanged = savedMenuMode !== null && settings?.menuMode !== savedMenuMode;
-
-  // 투썸 메뉴 전체 동기화 (메뉴 + 이미지 + 옵션)
-  const handleSyncTwosomeMenu = async () => {
+    setIsTwosomeLoading(true);
     try {
-      // 먼저 동기화 진행 중인지 확인
-      const { inProgress } = await twosomeMenuAPI.isSyncInProgress();
-      if (inProgress) {
-        showAlert('동기화가 이미 진행 중입니다. 잠시 후 다시 시도해주세요.');
-        setIsSyncing(true); // 폴링 시작
-        return;
-      }
+      const result = await twosomeStoreAPI.login({
+        contextId: captcha.contextId,
+        loginId: twosomeForm.loginId,
+        loginPwd: twosomeForm.loginPwd,
+        answerCd: twosomeForm.answerCd,
+      });
 
-      setIsSyncing(true);
-      setSyncProgress(null);
-
-      const result = await twosomeMenuAPI.sync();
-      showAlert(result.message || '동기화가 완료되었습니다.');
-      setIsSyncing(false);
-      setSyncProgress(null);
-    } catch (err) {
-      if (err.code === 'SYNC_IN_PROGRESS') {
-        showAlert('동기화가 이미 진행 중입니다. 진행 상태를 확인해주세요.');
-        setIsSyncing(true); // 폴링 시작하여 진행 상태 표시
+      if (result.status === 'SUCCESS') {
+        setShowTwosomeLogin(false);
+        setCaptcha(null);
+        setTwosomeForm({ loginId: '', loginPwd: '', answerCd: '' });
+        setTwosomeNotice(result.message || '로그인되었습니다.');
+        await loadTwosomeSession();
+        await loadTwosomeHealth();
       } else {
-        showAlert('동기화 실패했습니다. 잠시 후 다시 시도해주세요.');
-        setIsSyncing(false);
+        showAlert(result.message || '로그인에 실패했습니다.');
+        // 캡차는 1회용이므로 새로 발급
+        requestCaptcha();
+        setTwosomeForm({ ...twosomeForm, answerCd: '' });
       }
+    } catch (err) {
+      showAlert('로그인 요청 중 오류가 발생했습니다.');
+      requestCaptcha();
+    } finally {
+      setIsTwosomeLoading(false);
     }
   };
 
-  const generateTimeOptions = () => {
-    const options = [];
-    for (let h = 0; h < 24; h++) {
-      for (let m = 0; m < 60; m += 10) {
-        const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-        options.push(time);
-      }
+  const handleTwosomeLogout = async () => {
+    setIsTwosomeLoading(true);
+    try {
+      await twosomeStoreAPI.logout();
+      setTwosomeNotice('로그아웃되었습니다.');
+      await loadTwosomeSession();
+      await loadTwosomeHealth();
+    } catch (err) {
+      showAlert('로그아웃에 실패했습니다.');
+    } finally {
+      setIsTwosomeLoading(false);
     }
-    return options;
+  };
+
+  const handleTwosomeMenuRefresh = async () => {
+    setIsTwosomeLoading(true);
+    try {
+      const result = await twosomeStoreAPI.refreshMenu();
+      setTwosomeNotice(result.message || `매장 메뉴 ${result.updatedCount}건으로 교체했습니다.`);
+      await loadTwosomeSession();
+      await loadTwosomeHealth();
+    } catch (err) {
+      showAlert(err.message || '메뉴 새로고침에 실패했습니다.');
+      await loadTwosomeSession();
+      await loadTwosomeHealth();
+    } finally {
+      setIsTwosomeLoading(false);
+    }
+  };
+
+  // 자동 재로그인 (캡차 OCR + 관리자 자격증명, 수동 트리거)
+  const handleTwosomeAutoLogin = async () => {
+    setIsTwosomeLoading(true);
+    setTwosomeNotice('자동 로그인 진행 중... (캡차 인식에는 10초 이상 걸릴 수 있습니다)');
+    try {
+      const result = await twosomeStoreAPI.autoLogin();
+      setTwosomeNotice(
+        result.success
+          ? `자동 로그인 성공 (${result.attempts}회 시도)`
+          : `자동 로그인 실패 (${result.attempts}회 시도): ${result.message}`
+      );
+      await loadTwosomeSession();
+      await loadTwosomeHealth();
+    } catch (err) {
+      setTwosomeNotice(`자동 로그인 실패: ${err.message || '알 수 없는 오류'}`);
+      await loadTwosomeSession();
+      await loadTwosomeHealth();
+    } finally {
+      setIsTwosomeLoading(false);
+    }
   };
 
   return (
@@ -347,6 +360,15 @@ const ManagePage = ({ initialTab }) => {
           onClick={() => setActiveTab('settings')}
         >
           주문 설정
+        </button>
+        <button
+          className={activeTab === 'twosome' ? 'active' : ''}
+          onClick={() => setActiveTab('twosome')}
+        >
+          투썸 연동
+        </button>
+        <button onClick={() => { window.location.href = '/admin'; }}>
+          대표 관리
         </button>
       </div>
 
@@ -416,167 +438,206 @@ const ManagePage = ({ initialTab }) => {
         )}
 
         {/* 주문 설정 */}
-        {activeTab === 'settings' && settings && (
+        {activeTab === 'settings' && (
           <div className="settings-form">
             <h2>주문 설정 <span className="department-badge">({selectedDepartment?.name})</span></h2>
-              {/* 메뉴 모드 선택 */}
-              <div className="form-group">
-                <label className="form-label">메뉴 모드</label>
-                {todayOrderCount > 0 && (
-                  <p className="form-warning">
-                    오늘 주문이 {todayOrderCount}건 있어 메뉴 모드를 변경할 수 없습니다.
-                  </p>
+            <p className="settings-fixed-notice">
+              메뉴 모드는 투썸플레이스 메뉴로 고정되어 있습니다.
+            </p>
+          </div>
+        )}
+
+        {/* 투썸 연동 (PoC) */}
+        {activeTab === 'twosome' && (
+          <div className="twosome-section">
+            <div className="section-header">
+              <h2>투썸 연동</h2>
+              <span className={`twosome-status-badge ${(twosomeSession?.status || 'NONE').toLowerCase()}`}>
+                {(!twosomeSession || twosomeSession.status === 'NONE') && '로그인 없음'}
+                {twosomeSession?.status === 'ACTIVE' &&
+                  `활성 (${twosomeSession.remainingMinutes}분 남음${twosomeSession.storeNm ? ` · ${twosomeSession.storeNm}` : ''}${twosomeSession.source === 'RESTORED' ? ' · Redis 복구' : ''})`}
+                {twosomeSession?.status === 'EXPIRED' && '만료됨'}
+              </span>
+            </div>
+
+            {/* 연동 상태 패널 (헬스체크) */}
+            {twosomeHealth && (
+              <div className="twosome-health-panel">
+                {menuRefreshDiff && (
+                  <div className="health-row">
+                    <span className="health-label">메뉴 새로고침</span>
+                    <span className={menuRefreshDiff.success ? 'health-ok' : 'health-bad'}>
+                      {menuRefreshDiff.success ? '[성공]' : '[실패]'}
+                    </span>
+                    <span className="health-detail">
+                      {formatDateTime(menuRefreshDiff.executedAt)}
+                      {` · 신규 ${menuRefreshDiff.addedCount}, 가격변동 ${menuRefreshDiff.priceChangedCount}, 정리 ${menuRefreshDiff.cleanedCount}, 시즌종료 ${menuRefreshDiff.seasonEndedCount}, 품절 ${menuRefreshDiff.soldOutCount}`}
+                    </span>
+                  </div>
                 )}
-
-                {/* 선택형 카드 UI */}
-                <div className="mode-card-group">
-                  <button
-                    type="button"
-                    className={`mode-card ${settings.menuMode === 'CUSTOM' ? 'selected' : ''} ${todayOrderCount > 0 ? 'disabled' : ''}`}
-                    onClick={() => handleMenuModeChange('CUSTOM')}
-                    disabled={todayOrderCount > 0}
-                  >
-                    <div className="mode-card-header">
-                      <span className="mode-card-title">커스텀 메뉴</span>
-                      {settings.menuMode === 'CUSTOM' && <span className="mode-card-check">✓</span>}
-                    </div>
-                    <p className="mode-card-desc">직접 메뉴를 등록하여 관리합니다</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={`mode-card ${settings.menuMode === 'TWOSOME' ? 'selected' : ''} ${todayOrderCount > 0 ? 'disabled' : ''}`}
-                    onClick={() => handleMenuModeChange('TWOSOME')}
-                    disabled={todayOrderCount > 0}
-                  >
-                    <div className="mode-card-header">
-                      <span className="mode-card-title">투썸 메뉴</span>
-                      {settings.menuMode === 'TWOSOME' && <span className="mode-card-check">✓</span>}
-                    </div>
-                    <p className="mode-card-desc">투썸플레이스 메뉴를 자동 동기화</p>
-                  </button>
+                <div className="health-row">
+                  <span className="health-label">세션</span>
+                  <span className={`health-status ${(twosomeHealth.session?.status || 'NONE').toLowerCase()}`}>
+                    {(!twosomeHealth.session || twosomeHealth.session.status === 'NONE') && '로그인 없음'}
+                    {twosomeHealth.session?.status === 'ACTIVE' && '활성'}
+                    {twosomeHealth.session?.status === 'EXPIRED' && '만료됨'}
+                  </span>
+                  <span className="health-detail">
+                    마지막 확인 {formatMinutesAgo(twosomeHealth.session?.lastSuccessAt)}
+                    {twosomeHealth.session?.source === 'RESTORED' && ' · Redis 복구'}
+                  </span>
                 </div>
-
-                {/* 메뉴 모드 변경 시 안내 메시지 */}
-                {isMenuModeChanged && (
-                  <div className="mode-change-notice">
-                    <p>메뉴 모드가 변경되었습니다.</p>
-                    <p>설정 저장 후 메뉴 등록/관리가 가능합니다.</p>
-                  </div>
-                )}
-
-                {/* 커스텀 메뉴 모드일 때: 메뉴 관리 UI */}
-                {settings.menuMode === 'CUSTOM' && !isMenuModeChanged && (
-                  <div className="menu-mode-content">
-                    <div className="custom-menu-section">
-                      <div className="custom-menu-header">
-                        <span className="menu-count">등록된 메뉴 ({menus.length}개)</span>
-                      </div>
-                      {menus.length > 0 ? (
-                        <div className="custom-menu-list">
-                          {menus.map((menu) => (
-                            <div key={menu.id} className="custom-menu-item">
-                              <span className="menu-name">{menu.name}</span>
-                              <div className="menu-actions">
-                                <button className="btn-edit" onClick={() => handleEditMenu(menu)}>수정</button>
-                                <button className="btn-delete" onClick={() => handleDeleteMenu(menu.id)}>삭제</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="empty-menu-message">
-                          등록된 메뉴가 없습니다
-                        </div>
-                      )}
-                      <button className="btn-add-menu-bottom" onClick={handleCreateMenu}>
-                        + 메뉴 추가하기
-                      </button>
+                {[
+                  { label: '자동 로그인', successType: 'AUTO_RELOGIN_SUCCESS', failType: 'AUTO_RELOGIN_FAIL' },
+                  { label: '메뉴 배치', successType: 'MENU_SYNC_SUCCESS', failType: 'MENU_SYNC_FAIL' },
+                  { label: '장바구니', successType: 'CART_ADD_SUCCESS', failType: 'CART_ADD_FAIL' },
+                ].map((row) => {
+                  const summary = buildIndicatorSummary(row.successType, row.failType);
+                  return (
+                    <div className="health-row" key={row.label}>
+                      <span className="health-label">{row.label}</span>
+                      <span className={summary.ok ? 'health-ok' : 'health-bad'}>
+                        {summary.ok ? '[정상]' : '[확인필요]'}
+                      </span>
+                      <span className="health-detail">
+                        마지막 성공: {formatDateTime(summary.lastSuccessAt)}
+                      </span>
                     </div>
-                  </div>
-                )}
+                  );
+                })}
 
-                {/* 투썸 메뉴 모드일 때: 동기화 UI */}
-                {settings.menuMode === 'TWOSOME' && !isMenuModeChanged && (
-                  <div className="menu-mode-content">
-                    <div className="sync-section">
-                      <button
-                        className="btn-sync"
-                        onClick={handleSyncTwosomeMenu}
-                        disabled={isSyncing}
-                      >
-                        {isSyncing ? '동기화 중...' : '메뉴 동기화'}
-                      </button>
-                      <p className="sync-info">
-                        메뉴 정보, 이미지, 온도/사이즈 옵션을 동기화합니다.<br/>
-                        (약 3~5분 소요, 매일 새벽 3시 자동 실행)
-                      </p>
-
-                      {/* 동기화 진행률 표시 */}
-                      {isSyncing && syncProgress && (
-                        <div className="sync-progress-container">
-                          <div className="sync-progress-header">
-                            <span className="sync-status">
-                              {syncProgress.currentStepName || '동기화 진행 중...'}
-                            </span>
-                            <span className="sync-percentage">{syncProgress.overallProgress || 0}%</span>
-                          </div>
-                          <div className="sync-progress-bar">
-                            <div
-                              className="sync-progress-fill"
-                              style={{ width: `${syncProgress.overallProgress || 0}%` }}
-                            />
-                          </div>
-                          {syncProgress.processedCount > 0 && syncProgress.totalCount > 0 && (
-                            <div className="sync-progress-detail">
-                              처리 중: {syncProgress.processedCount} / {syncProgress.totalCount}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <hr className="settings-divider" />
-
-              {/* 주문 마감 시간 */}
-              <div className="form-group">
-                <label className="form-label">주문 마감 시간</label>
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    checked={settings.is24Hours}
-                    onChange={(e) =>
-                      setSettings({ ...settings, is24Hours: e.target.checked })
-                    }
-                  />
-                  24시간 주문 가능
-                </label>
-              </div>
-
-              {!settings.is24Hours && (
-                <div className="form-group">
-                  <label className="form-label">마감 시간</label>
-                  <select
-                    value={settings.orderDeadlineTime || '09:00:00'}
-                    onChange={(e) =>
-                      setSettings({ ...settings, orderDeadlineTime: e.target.value })
-                    }
-                  >
-                    {generateTimeOptions().map((time) => (
-                      <option key={time} value={`${time}:00`}>
-                        {time}
-                      </option>
-                    ))}
-                  </select>
+                <div className="health-events">
+                  <div className="health-events-title">최근 이벤트</div>
+                  {twosomeHealth.recentEvents && twosomeHealth.recentEvents.length > 0 ? (
+                    <ul className="health-event-list">
+                      {twosomeHealth.recentEvents.slice(0, 10).map((event) => (
+                        <li key={event.id} className={event.success ? 'health-event-ok' : 'health-event-bad'}>
+                          <span className="health-event-time">{formatDateTime(event.createdAt)}</span>
+                          <span className="health-event-type">{event.eventType}</span>
+                          <span className="health-event-result">{event.success ? '성공' : '실패'}</span>
+                          <span className="health-event-msg">{event.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="health-events-empty">기록된 이벤트가 없습니다.</div>
+                  )}
                 </div>
+              </div>
+            )}
+
+            <p className="sync-info">
+              관리자의 투썸 계정으로 로그인하여 매장(CJENM커머스부문점) 메뉴로 메뉴 DB를 새로고치고,
+              팀 주문을 투썸 장바구니에 담는 PoC 기능입니다. (세션 유휴 30분 만료)
+            </p>
+
+            <div className="twosome-actions">
+              {(!twosomeSession || twosomeSession.status !== 'ACTIVE') && !showTwosomeLogin && (
+                <>
+                  <button className="btn-sync" onClick={handleTwosomeLoginClick} disabled={isTwosomeLoading}>
+                    로그인
+                  </button>
+                  <button
+                    className="btn-sync btn-secondary"
+                    onClick={handleTwosomeAutoLogin}
+                    disabled={isTwosomeLoading}
+                  >
+                    {isTwosomeLoading ? '처리 중...' : '자동 로그인'}
+                  </button>
+                </>
               )}
+              {twosomeSession?.status === 'ACTIVE' && (
+                <>
+                  <button
+                    className="btn-sync"
+                    onClick={handleTwosomeMenuRefresh}
+                    disabled={isTwosomeLoading}
+                  >
+                    {isTwosomeLoading ? '처리 중...' : '메뉴 새로고침'}
+                  </button>
+                  <button
+                    className="btn-sync btn-secondary"
+                    onClick={handleTwosomeLogout}
+                    disabled={isTwosomeLoading}
+                  >
+                    로그아웃
+                  </button>
+                </>
+              )}
+            </div>
 
-              <button className="btn-save" onClick={handleSaveSettings}>
-                설정 저장
-              </button>
+            {/* 로그인 폼 */}
+            {showTwosomeLogin && (
+              <div className="twosome-login-form">
+                <div className="twosome-captcha-row">
+                  {captcha ? (
+                    <img className="twosome-captcha-img" src={captcha.imageBase64} alt="캡차" />
+                  ) : (
+                    <div className="twosome-captcha-loading">캡차 로딩 중...</div>
+                  )}
+                  <button
+                    className="btn-sync btn-secondary"
+                    onClick={requestCaptcha}
+                    disabled={isTwosomeLoading}
+                  >
+                    캡차 새로고침
+                  </button>
+                </div>
+
+                <label className="form-label">투썸 아이디</label>
+                <input
+                  type="text"
+                  value={twosomeForm.loginId}
+                  onChange={(e) => setTwosomeForm({ ...twosomeForm, loginId: e.target.value })}
+                  placeholder="투썸하트 아이디"
+                  autoComplete="off"
+                />
+
+                <label className="form-label">투썸 비밀번호</label>
+                <input
+                  type="password"
+                  value={twosomeForm.loginPwd}
+                  onChange={(e) => setTwosomeForm({ ...twosomeForm, loginPwd: e.target.value })}
+                  placeholder="비밀번호"
+                />
+
+                <label className="form-label">캡차 입력 (6자리 숫자)</label>
+                <input
+                  type="text"
+                  value={twosomeForm.answerCd}
+                  onChange={(e) => setTwosomeForm({ ...twosomeForm, answerCd: e.target.value.replace(/[^0-9]/g, '').slice(0, 6) })}
+                  placeholder="이미지의 숫자 6자리 입력"
+                  maxLength={6}
+                />
+
+                <div className="twosome-login-buttons">
+                  <button
+                    className="btn-sync"
+                    onClick={handleTwosomeLoginSubmit}
+                    disabled={isTwosomeLoading || !captcha}
+                  >
+                    {isTwosomeLoading ? '로그인 중...' : '로그인'}
+                  </button>
+                  <button
+                    className="btn-sync btn-secondary"
+                    onClick={() => {
+                      setShowTwosomeLogin(false);
+                      setCaptcha(null);
+                    }}
+                    disabled={isTwosomeLoading}
+                  >
+                    취소
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 안내 / 결과 메시지 */}
+            {twosomeNotice && (
+              <div className="twosome-notice">
+                {twosomeNotice}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -590,13 +651,9 @@ const ManagePage = ({ initialTab }) => {
             ? modalMode === 'create'
               ? '부서 추가'
               : '부서 수정'
-            : modalType === 'team'
-              ? modalMode === 'create'
-                ? '팀원 추가'
-                : '팀원 수정'
-              : modalMode === 'create'
-                ? '메뉴 추가'
-                : '메뉴 수정'
+            : modalMode === 'create'
+              ? '팀원 추가'
+              : '팀원 수정'
         }
       >
         <div className="modal-form">
@@ -624,27 +681,13 @@ const ManagePage = ({ initialTab }) => {
             </>
           )}
 
-          {modalType === 'menu' && (
-            <>
-              <label>메뉴명</label>
-              <input
-                type="text"
-                value={formData.name || ''}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="메뉴명을 입력하세요"
-              />
-            </>
-          )}
-
           <div className="modal-buttons">
             <button
               className="btn-primary"
               onClick={
                 modalType === 'department'
                   ? handleSaveDepartment
-                  : modalType === 'team'
-                    ? handleSaveTeam
-                    : handleSaveMenu
+                  : handleSaveTeam
               }
             >
               저장

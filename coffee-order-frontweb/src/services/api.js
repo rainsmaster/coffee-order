@@ -7,11 +7,11 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 const fetchAPI = async (url, options = {}) => {
   try {
     const response = await fetch(`${API_BASE_URL}${url}`, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      ...options,
     });
 
     if (!response.ok) {
@@ -85,29 +85,6 @@ export const teamAPI = {
   }),
 };
 
-// ==================== Menu API ====================
-export const menuAPI = {
-  // 전체 메뉴 조회 (부서별 필터링)
-  getAll: (departmentId) => fetchAPI(departmentId ? `/menus?departmentId=${departmentId}` : '/menus'),
-
-  // 메뉴 생성
-  create: (menu) => fetchAPI('/menus', {
-    method: 'POST',
-    body: JSON.stringify(menu),
-  }),
-
-  // 메뉴 수정
-  update: (id, menu) => fetchAPI(`/menus/${id}`, {
-    method: 'PUT',
-    body: JSON.stringify(menu),
-  }),
-
-  // 메뉴 삭제
-  delete: (id) => fetchAPI(`/menus/${id}`, {
-    method: 'DELETE',
-  }),
-};
-
 // ==================== Order API ====================
 export const orderAPI = {
   // 오늘 주문 조회 (부서별 필터링)
@@ -140,6 +117,12 @@ export const orderAPI = {
     method: 'DELETE',
   }),
 
+  // 장바구니 반영 일시 일괄 마킹 (일괄 담기 성공 후)
+  markCartReflected: (orderIds) => fetchAPI('/orders/cart-reflected', {
+    method: 'POST',
+    body: JSON.stringify({ orderIds }),
+  }),
+
   // 날짜별 메뉴 집계
   getSummary: (date) => fetchAPI(`/orders/summary?date=${date}`),
 
@@ -170,51 +153,234 @@ export const settingsAPI = {
 
 // ==================== Twosome Menu API ====================
 export const twosomeMenuAPI = {
-  // 전체 메뉴 조회 (중분류별 그룹화)
-  getAll: () => fetchAPI('/twosome-menus'),
+  // 전체 메뉴 조회 (중분류별 그룹화, 매장 메뉴 기준)
+  getAll: () => fetchAPI('/twosome-menus'),};
 
-  // ID로 조회
-  getById: (id) => fetchAPI(`/twosome-menus/${id}`),
+// ==================== Twosome Store Integration API (PoC) ====================
+const repTokenHeaderIfAny = () => {
+  const token = localStorage.getItem('repToken');
+  return token ? { 'X-Rep-Token': token } : {};
+};
 
-  // 메뉴코드로 조회
-  getByCode: (menuCd) => fetchAPI(`/twosome-menus/code/${menuCd}`),
+export const twosomeStoreAPI = {
+  // 세션 상태 조회
+  getSession: () => fetchAPI('/twosome/session'),
 
-  // 중분류명으로 조회
-  getByCategory: (midNm) => fetchAPI(`/twosome-menus/category/${midNm}`),
+  // 연동 상태 패널 (세션 + 유형별 지표 + 최근 이벤트)
+  getHealth: () => fetchAPI('/twosome/health'),
 
-  // 메뉴 옵션 조회 (온도/사이즈)
-  getOptions: (menuCd) => fetchAPI(`/twosome-menus/options/${menuCd}`),
+  // 캡차 발급
+  requestCaptcha: () => fetchAPI('/twosome/auth/captcha', {
+    method: 'POST',
+  }),
 
-  // 전체 동기화 (메뉴 + 이미지 + 옵션)
-  sync: async () => {
-    const response = await fetch(`${API_BASE_URL}/twosome-menus/sync`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+  // 로그인
+  login: (loginData) => fetchAPI('/twosome/auth/login', {
+    method: 'POST',
+    body: JSON.stringify(loginData),
+  }),
 
-    const data = await response.json();
+  // 로그아웃
+  logout: () => fetchAPI('/twosome/auth/logout', {
+    method: 'POST',
+  }),
 
-    // 409 Conflict (동기화 진행 중) 처리
-    if (response.status === 409) {
-      const error = new Error(data.message || '동기화가 이미 진행 중입니다.');
-      error.code = 'SYNC_IN_PROGRESS';
-      throw error;
-    }
+  // 자동 재로그인 (캡차 OCR + 관리자 자격증명)
+  autoLogin: () => fetchAPI('/twosome/auth/auto-login', {
+    method: 'POST',
+  }),
 
-    if (!response.ok) {
-      throw new Error(data.error || `HTTP error! status: ${response.status}`);
-    }
+  // 매장 메뉴로 메뉴 DB 새로고침
+  refreshMenu: () => fetchAPI('/twosome/menu/refresh', {
+    method: 'POST',
+  }),
 
-    return data;
-  },
+  // 팀 주문 항목을 투썸 장바구니에 일괄 담기
+  addToCart: (items) => fetchAPI('/twosome/cart/add', {
+    method: 'POST',
+    body: JSON.stringify({ items }),
+  }),
 
-  // 동기화 진행 상태 조회
-  getSyncStatus: () => fetchAPI('/twosome-menus/sync/status'),
+  // 투썸 장바구니 목록 조회
+  getCart: () => fetchAPI('/twosome/cart'),
 
-  // 동기화 진행 중인지 확인
-  isSyncInProgress: () => fetchAPI('/twosome-menus/sync/in-progress'),
+  // 투썸 장바구니 항목 삭제
+  removeCartItem: (cartNo, cartDtlNo) => fetchAPI(`/twosome/cart/items/${cartNo}?cartDtlNo=${encodeURIComponent(cartDtlNo)}`, {
+    method: 'DELETE',
+  }),
+
+  // 투썸 장바구니 항목 수량 조정 (삭제 + 재담기)
+  // 투썸 장바구니 항목 수량 조정 (삭제 + 재담기, 옵션 조합 + 퍼스널 옵션 복원 포함)
+  adjustCartItemQty: (cartNo, cartDtlNo, menuCd, qty, opts, cstmInfo) => fetchAPI(`/twosome/cart/items/${cartNo}/qty`, {
+    method: 'PUT',
+    body: JSON.stringify({ cartDtlNo, menuCd, qty, opts, cstmInfo }),
+  }),
+
+  // 투썸 장바구니 전체 비우기
+  clearCart: () => fetchAPI('/twosome/cart/clear', {
+    method: 'POST',
+  }),
+
+  // 장바구니 항목의 퍼스널 옵션(커스텀) 명세 조회 (읽기 전용)
+  getCartCustomList: (cartNo, cartDtlNo) => fetchAPI('/twosome/cart/custom-list', {
+    method: 'POST',
+    headers: repTokenHeaderIfAny(),
+    body: JSON.stringify({ cartNo, cartDtlNo }),
+  }),
+
+  // 메뉴 옵션 그룹 조회 (상세 페이지 파싱 + 캐시, 관리자/대표 세션 필요)
+  getMenuOptions: (menuCd) => fetchAPI(`/twosome/menus/${menuCd}/options`, {
+    headers: repTokenHeaderIfAny(),
+  }),
+
+  // 옵션 그룹 의존성 조회 (선택한 옵션 기준 미선택 그룹의 가능 선택지, 읽기 전용)
+  getAvailableOptions: (menuCd, opts, groupOptCds) => fetchAPI('/twosome/menus/available-options', {
+    method: 'POST',
+    headers: repTokenHeaderIfAny(),
+    body: JSON.stringify({ menuCd, opts, groupOptCds }),
+  }),
+
+  // 투썸 퍼스널 옵션(커스텀) 목록 조회 (변형 메뉴 코드 기준, 수량형+선택형)
+  getMenuCustomOptions: (variantMenuCd) => fetchAPI('/twosome/menus/custom-options', {
+    method: 'POST',
+    headers: repTokenHeaderIfAny(),
+    body: JSON.stringify({ menuCd: variantMenuCd }),
+  }),
+
+  // 선택 옵션의 변형 메뉴 코드 조회 (예상 가격 포함)
+  resolveVariant: (menuCd, opts) => fetchAPI('/twosome/menus/resolve-variant', {
+    method: 'POST',
+    headers: repTokenHeaderIfAny(),
+    body: JSON.stringify({ menuCd, opts }),
+  }),
+
+  // 매장 상세 정보 (영업시간/시설 태그, 세션 불필요)
+  getStoreInfo: () => fetchAPI('/twosome/store-info'),
+
+  // 최근 메뉴 새로고침 diff 리포트 (없으면 빈 객체)
+  getMenuRefreshDiff: () => fetchAPI('/twosome/menu-refresh/diff'),
+};
+
+// ==================== Admin API (/admin 전용 페이지) ====================
+const adminTokenHeader = () => ({
+  'X-Admin-Token': localStorage.getItem('adminToken') || '',
+});
+
+export const adminAPI = {
+  login: (password) => fetchAPI('/admin/login', {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  }),
+
+  // 팀 대표 목록 (PIN 관련 값 미포함)
+  getReps: () => fetchAPI('/admin/reps', { headers: adminTokenHeader() }),
+
+  createRep: (data) => fetchAPI('/admin/reps', {
+    method: 'POST',
+    headers: adminTokenHeader(),
+    body: JSON.stringify(data),
+  }),
+
+  updateRep: (id, data) => fetchAPI(`/admin/reps/${id}`, {
+    method: 'PUT',
+    headers: adminTokenHeader(),
+    body: JSON.stringify(data),
+  }),
+
+  deleteRep: (id) => fetchAPI(`/admin/reps/${id}`, {
+    method: 'DELETE',
+    headers: adminTokenHeader(),
+  }),
+
+  // 초대코드 발급 (평문은 이 응답 1회만 제공)
+  issueInvite: (id) => fetchAPI(`/admin/reps/${id}/invite`, {
+    method: 'POST',
+    headers: adminTokenHeader(),
+  }),
+};
+
+// ==================== Rep API (팀 대표) ====================
+const repTokenHeader = () => ({
+  'X-Rep-Token': localStorage.getItem('repToken') || '',
+});
+
+export const repAPI = {
+  // 로그인 화면용 활성 대표 목록
+  list: () => fetchAPI('/reps'),
+
+  login: (memberId, pin) => fetchAPI('/rep/login', {
+    method: 'POST',
+    body: JSON.stringify({ memberId, pin }),
+  }),
+
+  // 최초 PIN 설정 (초대코드 필요)
+  setupPin: (memberId, inviteCode, pin) => fetchAPI('/rep/pin/setup', {
+    method: 'POST',
+    body: JSON.stringify({ memberId, inviteCode, pin }),
+  }),
+
+  changePin: (currentPin, newPin) => fetchAPI('/rep/pin/change', {
+    method: 'POST',
+    headers: repTokenHeader(),
+    body: JSON.stringify({ currentPin, newPin }),
+  }),
+
+  me: () => fetchAPI('/rep/me', { headers: repTokenHeader() }),
+
+  // ==================== 대표 투썸 계정 / 개인 세션 ====================
+
+  // 투썸 계정 등록 (서버 AES-256-GCM 암호화 저장)
+  registerTwosomeAccount: (twosomeId, twosomePw) => fetchAPI('/rep/twosome/account', {
+    method: 'POST',
+    headers: repTokenHeader(),
+    body: JSON.stringify({ twosomeId, twosomePw }),
+  }),
+
+  // 대표 투썸 로그인용 캡차 (수동 입력)
+  twosomeCaptcha: () => fetchAPI('/rep/twosome/captcha', {
+    method: 'POST',
+    headers: repTokenHeader(),
+  }),
+
+  // 통합 로그인 폼: 아이디/패스워드 입력 시 서버가 계정으로 저장, 미입력 시 저장된 계정 사용
+  twosomeLogin: (contextId, answerCd, loginId, loginPwd) => fetchAPI('/rep/twosome/login', {
+    method: 'POST',
+    headers: repTokenHeader(),
+    body: JSON.stringify({ contextId, answerCd, loginId, loginPwd }),
+  }),
+
+  twosomeLogout: () => fetchAPI('/rep/twosome/logout', {
+    method: 'POST',
+    headers: repTokenHeader(),
+  }),
+
+  twosomeSession: () => fetchAPI('/rep/twosome/session', { headers: repTokenHeader() }),
+
+  // ==================== 대표 세션 장바구니 ====================
+
+  repAddToCart: (items) => fetchAPI('/rep/twosome/cart/add', {
+    method: 'POST',
+    headers: repTokenHeader(),
+    body: JSON.stringify({ items }),
+  }),
+
+  repGetCart: () => fetchAPI('/rep/twosome/cart', { headers: repTokenHeader() }),
+
+  repRemoveCartItem: (cartNo, cartDtlNo) => fetchAPI(`/rep/twosome/cart/items/${cartNo}?cartDtlNo=${encodeURIComponent(cartDtlNo)}`, {
+    method: 'DELETE',
+    headers: repTokenHeader(),
+  }),
+
+  repAdjustCartItemQty: (cartNo, cartDtlNo, menuCd, qty, opts, cstmInfo) => fetchAPI(`/rep/twosome/cart/items/${cartNo}/qty`, {
+    method: 'PUT',
+    headers: repTokenHeader(),
+    body: JSON.stringify({ cartDtlNo, menuCd, qty, opts, cstmInfo }),
+  }),
+
+  repClearCart: () => fetchAPI('/rep/twosome/cart/clear', {
+    method: 'POST',
+    headers: repTokenHeader(),
+  }),
 };
 
 // ==================== Suggestion API ====================

@@ -4,19 +4,19 @@
 
 <mapper namespace="com.example.coffeeorder.mapper.OrderMapper">
 
-    <!-- 날짜별 메뉴 집계 조회 -->
+    <!-- 날짜별 메뉴 집계 조회 (투썸 메뉴 기준, 레거시 CUSTOM 모드는 제거됨) -->
     <select id="findMenuSummaryByDate" resultType="MenuSummaryDto">
         SELECT
-            m.name AS menuName,
-            m.category,
+            tm.menu_nm AS menuName,
+            tm.mid_nm AS category,
             o.personal_option AS personalOption,
             COUNT(*) AS count
         FROM orders o
-        INNER JOIN menu m ON o.menu_id = m.id
+        INNER JOIN twosome_menu tm ON o.twosome_menu_id = tm.id
         WHERE o.order_date = #{orderDate}
           AND o.del_yn = 'N'
-        GROUP BY m.name, m.category, o.personal_option
-        ORDER BY m.category, m.name
+        GROUP BY tm.menu_nm, tm.mid_nm, o.personal_option
+        ORDER BY tm.mid_nm, tm.menu_nm
     </select>
 
 </mapper>

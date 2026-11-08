@@ -25,6 +25,9 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // 특정 날짜에 팀원이 이미 주문했는지 확인
     boolean existsByTeamAndOrderDateAndDelYn(Team team, LocalDate orderDate, String delYn);
 
+    // 투썸 메뉴 참조 이력 존재 여부 (메뉴 정책: 주문 이력 있으면 소프트삭제 보존)
+    boolean existsByTwosomeMenuId(Long twosomeMenuId);
+
     // 특정 팀원의 최근 주문 조회 (날짜 내림차순, 생성시간 내림차순)
     Optional<Order> findTopByTeamAndDelYnOrderByOrderDateDescCreatedTimeDesc(Team team, String delYn);
 

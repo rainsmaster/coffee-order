@@ -1,465 +1,250 @@
-# 배포 가이드 (시놀로지 NAS Container Manager)
+# 배포 가이드 — MySQL, Redis, OCR 구성
 
-## 목차
-1. [로컬 개발 환경 테스트](#1-로컬-개발-환경-테스트)
-2. [Docker 이미지 빌드](#2-docker-이미지-빌드)
-3. [시놀로지 NAS 배포 (Docker Compose)](#3-시놀로지-nas-배포-docker-compose)
-4. [시놀로지 NAS 배포 (개별 컨테이너)](#4-시놀로지-nas-배포-개별-컨테이너)
-5. [업데이트 배포](#5-업데이트-배포)
-6. [트러블슈팅](#6-트러블슈팅)
+이 문서는 시놀로지 NAS Container Manager 배포 기준이다. 현재 대상 구성은 Spring Boot·React 앱, MySQL, Redis, OCR 사이드카다. 과거 H2 파일 DB와 공식 홈페이지 메뉴 동기화만 사용하던 배포 절차는 사용하지 않는다.
 
----
+## 구성 요소
 
-## 프로젝트 아키텍처
+| 컨테이너 | 역할 | 기본 포트 |
+| --- | --- | --- |
+| `coffee-order` | Spring Boot API와 React 정적 파일 | `8888:8080` |
+| `coffee-mysql` | 운영 데이터 저장 | `3306:3306` |
+| `coffee-redis` | 세션·분산 락·연동 상태 저장 | 외부 포트 없음 |
+| `coffee-ocr` | 투썸 캡챠 OCR | `8090:8090` |
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Docker Network                        │
-│  ┌─────────────────┐      ┌─────────────────────────┐   │
-│  │     Redis       │◄────►│    Coffee Order App     │   │
-│  │  (분산 락/캐시)  │      │   (Spring Boot + React) │   │
-│  │  Port: 6379     │      │   Port: 8080            │   │
-│  └─────────────────┘      └─────────────────────────┘   │
-│                                    │                     │
-└────────────────────────────────────┼─────────────────────┘
-                                     │
-                              Port: 8888 (외부)
-                                     │
-                              ┌──────▼──────┐
-                              │   Browser   │
-                              └─────────────┘
-```
+Redis는 같은 Docker 네트워크 안에서만 접근한다. MySQL과 OCR의 외부 포트 공개 범위는 운영 보안 점검 시 별도로 조정한다.
 
-### 개발 모드 (로컬)
-- 프론트엔드: http://localhost:3000 (React 개발 서버, Hot reload)
-- 백엔드: http://localhost:8080 (Spring Boot)
-- Redis: localhost:6379 (Docker)
-- H2 Console: http://localhost:8080/h2-console
+## 로컬 개발 환경
 
-### 프로덕션 모드 (시놀로지 NAS)
-- 접속 URL: http://192.168.0.48:8888
-- Spring Boot가 React 정적 파일 + API 모두 제공
-- Redis: 같은 Docker 네트워크 내 컨테이너
+프로젝트 루트는 `/Users/heogyuseon/Development/coffee-order`다.
 
----
-
-## 1. 로컬 개발 환경 테스트
-
-### 1-1. Redis 실행 (Docker)
+### 의존 서비스 실행
 
 ```bash
-# 프로젝트 루트에서 실행
-cd /Users/gyuseonheo/Development/coffee-order
-
-# Redis 컨테이너 시작
-docker-compose -f docker-compose.dev.yml up -d
-
-# Redis 실행 확인
-docker ps | grep redis
+cd /Users/heogyuseon/Development/coffee-order
+docker compose -f docker-compose.dev.yml up -d
 ```
 
-**확인 방법:**
+로컬 MySQL, Redis, OCR이 실행된다. 상태 확인:
+
 ```bash
-# Redis 연결 테스트
+docker ps
 docker exec coffee-redis-dev redis-cli ping
-# 응답: PONG
+curl http://localhost:8090/health
 ```
 
-### 1-2. 백엔드 실행
+### 애플리케이션 실행
+
+MySQL 프로파일 사용:
 
 ```bash
-# 프로젝트 루트에서
-cd coffee-order-api
-../mvnw spring-boot:run
+cd /Users/heogyuseon/Development/coffee-order/coffee-order-api
+../mvnw spring-boot:run -Dspring-boot.run.profiles=mysql
 ```
 
-또는 IntelliJ에서:
-- Run Configuration: `CoffeeOrderApplication [devtools]` 실행
+`application-mysql.properties`의 기본값은 로컬 개발용이다. NAS에서는 `DB_HOST=mysql` 등 환경 변수로 접속 정보를 바꾼다.
 
-### 1-3. 프론트엔드 실행
+투썸 자동 재로그인과 매장 메뉴 갱신을 로컬에서 사용하려면 실제 값은 소스가 아닌 환경 변수로 설정한다.
 
 ```bash
-# 새 터미널에서
-cd coffee-order-frontweb
+export TWOSOME_ADMIN_ID='투썸-계정'
+export TWOSOME_ADMIN_PW='투썸-비밀번호'
+export TWOSOME_CRYPTO_KEY='발급한-Base64-32바이트-키'
+export ADMIN_PASSWORD='로컬-관리자-비밀번호'
+```
+
+투썸 연동 없이 일반 API만 시험할 때는 두 스케줄러를 끄고 실행할 수 있다.
+
+```bash
+TWOSOME_KEEPALIVE_ENABLED=false \
+TWOSOME_MENU_REFRESH_ENABLED=false \
+../mvnw spring-boot:run -Dspring-boot.run.profiles=mysql
+```
+
+프론트엔드 개발 서버가 필요하면 별도 터미널에서 실행한다.
+
+```bash
+cd /Users/heogyuseon/Development/coffee-order/coffee-order-frontweb
 npm start
 ```
 
-### 1-4. 테스트
-
-1. 브라우저에서 http://localhost:3000 접속
-2. 관리 페이지 > 투썸 메뉴 탭 이동
-3. "메뉴 동기화" 버튼 클릭
-4. 진행률 표시 확인
-
-**동시성 테스트:**
-- 브라우저 2개에서 동시에 동기화 버튼 클릭
-- 먼저 클릭한 쪽: 동기화 진행
-- 나중에 클릭한 쪽: "동기화가 이미 진행 중입니다" 메시지
-
-### 1-5. 로컬 테스트 종료
+로컬 의존 서비스 종료:
 
 ```bash
-# Redis 중지
-docker-compose -f docker-compose.dev.yml down
-
-# Redis 데이터도 삭제하려면
-docker-compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml down
 ```
 
----
+`-v`는 로컬 MySQL과 Redis 데이터까지 삭제하므로 일반 종료에는 사용하지 않는다.
 
-## 2. Docker 이미지 빌드
+## 빌드
 
-### 2-1. 이미지 빌드
+### 애플리케이션 검증
 
 ```bash
-# 프로젝트 루트에서 실행
-cd /Users/gyuseonheo/Development/coffee-order
-
-# 시놀로지 NAS용 이미지 빌드 (linux/amd64)
-docker buildx build --platform linux/amd64 -t coffee-order-svc:latest --load .
+cd /Users/heogyuseon/Development/coffee-order
+./mvnw clean package
 ```
 
-**참고:** M1/M2 Mac에서도 `--platform linux/amd64`로 빌드해야 시놀로지에서 동작합니다.
+### NAS용 앱 이미지
 
-### 2-2. 이미지 압축
+NAS 아키텍처에 맞춰 `linux/amd64`로 빌드한다.
 
 ```bash
-docker save coffee-order-svc:latest | gzip > coffee-order-svc.tar.gz
+docker buildx build --platform linux/amd64 \
+  -t coffee-order-svc:main-mysql --load .
+docker save -o coffee-order-svc-main-mysql.tar coffee-order-svc:main-mysql
 ```
 
-### 2-3. 빠른 빌드 스크립트
+현재 운영 이미지와 같은 태그를 덮어쓰지 않는다. 기존 `coffee-order-svc:mysql`은 롤백 후보로 보존한다.
+
+### OCR 이미지
+
+`docker-compose.yml`은 `./ocr-service`에서 OCR을 빌드하도록 설정돼 있다. NAS에서 직접 빌드하려면 `ocr-service` 디렉터리 전체를 함께 업로드한다.
+
+맥에서 미리 빌드할 수도 있다.
 
 ```bash
-# build.sh 실행
-chmod +x build.sh
-./build.sh
+docker buildx build --platform linux/amd64 \
+  -t coffee-order-ocr:main --load ./ocr-service
+docker save -o coffee-order-ocr-main.tar coffee-order-ocr:main
 ```
 
----
+### 앱과 OCR 한 번에 빌드
 
-## 3. 시놀로지 NAS 배포 (Docker Compose) - 권장
+다음 스크립트는 두 이미지를 `linux/amd64`로 빌드하고 배포용 tar 두 개를 생성한다.
 
-DSM 7.2 이상에서 Container Manager의 "프로젝트" 기능을 사용합니다.
-
-### 3-1. 사전 준비
-
-1. **폴더 생성** (File Station)
-   ```
-   /docker/coffee-order/
-   ├── data/           # H2 DB + 이미지 저장
-   └── docker-compose.yml
-   ```
-
-2. **이미지 업로드**
-   - `coffee-order-svc.tar.gz` 파일을 시놀로지에 업로드
-   - Container Manager > 이미지 > 추가 > 파일에서 추가
-   - 이미지 로드 완료 대기
-
-### 3-2. Docker Compose 파일 업로드
-
-`docker-compose.yml` 파일을 `/docker/coffee-order/` 폴더에 업로드:
-
-```yaml
-version: '3.8'
-services:
-  redis:
-    image: redis:7-alpine
-    container_name: coffee-redis
-    restart: always
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
-    networks:
-      - coffee-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  app:
-    image: coffee-order-svc:latest
-    container_name: coffee-order
-    restart: always
-    ports:
-      - "8888:8080"
-    volumes:
-      - ./data:/app/data
-    environment:
-      - SPRING_DATA_REDIS_HOST=redis
-      - SPRING_DATA_REDIS_PORT=6379
-      - TZ=Asia/Seoul
-    depends_on:
-      redis:
-        condition: service_healthy
-    networks:
-      - coffee-network
-
-volumes:
-  redis-data:
-    driver: local
-
-networks:
-  coffee-network:
-    driver: bridge
+```bash
+cd /Users/heogyuseon/Development/coffee-order
+./docker-build.sh
 ```
 
-### 3-3. Container Manager에서 프로젝트 생성
+출력 파일:
 
-1. **Container Manager** 앱 실행
+- `coffee-order-svc-main-mysql.tar`
+- `coffee-order-ocr-main.tar`
 
-2. **프로젝트** 탭 클릭
+## 필수 환경 변수
 
-3. **생성** 버튼 클릭
+실제 비밀번호와 계정은 Git이나 이 문서에 저장하지 않는다. Container Manager 프로젝트의 환경 변수 또는 안전한 배포용 환경 파일로 전달한다.
 
-4. **프로젝트 설정**
-   - 프로젝트 이름: `coffee-order`
-   - 경로: `/docker/coffee-order` 선택
-   - 소스: `docker-compose.yml 업로드` 또는 `기존 docker-compose.yml 사용`
+| 변수 | 용도 |
+| --- | --- |
+| `MYSQL_PASSWORD` | 앱의 `coffee` 계정 비밀번호 |
+| `MYSQL_ROOT_PASSWORD` | MySQL root 비밀번호, 앱 계정과 분리 |
+| `TWOSOME_ADMIN_ID` | 매장 메뉴 갱신용 투썸 관리자 ID |
+| `TWOSOME_ADMIN_PW` | 매장 메뉴 갱신용 투썸 관리자 비밀번호 |
+| `TWOSOME_CRYPTO_KEY` | 대표 투썸 계정 암호화 키, Base64 32바이트 |
+| `ADMIN_PASSWORD` | 허다방 관리자 페이지와 건의사항 관리 비밀번호 |
 
-5. **다음** 클릭 후 설정 확인
+선택 변수:
 
-6. **완료** 클릭
+- `APP_IMAGE`: 기본값 `coffee-order-svc:main-mysql`
+- `MYSQL_DATABASE`: 기본값 `coffee_order`
+- `MYSQL_USER`: 기본값 `coffee`
 
-### 3-4. 프로젝트 실행 확인
+암호화 키는 다음처럼 생성할 수 있다. 이미 암호화된 계정이 있으면 키를 바꾸지 말고 기존 키를 유지해야 한다.
 
-1. **프로젝트** 탭에서 `coffee-order` 선택
-2. 상태가 "실행 중"인지 확인
-3. 컨테이너 2개 실행 확인:
-   - `coffee-redis` (Redis)
-   - `coffee-order` (앱)
-
-### 3-5. 접속 테스트
-
-브라우저에서 접속:
+```bash
+openssl rand -base64 32
 ```
+
+## NAS 파일 구성
+
+현재 운영 경로는 `/volume1/docker/mywebsite`다.
+
+```text
+/volume1/docker/mywebsite/
+  docker-compose.yml
+  ocr-service/
+    Dockerfile
+    main.py
+    requirements.txt
+  data/
+    images/
+  scripts/
+    backup-mysql-nas.sh
+  backups/
+    mysql/
+```
+
+MySQL 데이터는 Compose의 `mysql-data` Docker 볼륨에 저장된다. File Station의 `data/demo.mv.db`는 현재 MySQL 운영 DB가 아니다.
+
+## 운영 DB 1회 전환
+
+기존 H2에서 이관한 운영 DB는 다음 스키마 전환 없이 `coffee-order-svc:main-mysql`로 교체하면 안 된다. 앱 이미지만 먼저 바꾸면 테이블과 컬럼 부족으로 실행에 실패한다.
+
+1. 운영 MySQL 백업이 생성되고 복원 가능한지 확인한다.
+2. DBeaver에서 `coffee` 계정으로 `scripts/upgrade-production-to-main-v1.sql`을 실행한다. 스크립트는 추가·보정 위주이며 기존 레거시 테이블과 컬럼은 삭제하지 않는다.
+3. `scripts/verify-production-main-v1.sql`을 실행한다. 숫자 검증 항목의 `actual`과 `expected`가 모두 같아야 하고, 기존 데이터 건수는 백업 시점과 비교한다.
+4. 메인 앱을 시작하면 기존 DB에는 Flyway baseline이 생성된다. 초기 스키마 V1이 다시 실행되는 것은 아니다.
+5. 사용자에게 열기 전에 관리자 계정으로 실제 매장 메뉴를 즉시 갱신한다. 매장 배치 정보가 채워지기 전에는 주문 페이지 메뉴가 0개로 표시되는 것이 정상이다. 갱신 결과와 매장 재고를 확인하지 않은 채 주문을 받으면 안 된다.
+6. 초기 CUSTOM 주문 6건의 메뉴 이름과 기존 건의사항·댓글의 비밀번호 확인 동작을 점검한다.
+
+이 스크립트는 Flyway `db/migration`에 넣지 않는다. 이후 스키마 변경은 새 Flyway 버전으로 관리한다. 운영 `coffee` 계정에는 `coffee_order` 전체 권한이 있어 이 전환 SQL을 실행할 수 있다.
+
+## Container Manager 배포
+
+전환 검증이 끝난 후의 배포 순서:
+
+1. 앱 이미지 tar와 OCR 관련 파일을 NAS에 업로드한다.
+2. Container Manager에서 이미지를 불러온다.
+3. 필수 환경 변수를 설정한다.
+4. `/volume1/docker/mywebsite/docker-compose.yml`을 확인한다.
+5. Container Manager 프로젝트를 빌드하고 실행한다.
+6. 다음 컨테이너 상태를 확인한다.
+   - `coffee-order`
+   - `coffee-mysql`
+   - `coffee-redis`
+   - `coffee-ocr`
+7. 실제 매장 메뉴 갱신을 완료한 뒤 부서·팀·메뉴·주문 내역을 확인한다.
+
+로컬 네트워크 접속 주소:
+
+```text
 http://192.168.0.48:8888
 ```
 
----
+외부 서비스 주소:
 
-## 4. 시놀로지 NAS 배포 (개별 컨테이너)
-
-Docker Compose를 사용하지 않고 개별 컨테이너로 배포하는 방법입니다.
-
-### 4-1. Redis 컨테이너 생성
-
-**Container Manager UI:**
-1. 레지스트리 > `redis` 검색 > `redis:7-alpine` 다운로드
-2. 이미지 탭 > `redis:7-alpine` 선택 > 실행
-3. 설정:
-   - 컨테이너 이름: `coffee-redis`
-   - 자동 재시작: 활성화
-   - 네트워크: bridge (기본값)
-4. 볼륨: (선택사항)
-   - `/docker/redis-data` → `/data`
-
-**SSH 방식:**
-```bash
-docker run -d \
-  --name coffee-redis \
-  --restart always \
-  redis:7-alpine redis-server --appendonly yes
+```text
+https://heodabang.me
 ```
 
-### 4-2. Redis 컨테이너 IP 확인
+## 업데이트와 롤백
+
+- 새 앱은 기존 태그를 덮어쓰지 않고 새 태그로 빌드한다.
+- 배포 전 `docker compose config --quiet`로 환경 변수와 YAML을 확인한다.
+- DB 구조 변경이 포함된 업데이트는 앱 롤백과 DB 롤백을 함께 검토한다.
+- 새로 추가된 NOT NULL 컬럼이나 데이터 변환이 있으면 이전 앱 이미지로 되돌리는 것만으로는 롤백이 완료되지 않을 수 있다.
+- 현재 MySQL 백업과 현재 운영 이미지를 함께 보존한 상태에서만 전환한다.
+
+## 백업과 접속 매뉴얼
+
+- MySQL 백업·복원: `docs/mysql-backup-restore.md`
+- DBeaver 접속: `docs/mysql-dbeaver-connection.md`
+- NAS 백업 스크립트: `scripts/backup-mysql-nas.sh`
+
+MySQL 백업은 NAS 작업 스케줄러에서 매일 실행하며, NAS 자체 고장에 대비한 외부 저장소 복사도 별도로 설정한다.
+
+## 기본 점검 명령
 
 ```bash
-# SSH 접속 후
-docker inspect coffee-redis | grep IPAddress
-# 예: "IPAddress": "172.17.0.2"
-```
+# Compose 문법과 필수 환경 변수 확인
+docker compose -f docker-compose.yml config --quiet
 
-### 4-3. 앱 컨테이너 생성
+# 컨테이너 상태
+docker ps
 
-**Container Manager UI:**
-1. 이미지 탭 > `coffee-order-svc:latest` 선택 > 실행
-2. 설정:
-   - 컨테이너 이름: `coffee-order`
-   - 자동 재시작: 활성화
-3. 포트 설정:
-   - 로컬 포트: `8888`
-   - 컨테이너 포트: `8080`
-4. 볼륨 설정:
-   - `/docker/coffee-order/data` → `/app/data`
-5. 환경 변수:
-   - `SPRING_DATA_REDIS_HOST` = `172.17.0.2` (Redis IP)
-   - `SPRING_DATA_REDIS_PORT` = `6379`
-   - `TZ` = `Asia/Seoul`
+# 앱 로그
+docker logs coffee-order
 
-**SSH 방식:**
-```bash
-# Redis IP 확인
-REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' coffee-redis)
+# MySQL 로그
+docker logs coffee-mysql
 
-# 앱 컨테이너 실행
-docker run -d \
-  --name coffee-order \
-  -p 8888:8080 \
-  -v /volume1/docker/coffee-order/data:/app/data \
-  -e SPRING_DATA_REDIS_HOST=$REDIS_IP \
-  -e SPRING_DATA_REDIS_PORT=6379 \
-  -e TZ=Asia/Seoul \
-  --restart always \
-  coffee-order-svc:latest
-```
+# OCR 상태
+curl http://localhost:8090/health
 
----
-
-## 5. 업데이트 배포
-
-### 5-1. 새 이미지 빌드
-
-```bash
-# 로컬에서
-docker buildx build --platform linux/amd64 -t coffee-order-svc:latest --load .
-docker save coffee-order-svc:latest | gzip > coffee-order-svc.tar.gz
-```
-
-### 5-2. Docker Compose 사용 시 (권장)
-
-1. **이미지 업로드**
-   - `coffee-order-svc.tar.gz` 시놀로지에 업로드
-   - Container Manager > 이미지 > 추가 > 파일에서 추가
-
-2. **프로젝트 재시작**
-   - Container Manager > 프로젝트 > `coffee-order` 선택
-   - 동작 > 중지
-   - 동작 > 빌드 (새 이미지 적용)
-   - 동작 > 시작
-
-**SSH 방식:**
-```bash
-cd /volume1/docker/coffee-order
-docker-compose down
-docker-compose up -d
-```
-
-### 5-3. 개별 컨테이너 사용 시
-
-1. **이미지 업로드** (위와 동일)
-
-2. **앱 컨테이너만 재생성**
-   - Container Manager > 컨테이너 > `coffee-order` 선택
-   - 중지 > 삭제
-   - 이미지 탭에서 새 이미지로 컨테이너 재생성
-
-**SSH 방식:**
-```bash
-# 기존 컨테이너 중지/삭제
-docker stop coffee-order
-docker rm coffee-order
-
-# 새 이미지 로드
-gunzip -c /volume1/docker/coffee-order-svc.tar.gz | docker load
-
-# Redis IP 확인 후 재실행
-REDIS_IP=$(docker inspect -f '{{range.NetworkSettings.Networks}}{{.IPAddress}}{{end}}' coffee-redis)
-
-docker run -d \
-  --name coffee-order \
-  -p 8888:8080 \
-  -v /volume1/docker/coffee-order/data:/app/data \
-  -e SPRING_DATA_REDIS_HOST=$REDIS_IP \
-  -e SPRING_DATA_REDIS_PORT=6379 \
-  -e TZ=Asia/Seoul \
-  --restart always \
-  coffee-order-svc:latest
-```
-
----
-
-## 6. 트러블슈팅
-
-### Redis 연결 오류
-
-**증상:** 앱 시작 시 Redis 연결 실패
-
-**확인:**
-```bash
-# Redis 컨테이너 상태 확인
-docker ps | grep redis
-
-# Redis 연결 테스트
+# Redis 상태
 docker exec coffee-redis redis-cli ping
-
-# 앱에서 Redis 연결 확인 (로그)
-docker logs coffee-order | grep -i redis
 ```
 
-**해결:**
-1. Redis 컨테이너가 실행 중인지 확인
-2. `SPRING_DATA_REDIS_HOST` 환경 변수가 올바른지 확인
-3. Docker Compose 사용 시: 서비스명 `redis` 사용
-4. 개별 컨테이너 시: Redis 컨테이너 IP 사용
-
-### 동기화 진행률이 표시되지 않음
-
-**증상:** 동기화 버튼 클릭 후 진행률 바가 안 보임
-
-**확인:**
-```bash
-# Redis에 진행 상태 저장되는지 확인
-docker exec coffee-redis redis-cli GET "twosome:sync:progress"
-```
-
-**해결:**
-1. Redis 연결 상태 확인
-2. 브라우저 개발자 도구에서 네트워크 탭 확인
-3. `/api/twosome-menus/sync/status` API 응답 확인
-
-### 포트 충돌
-
-**증상:** 컨테이너 시작 실패, 포트 사용 중
-
-**해결:**
-```bash
-# 8888 포트 사용 중인 프로세스 확인
-docker ps | grep 8888
-netstat -an | grep 8888
-
-# 다른 포트로 변경 (예: 9999)
-# docker-compose.yml에서 ports: "9999:8080"으로 수정
-```
-
-### 컨테이너 로그 확인
-
-```bash
-# 앱 로그 (실시간)
-docker logs -f coffee-order
-
-# 앱 로그 (최근 100줄)
-docker logs --tail 100 coffee-order
-
-# Redis 로그
-docker logs coffee-redis
-```
-
-### 데이터베이스 백업
-
-```bash
-# H2 DB 파일 백업
-cp -r /volume1/docker/coffee-order/data /volume1/docker/coffee-order/data-backup-$(date +%Y%m%d)
-```
-
----
-
-## 빠른 체크리스트
-
-### 최초 배포
-- [ ] 로컬에서 `docker-compose.dev.yml`로 테스트
-- [ ] Docker 이미지 빌드 (`build.sh`)
-- [ ] 시놀로지에 `coffee-order-svc.tar.gz` 업로드
-- [ ] Container Manager에서 이미지 가져오기
-- [ ] `/docker/coffee-order/data` 폴더 생성
-- [ ] `docker-compose.yml` 업로드
-- [ ] Container Manager > 프로젝트 생성
-- [ ] http://192.168.0.48:8888 접속 테스트
-
-### 업데이트 배포
-- [ ] 로컬에서 새 이미지 빌드
-- [ ] 시놀로지에 tar.gz 업로드
-- [ ] Container Manager에서 이미지 가져오기
-- [ ] 프로젝트 재빌드/재시작
-- [ ] 접속 테스트
+운영 DB에서 테이블이나 데이터를 직접 삭제하기 전에는 반드시 최신 백업과 복원 절차를 확인한다.

@@ -71,6 +71,27 @@ public class TwosomeMenu {
     @Column(name = "local_img_path", length = 500)
     private String localImgPath;
 
+    // 매장 기반 신규 컬럼 (매장 메뉴 새로고침 시 채워짐. 미동기화 항목은 null)
+    // 가격 (투썸이 매기지 못한 항목 방어용 null 허용)
+    @Column(name = "sale_amt")
+    private Integer saleAmt;
+
+    // 판매 가능 수량 (-1이면 무제한)
+    @Column(name = "sales_psbl_qty")
+    private Integer salesPsblQty;
+
+    // 기본 메뉴 코드 (변형 메뉴의 원본)
+    @Column(name = "default_menu_cd", length = 20)
+    private String defaultMenuCd;
+
+    // 사용 시작일 (yyyyMMdd)
+    @Column(name = "use_fr_dt", length = 8)
+    private String useFrDt;
+
+    // 메뉴 상세 페이지 파싱 옵션 데이터 (JSON, 캐시. 메뉴 새로고침 시 무효화)
+    @Column(name = "option_data", columnDefinition = "TEXT")
+    private String optionData;
+
     @Column(name = "del_yn", nullable = false, length = 1)
     private String delYn = "N";
 

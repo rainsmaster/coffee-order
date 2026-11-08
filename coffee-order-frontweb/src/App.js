@@ -3,6 +3,7 @@ import OrderPage from './pages/OrderPage';
 import ManagePage from './pages/ManagePage';
 import HistoryPage from './pages/HistoryPage';
 import SuggestionPage from './pages/SuggestionPage';
+import AdminPage from './pages/AdminPage';
 import { DepartmentProvider, useDepartment } from './context/DepartmentContext';
 import BottomSheet from './components/BottomSheet';
 import './App.css';
@@ -101,15 +102,10 @@ function AppContent() {
     setCurrentPage('manage');
   };
 
-  const handleAddMenu = () => {
-    setManageInitialTab('settings');
-    setCurrentPage('manage');
-  };
-
   const renderPage = () => {
     switch (currentPage) {
       case 'order':
-        return <OrderPage onAddTeamMember={handleAddTeamMember} onAddMenu={handleAddMenu} />;
+        return <OrderPage onAddTeamMember={handleAddTeamMember} />;
       case 'manage':
         return <ManagePage initialTab={manageInitialTab} />;
       case 'history':
@@ -187,6 +183,10 @@ function AppContent() {
 }
 
 function App() {
+  // /admin 경로는 관리자 페이지를 렌더한다 (라우터 라이브러리 미사용)
+  if (window.location.pathname.startsWith('/admin')) {
+    return <AdminPage />;
+  }
   return (
     <DepartmentProvider>
       <AppContent />

@@ -49,9 +49,7 @@ const ReorderModal = ({
               {formatDate(latestOrder.orderDate)} 주문 내역
             </div>
             <div className="reorder-menu">
-              {latestOrder.menuType === 'TWOSOME'
-                ? latestOrder.twosomeMenuName
-                : latestOrder.menuName}
+              {latestOrder.menuName}
             </div>
             {latestOrder.personalOption && (
               <div className="reorder-option">

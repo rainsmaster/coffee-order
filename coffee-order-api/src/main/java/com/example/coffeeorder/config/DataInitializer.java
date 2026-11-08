@@ -2,7 +2,6 @@ package com.example.coffeeorder.config;
 
 import com.example.coffeeorder.entity.Department;
 import com.example.coffeeorder.repository.DepartmentRepository;
-import com.example.coffeeorder.repository.MenuRepository;
 import com.example.coffeeorder.repository.OrderRepository;
 import com.example.coffeeorder.repository.SettingsRepository;
 import com.example.coffeeorder.repository.TeamRepository;
@@ -22,7 +21,6 @@ public class DataInitializer implements CommandLineRunner {
 
     private final DepartmentRepository departmentRepository;
     private final TeamRepository teamRepository;
-    private final MenuRepository menuRepository;
     private final OrderRepository orderRepository;
     private final SettingsRepository settingsRepository;
 
@@ -80,19 +78,6 @@ public class DataInitializer implements CommandLineRunner {
 
         if (migratedTeams > 0) {
             log.info("{}개의 팀원이 '{}'에 연결되었습니다.", migratedTeams, defaultDepartment.getName());
-        }
-
-        // 부서가 할당되지 않은 메뉴 마이그레이션
-        long migratedMenus = menuRepository.findByDelYn("N").stream()
-                .filter(menu -> menu.getDepartment() == null)
-                .peek(menu -> {
-                    menu.setDepartment(defaultDepartment);
-                    menuRepository.save(menu);
-                })
-                .count();
-
-        if (migratedMenus > 0) {
-            log.info("{}개의 메뉴가 '{}'에 연결되었습니다.", migratedMenus, defaultDepartment.getName());
         }
 
         // 부서가 할당되지 않은 주문 마이그레이션

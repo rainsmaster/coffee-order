@@ -1,5 +1,5 @@
 # 로컬 개발용 Docker Compose
-# Redis만 실행하고, 애플리케이션은 IDE에서 실행
+# Redis + MySQL + OCR 사이드칸만 실행하고, 애플리케이션은 IDE에서 실행
 
 version: '3.8'
 services:
@@ -12,5 +12,43 @@ services:
       - redis-dev-data:/data
     command: redis-server --appendonly yes
 
+  ocr:
+    build: ./ocr-service
+    container_name: coffee-ocr
+    restart: always
+    ports:
+      - "8090:8090"
+    networks:
+      - coffee-network
+
+  mysql:
+    image: mysql:8.4
+    container_name: coffee-mysql-dev
+    ports:
+      - "3306:3306"
+    volumes:
+      - coffee-mysql-data:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=coffee_order
+      - MYSQL_USER=coffee
+      - MYSQL_PASSWORD=coffee1234
+      - MYSQL_ROOT_PASSWORD=root1234
+      - TZ=Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    networks:
+      - coffee-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot1234"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   redis-dev-data:
+  coffee-mysql-data:
+
+networks:
+  coffee-network:
+    driver: bridge

@@ -17,13 +17,17 @@ public class OrderCreateDto {
     @NotNull(message = "팀 ID는 필수입니다.")
     private Long teamId;
 
-    private Long menuId;  // 커스텀 메뉴 ID (CUSTOM 모드)
-
-    private Long twosomeMenuId;  // 투썸 메뉴 ID (TWOSOME 모드)
-
-    private String menuType = "CUSTOM";  // CUSTOM 또는 TWOSOME
+    private Long twosomeMenuId;  // 투썸 메뉴 ID (주문 생성은 항상 투썸 메뉴 기준)
 
     private String personalOption;
 
     private LocalDate orderDate;
+
+    // 투썸 변형 정보 (옵션 조합 결과, TWOSOME 모드에서 장바구니 담기용)
+    private String variantMenuCd;
+
+    private String variantOpts;
+
+    // 투썸 퍼스널 옵션 JSON (cartCstmInfo 배열)
+    private String cstmInfo;
 }

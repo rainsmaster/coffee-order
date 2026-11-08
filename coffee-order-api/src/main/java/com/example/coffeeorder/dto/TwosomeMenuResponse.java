@@ -65,6 +65,18 @@ public class TwosomeMenuResponse {
         @JsonProperty("BADG_NM")
         private String badgNm;
 
+        @JsonProperty("SALE_AMT")
+        private String saleAmt;          // 판매가 ("6,300"). "0"이면 가격 미산정 → null 저장
+
+        @JsonProperty("SALES_PSBL_QTY")
+        private Integer salesPsblQty;    // 판매가능수량 (-1=무제한, 0=품절)
+
+        @JsonProperty("DEFAULT_MENU_CD")
+        private String defaultMenuCd;    // 기본(원) 메뉴 코드
+
+        @JsonProperty("USE_FR_DT")
+        private String useFrDt;          // 사용 시작일 (yyyyMMdd)
+
         @JsonProperty("SORT_ORD")
         private Integer sortOrd;
 

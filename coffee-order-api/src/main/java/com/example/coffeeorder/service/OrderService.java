@@ -4,13 +4,11 @@ import com.example.coffeeorder.dto.MenuSummaryDto;
 import com.example.coffeeorder.dto.OrderCreateDto;
 import com.example.coffeeorder.dto.OrderResponseDto;
 import com.example.coffeeorder.entity.Department;
-import com.example.coffeeorder.entity.Menu;
 import com.example.coffeeorder.entity.Order;
 import com.example.coffeeorder.entity.Team;
 import com.example.coffeeorder.entity.TwosomeMenu;
 import com.example.coffeeorder.mapper.OrderMapper;
 import com.example.coffeeorder.repository.DepartmentRepository;
-import com.example.coffeeorder.repository.MenuRepository;
 import com.example.coffeeorder.repository.OrderRepository;
 import com.example.coffeeorder.repository.TeamRepository;
 import com.example.coffeeorder.repository.TwosomeMenuRepository;
@@ -19,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -30,7 +29,6 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final TeamRepository teamRepository;
-    private final MenuRepository menuRepository;
     private final TwosomeMenuRepository twosomeMenuRepository;
     private final DepartmentRepository departmentRepository;
     private final OrderMapper orderMapper;
@@ -102,6 +100,9 @@ public class OrderService {
         order.setTeam(team);
         order.setPersonalOption(dto.getPersonalOption());
         order.setOrderDate(orderDate);
+        order.setVariantMenuCd(dto.getVariantMenuCd());
+        order.setVariantOpts(dto.getVariantOpts());
+        order.setCstmInfo(dto.getCstmInfo());
 
         // 부서 설정 (팀의 부서를 따라가거나 직접 지정)
         if (dto.getDepartmentId() != null) {
@@ -113,28 +114,14 @@ public class OrderService {
         }
 
         // 메뉴 타입에 따라 처리
-        String menuType = dto.getMenuType() != null ? dto.getMenuType() : "CUSTOM";
-        order.setMenuType(menuType);
-
-        if ("TWOSOME".equals(menuType)) {
-            // 투썸 메뉴 모드
-            if (dto.getTwosomeMenuId() == null) {
-                throw new Exception("투썸 메뉴를 선택해주세요.");
-            }
-            TwosomeMenu twosomeMenu = twosomeMenuRepository.findById(dto.getTwosomeMenuId())
-                    .orElseThrow(() -> new Exception("투썸 메뉴를 찾을 수 없습니다."));
-            order.setTwosomeMenu(twosomeMenu);
-            order.setMenu(null);
-        } else {
-            // 커스텀 메뉴 모드
-            if (dto.getMenuId() == null) {
-                throw new Exception("메뉴를 선택해주세요.");
-            }
-            Menu menu = menuRepository.findById(dto.getMenuId())
-                    .orElseThrow(() -> new Exception("메뉴를 찾을 수 없습니다."));
-            order.setMenu(menu);
-            order.setTwosomeMenu(null);
+        // 주문 생성은 항상 투썸 메뉴 기준 (CUSTOM 모드는 제거됨)
+        if (dto.getTwosomeMenuId() == null) {
+            throw new Exception("투썸 메뉴를 선택해주세요.");
         }
+        TwosomeMenu twosomeMenu = twosomeMenuRepository.findById(dto.getTwosomeMenuId())
+                .orElseThrow(() -> new Exception("투썸 메뉴를 찾을 수 없습니다."));
+        order.setTwosomeMenu(twosomeMenu);
+        order.setMenuType("TWOSOME");
 
         Order savedOrder = orderRepository.save(order);
         // 저장된 ID만 반환 (사용자 입력으로부터 완전히 분리)
@@ -155,24 +142,46 @@ public class OrderService {
         if (existingOrder.isPresent()) {
             Order order = existingOrder.get();
 
-            // 메뉴 타입 업데이트
+            // 메뉴 타입 업데이트 (레거시 구분용, 신규 주문은 항상 TWOSOME)
             if (updatedOrder.getMenuType() != null) {
                 order.setMenuType(updatedOrder.getMenuType());
             }
 
-            // 메뉴 타입에 따라 적절한 메뉴 설정
-            if ("TWOSOME".equals(updatedOrder.getMenuType())) {
-                order.setTwosomeMenu(updatedOrder.getTwosomeMenu());
-                order.setMenu(null);
-            } else {
-                order.setMenu(updatedOrder.getMenu());
-                order.setTwosomeMenu(null);
-            }
-
+            // 주문 수정은 항상 투썸 메뉴 기준 (CUSTOM 모드는 제거됨)
+            order.setTwosomeMenu(updatedOrder.getTwosomeMenu());
             order.setPersonalOption(updatedOrder.getPersonalOption());
+
+            // 변형 정보 갱신 (메뉴 변경 시 장바구니에 담긴 것과 달라지므로 반영 마커 초기화)
+            order.setVariantMenuCd(updatedOrder.getVariantMenuCd());
+            order.setVariantOpts(updatedOrder.getVariantOpts());
+            order.setCstmInfo(updatedOrder.getCstmInfo());
+            order.setCartReflectedAt(null);
+
             return orderRepository.save(order);
         }
         return null;
+    }
+
+    /**
+     * 주문의 장바구니 반영 일시를 일괄 갱신한다. 존재하지 않는 id는 조용히 스킵.
+     *
+     * @return 갱신 건수
+     */
+    @Transactional
+    public int markCartReflected(List<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            return 0;
+        }
+        int updated = 0;
+        LocalDateTime now = LocalDateTime.now();
+        for (Order order : orderRepository.findAllById(orderIds)) {
+            if ("N".equals(order.getDelYn())) {
+                order.setCartReflectedAt(now);
+                orderRepository.save(order);
+                updated++;
+            }
+        }
+        return updated;
     }
 
     // 소프트 삭제

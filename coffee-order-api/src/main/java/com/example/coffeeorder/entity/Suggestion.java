@@ -29,8 +29,11 @@ public class Suggestion {
     @Column(nullable = false, length = 50)
     private String author;
 
-    @Column(nullable = false)
-    private String password;
+    @Column(name = "password_hash", nullable = false, length = 100)
+    private String passwordHash;
+
+    @Column(name = "password_salt", nullable = false, length = 100)
+    private String passwordSalt;
 
     @Column(nullable = false)
     private Boolean pinned = false;

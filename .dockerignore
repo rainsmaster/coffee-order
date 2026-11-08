@@ -1,4 +1,4 @@
-target/
+**/target/
 data/
 .git/
 .idea/
@@ -6,12 +6,12 @@ data/
 .DS_Store
 
 # Frontend
-frontend/node_modules/
-frontend/build/
-frontend/.env.local
-frontend/.env.development.local
-frontend/.env.test.local
-frontend/.env.production.local
-frontend/npm-debug.log*
-frontend/yarn-debug.log*
-frontend/yarn-error.log*
+coffee-order-frontweb/node_modules/
+coffee-order-frontweb/build/
+coffee-order-frontweb/.env.local
+coffee-order-frontweb/.env.development.local
+coffee-order-frontweb/.env.test.local
+coffee-order-frontweb/.env.production.local
+coffee-order-frontweb/npm-debug.log*
+coffee-order-frontweb/yarn-debug.log*
+coffee-order-frontweb/yarn-error.log*

@@ -18,16 +18,19 @@ public class OrderResponseDto {
     private Long id;
     private Long teamId;
     private String teamName;
-    private Long menuId;
-    private String menuName;
+    private String menuName;  // TWOSOME이면 twosomeMenu.menuNm, 레거시 CUSTOM이면 personal_option 값 (메뉴 이름 역할)
     private Long twosomeMenuId;
     private String twosomeMenuName;
     private String twosomeMenuCategory;
     private String twosomeMenuCode;  // 메뉴 옵션 조회용 코드
-    private String menuType;  // CUSTOM 또는 TWOSOME
+    private String menuType;  // 레거시 CUSTOM 주문 구분용 (신규 주문은 항상 TWOSOME)
     private String personalOption;
     private LocalDate orderDate;
     private LocalDateTime createdTime;
+    private LocalDateTime cartReflectedAt;  // 장바구니 반영 일시 (null이면 미반영)
+    private String variantMenuCd;
+    private String variantOpts;
+    private String cstmInfo;
 
     public static OrderResponseDto from(Order order) {
         OrderResponseDto dto = new OrderResponseDto();
@@ -40,22 +43,20 @@ public class OrderResponseDto {
         dto.setPersonalOption(sanitize(order.getPersonalOption()));
         dto.setOrderDate(order.getOrderDate());
         dto.setCreatedTime(order.getCreatedTime());
+        dto.setCartReflectedAt(order.getCartReflectedAt());
+        dto.setVariantMenuCd(order.getVariantMenuCd());
+        dto.setVariantOpts(order.getVariantOpts());
+        dto.setCstmInfo(order.getCstmInfo());
 
-        // 메뉴 타입에 따라 처리
+        // 메뉴 이름 결정: TWOSOME이면 투썸 메뉴 이름, 레거시 CUSTOM이면 personal_option 값을 메뉴 이름처럼 사용
         if ("TWOSOME".equals(menuType) && order.getTwosomeMenu() != null) {
             dto.setTwosomeMenuId(order.getTwosomeMenu().getId());
             dto.setTwosomeMenuName(sanitize(order.getTwosomeMenu().getMenuNm()));
             dto.setTwosomeMenuCategory(sanitize(order.getTwosomeMenu().getMidNm()));
             dto.setTwosomeMenuCode(order.getTwosomeMenu().getMenuCd());
-            dto.setMenuId(null);
-            dto.setMenuName(null);
-        } else if (order.getMenu() != null) {
-            dto.setMenuId(order.getMenu().getId());
-            dto.setMenuName(sanitize(order.getMenu().getName()));
-            dto.setTwosomeMenuId(null);
-            dto.setTwosomeMenuName(null);
-            dto.setTwosomeMenuCategory(null);
-            dto.setTwosomeMenuCode(null);
+            dto.setMenuName(dto.getTwosomeMenuName());
+        } else {
+            dto.setMenuName(dto.getPersonalOption());
         }
 
         return dto;

@@ -38,6 +38,22 @@ data/
 *.db
 *.mv.db
 *.trace.db
+backups/
+*.sql.gz
+
+### Local secrets ###
+.env
+.env.*
+!.env.example
+
+### Python / OCR ###
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+
+### Captured integration responses ###
+docs/twosome-snapshot/
 
 ### Frontend ###
 coffee-order-frontweb/node_modules/

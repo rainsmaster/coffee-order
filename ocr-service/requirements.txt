@@ -1,0 +1,6 @@
+# Python 3.11 고정 (onnxruntime이 3.15 미지원, 3.11.12 + rapidocr-onnxruntime 1.4.4 동작 확인)
+rapidocr-onnxruntime==1.4.4
+pillow==13.0.0
+numpy==2.4.6
+fastapi==0.115.6
+uvicorn==0.32.1

@@ -1,7 +1,6 @@
 # 시놀로지 NAS 배포용 Docker Compose
 # Container Manager > 프로젝트에서 사용
 
-version: '3.8'
 services:
   redis:
     image: redis:7-alpine
@@ -19,7 +18,7 @@ services:
       retries: 5
 
   app:
-    image: coffee-order-svc:latest
+    image: ${APP_IMAGE:-coffee-order-svc:main-mysql}
     container_name: coffee-order
     restart: always
     ports:
@@ -27,17 +26,76 @@ services:
     volumes:
       - ./data:/app/data
     environment:
+      - SPRING_PROFILES_ACTIVE=mysql
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=${MYSQL_DATABASE:-coffee_order}
+      - DB_USERNAME=${MYSQL_USER:-coffee}
+      - DB_PASSWORD=${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
       - SPRING_DATA_REDIS_HOST=redis
       - SPRING_DATA_REDIS_PORT=6379
+      - TWOSOME_OCR_URL=http://ocr:8090
+      - TWOSOME_ADMIN_ID=${TWOSOME_ADMIN_ID:?TWOSOME_ADMIN_ID is required}
+      - TWOSOME_ADMIN_PW=${TWOSOME_ADMIN_PW:?TWOSOME_ADMIN_PW is required}
+      - TWOSOME_CRYPTO_KEY=${TWOSOME_CRYPTO_KEY:?TWOSOME_CRYPTO_KEY is required}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       - TZ=Asia/Seoul
     depends_on:
       redis:
         condition: service_healthy
+      mysql:
+        condition: service_healthy
+      ocr:
+        condition: service_started
     networks:
       - coffee-network
 
+  mysql:
+    image: mysql:8.4
+    container_name: coffee-mysql
+    restart: always
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-coffee_order}
+      - MYSQL_USER=${MYSQL_USER:-coffee}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+      - TZ=Asia/Seoul
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - coffee-network
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  ocr:
+    build: ./ocr-service
+    image: coffee-order-ocr:main
+    container_name: coffee-ocr
+    restart: always
+    ports:
+      - "8090:8090"
+    networks:
+      - coffee-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8090/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
 volumes:
   redis-data:
+    driver: local
+  mysql-data:
     driver: local
 
 networks:

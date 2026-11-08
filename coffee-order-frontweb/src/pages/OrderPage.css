@@ -114,45 +114,6 @@
   font-size: 0.9rem;
 }
 
-.menu-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 0.5rem;
-}
-
-.menu-item {
-  padding: 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background: white;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s;
-  font-weight: 400;
-}
-
-.menu-item:hover:not(:disabled) {
-  border-color: #666;
-  background-color: #f5f5f5;
-}
-
-.menu-item.selected {
-  background-color: #666;
-  color: white;
-  border-color: #666;
-}
-
-.menu-item.selected:hover:not(:disabled) {
-  background-color: #555;
-  color: white;
-  border-color: #555;
-}
-
-.menu-item:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* 퍼스널 옵션 - 텍스트 입력 */
 .personal-option-input {
   width: 100%;
@@ -397,16 +358,6 @@
     padding: 1rem;
   }
 
-  .menu-grid {
-    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
-    gap: 0.4rem;
-  }
-
-  .menu-item {
-    padding: 0.5rem;
-    font-size: 0.85rem;
-  }
-
   .order-item {
     flex-direction: column;
     align-items: flex-start;
@@ -422,10 +373,6 @@
 @media (max-width: 480px) {
   .order-form-card h2 {
     font-size: 1.1rem;
-  }
-
-  .menu-grid {
-    grid-template-columns: repeat(2, 1fr);
   }
 
   .btn-edit,
@@ -959,56 +906,269 @@
     margin-top: 0.5rem;
   }
 }
+/* ==================== 투썸 장바구니 담기 (PoC) ==================== */
 
-/* 빈 메뉴 안내 */
-.empty-menu-notice {
-  text-align: center;
-  padding: 2rem;
-  color: #666;
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  border: 1px dashed #ddd;
+.cart-add-button {
+  margin-top: 0.5rem;
+  background-color: #6b4f2e;
 }
 
-.empty-menu-notice p {
-  margin: 0 0 1rem 0;
+.cart-add-button:hover:not(:disabled) {
+  background-color: #5a4226;
+}
+
+.cart-result-summary {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
   font-size: 0.95rem;
 }
 
-.btn-add-menu {
-  padding: 0.6rem 1.2rem;
-  background-color: #666;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 0.95rem;
+.cart-result-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.cart-result-list li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.25rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.cart-result-status {
+  flex-shrink: 0;
+  padding: 0.1rem 0.5rem;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.cart-result-success .cart-result-status {
+  background-color: #e6f7e6;
+  color: #2e7d32;
+}
+
+.cart-result-failed .cart-result-status {
+  background-color: #fdecea;
+  color: #c62828;
+}
+
+.cart-result-menu {
   font-weight: 500;
-  transition: all 0.2s;
 }
 
-.btn-add-menu:hover {
-  background-color: #555;
+.cart-result-message {
+  color: #888;
+  font-size: 0.8rem;
 }
 
-/* 메뉴 목록 하단 인라인 추가 버튼 */
-.btn-add-menu-inline {
+/* 팀 대표 로그인 바 (1단계) */
+.rep-auth-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.45rem 0.7rem;
+  background-color: #f7f7f7;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+}
+
+.rep-auth-info {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #2e7d32;
+}
+
+.rep-auth-btn {
+  padding: 0.3rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #555;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.rep-auth-btn.primary {
+  background-color: #2e7d32;
+  border-color: #2e7d32;
+  color: #fff;
+}
+
+.rep-auth-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 대표 로그인 모달 폼 */
+.rep-modal-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.rep-modal-form .form-label {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.rep-modal-form select,
+.rep-modal-form input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+.rep-modal-buttons {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+/* 서버 기반 옵션 그룹 / 변형 가격 */
+.option-required-mark {
+  color: #c62828;
+  font-weight: 600;
+}
+
+.variant-price {
+  margin-left: 0.4rem;
+  color: #2e7d32;
+  font-weight: 600;
+}
+
+.option-error-notice {
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background-color: #fff8e1;
+  border: 1px solid #ffe082;
+  border-radius: 6px;
+  color: #7a5c00;
+  font-size: 0.82rem;
+}
+
+.rep-twosome-status {
+  font-weight: 400;
+  color: #777;
+}
+
+.rep-twosome-status.active {
+  color: #2e7d32;
+}
+
+.rep-twosome-guide {
+  margin: 0 0 0.5rem;
+  color: #777;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* 투썸 퍼스널 옵션(커스텀) */
+.custom-qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0;
+}
+
+.custom-qty-name {
+  font-size: 0.88rem;
+  color: #333;
+}
+
+.custom-qty-price {
+  margin-left: 0.35rem;
+  color: #888;
+  font-size: 0.8rem;
+}
+
+.custom-group-label {
+  display: block;
+  font-size: 0.85rem;
+  color: #555;
+  margin: 0.4rem 0 0.25rem;
+}
+
+/* 퍼스널 옵션 아코디언 (변형 완료 후 헤더 한 줄, 기본 접힘) */
+.custom-accordion {
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.custom-accordion-header {
   display: block;
   width: 100%;
-  margin-top: 0.75rem;
-  padding: 0.5rem;
-  background-color: transparent;
-  color: #666;
-  border: 1px dashed #ccc;
-  border-radius: 4px;
-  cursor: pointer;
+  text-align: left;
+  padding: 0.6rem 0.8rem;
+  border: none;
+  background-color: #fafafa;
+  color: #333;
   font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
+  font-weight: 600;
+  cursor: pointer;
 }
 
-.btn-add-menu-inline:hover {
-  background-color: #f5f5f5;
-  border-color: #999;
-  color: #333;
+.custom-accordion-header:hover {
+  background-color: #f0f0f0;
+}
+
+.custom-accordion-body {
+  padding: 0.5rem 0.8rem 0.8rem;
+}
+
+.custom-group-block {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f0f0f0;
+}
+
+.custom-group-block:first-of-type {
+  border-top: none;
+  margin-top: 0;
+  padding-top: 0;
+}
+
+.custom-accordion-close {
+  display: block;
+  margin: 0.75rem auto 0;
+  padding: 0.3rem 1.2rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #555;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+/* 품절 메뉴 카드 */
+.twosome-card.sold-out {
+  opacity: 0.55;
+}
+
+.twosome-card .sold-out-badge {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 8px;
+  background-color: #c62828;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.twosome-card {
+  position: relative;
 }
