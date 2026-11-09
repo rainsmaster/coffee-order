@@ -18,6 +18,7 @@ jest.mock('../services/api', () => ({
     me: jest.fn(),
     twosomeCaptcha: jest.fn(),
     twosomeLogin: jest.fn(),
+    twosomeLogout: jest.fn(),
   },
 }));
 
@@ -150,5 +151,36 @@ test('대표 행에서 PIN과 캡차로 직접 로그인한다', async () => {
   expect(await screen.findByText('정상')).toBeInTheDocument();
   expect(repAPI.login).toHaveBeenCalledWith(2, '123456');
   expect(repAPI.twosomeLogin).toHaveBeenCalledWith('captcha-context', '654321', 'saved-id', 'secret');
+  expect(localStorage.getItem('repToken')).toBe('rep-token');
+});
+
+test('ACTIVE 대표는 로그아웃 버튼으로 표시되고 상태를 해제한다', async () => {
+  const rep = {
+    id: 2,
+    name: '허규선',
+    departmentId: 137,
+    departmentName: 'MSA TF',
+    teamId: 247,
+    teamName: '허규선',
+    pinSet: true,
+    twosomeStatus: 'ACTIVE',
+    autoReloginBlocked: false,
+  };
+  adminAPI.getReps
+    .mockResolvedValueOnce([rep])
+    .mockResolvedValueOnce([{ ...rep, twosomeStatus: 'NONE', twosomeSource: null }]);
+  departmentAPI.getAll.mockResolvedValue([]);
+  teamAPI.getAll.mockResolvedValue([]);
+  repAPI.twosomeLogout.mockResolvedValue({ status: 'SUCCESS' });
+  localStorage.setItem('repToken', 'rep-token');
+
+  render(<AdminPage embedded />);
+
+  fireEvent.click(await screen.findByRole('button', { name: '로그아웃' }));
+
+  expect(await screen.findByText('로그인 없음')).toBeInTheDocument();
+  expect(screen.getByText('투썸 로그아웃했습니다.')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '로그인' })).toBeInTheDocument();
+  expect(repAPI.twosomeLogout).toHaveBeenCalled();
   expect(localStorage.getItem('repToken')).toBe('rep-token');
 });

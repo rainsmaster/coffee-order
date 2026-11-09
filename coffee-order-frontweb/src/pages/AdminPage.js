@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { adminAPI, departmentAPI, teamAPI } from '../services/api';
+import { adminAPI, departmentAPI, teamAPI, repAPI } from '../services/api';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 import RepLoginModal from '../components/RepLoginModal';
@@ -16,6 +16,7 @@ const AdminPage = ({ embedded = false }) => {
   const [verifyingRepIds, setVerifyingRepIds] = useState({});
   const [verificationResults, setVerificationResults] = useState({});
   const [loginRep, setLoginRep] = useState(null);
+  const [logoutRepIds, setLogoutRepIds] = useState({});
   const {
     isAlertOpen, alertConfig, showAlert, closeAlert,
     isConfirmOpen, confirmConfig, showConfirm, closeConfirm,
@@ -123,6 +124,31 @@ const AdminPage = ({ embedded = false }) => {
     loadReps();
   };
 
+  const handleTwosomeLogout = async (rep) => {
+    setLogoutRepIds((current) => ({ ...current, [rep.id]: true }));
+    try {
+      await repAPI.twosomeLogout();
+      setVerificationResults((current) => ({
+        ...current,
+        [rep.id]: { result: 'NONE', message: '투썸 로그아웃했습니다.' },
+      }));
+      await loadReps();
+    } catch (err) {
+      setVerificationResults((current) => ({
+        ...current,
+        [rep.id]: {
+          result: 'TEMPORARY_ERROR',
+          message: err.message || '로그아웃에 실패했습니다. 잠시 후 다시 시도해주세요.',
+        },
+      }));
+      if (!localStorage.getItem('repToken') || err.message?.includes('로그인')) {
+        setLoginRep(rep);
+      }
+    } finally {
+      setLogoutRepIds((current) => ({ ...current, [rep.id]: false }));
+    }
+  };
+
   const getTwosomeStatus = (rep) => {
     if (verifyingRepIds[rep.id]) return { label: '확인 중...', className: 'checking' };
     if (verificationResults[rep.id]?.result === 'TEMPORARY_ERROR') {
@@ -190,7 +216,13 @@ const AdminPage = ({ embedded = false }) => {
                     )}
                   </td>
                   <td className="admin-table-actions">
-                    <button className="admin-btn small" onClick={() => setLoginRep(rep)}>로그인</button>
+                    {rep.twosomeStatus === 'ACTIVE' ? (
+                      <button className="admin-btn small" disabled={logoutRepIds[rep.id]} onClick={() => handleTwosomeLogout(rep)}>
+                        {logoutRepIds[rep.id] ? '로그아웃 중...' : '로그아웃'}
+                      </button>
+                    ) : (
+                      <button className="admin-btn small" onClick={() => setLoginRep(rep)}>로그인</button>
+                    )}
                     <button className="admin-btn small" disabled={verifyingRepIds[rep.id]} onClick={() => handleVerifyTwosome(rep)}>
                       {verifyingRepIds[rep.id] ? '확인 중...' : '지금 확인'}
                     </button>
