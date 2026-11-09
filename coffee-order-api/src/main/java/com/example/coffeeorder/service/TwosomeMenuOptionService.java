@@ -88,6 +88,8 @@ public class TwosomeMenuOptionService {
      * 실측 마크업(tsTsoMenuCustomListAjax HTML 조각):
      * - 수량형: input[id^=spinner_box_qty] (data-data=key, data-price=단가) + hidden #cstmInfo{key} (그룹-추가유형-추가코드-조정유형-조정코드)
      * - 선택형: input:radio[name^=radio_custom] (data-price, #chgYn 조정여부) + label 텍스트 + hidden #cstmInfo{id}
+     * - 추가형: check_custom 체크박스를 선택하면 하위 라디오가 열리고, 단일 항목 또는 '보통'이 기본 선택됨
+     * - article.collapse의 이름과 data-id를 카테고리로 유지하고, 우유 그룹(3004)은 하나만 선택
      */
     public JsonNode getMenuCustomOptions(String sessionKey, String variantMenuCd) {
         String html = integrationService.getMenuCustomOptionsHtml(sessionKey, variantMenuCd);
@@ -101,12 +103,12 @@ public class TwosomeMenuOptionService {
             result.put("hasCustom", false);
             result.set("qtyItems", objectMapper.createArrayNode());
             result.set("choiceGroups", objectMapper.createArrayNode());
+            result.set("categories", objectMapper.createArrayNode());
             return result;
         }
 
         Document doc = Jsoup.parse(html);
 
-        // 수량형 항목
         ArrayNode qtyItems = objectMapper.createArrayNode();
         for (Element input : doc.select("input[type=number][id^=spinner_box_qty]")) {
             String key = input.attr("data-data");
@@ -118,18 +120,28 @@ public class TwosomeMenuOptionService {
             item.put("maxQty", maxQtyForGroup(tuple));
             item.put("deposit", parseIntOrZero(hiddenValue(doc, "deposit" + key)));
             putTupleFields(item, tuple);
+            putCategoryFields(item, input);
             qtyItems.add(item);
         }
 
-        // 선택형 그룹(라디오 name 기준)
         ArrayNode choiceGroups = objectMapper.createArrayNode();
         Map<String, ObjectNode> groupByName = new LinkedHashMap<>();
         for (Element radio : doc.select("input[type=radio][name^=radio_custom]")) {
             String groupName = radio.attr("name");
+            String groupKey = groupName.replace("radio_custom", "");
             ObjectNode group = groupByName.computeIfAbsent(groupName, name -> {
                 ObjectNode g = objectMapper.createObjectNode();
-                g.put("groupKey", name.replace("radio_custom", ""));
+                g.put("groupKey", groupKey);
                 g.put("name", resolveGroupTitle(radio));
+                g.put("toggleable", doc.selectFirst(
+                        "input[type=checkbox][data-data=\"" + groupKey + "\"]") != null);
+                if (groupKey.startsWith("3004-")) {
+                    g.put("exclusiveGroupKey", "3004");
+                }
+                Element item = radio.closest("div.items");
+                Element price = item != null ? item.selectFirst(".selected_value .data-custom-price2") : null;
+                g.put("displayPrice", price != null ? parseIntOrZero(price.text()) : 0);
+                putCategoryFields(g, radio);
                 g.set("choices", objectMapper.createArrayNode());
                 return g;
             });
@@ -146,30 +158,74 @@ public class TwosomeMenuOptionService {
             putTupleFields(choice, tuple);
             ((ArrayNode) group.get("choices")).add(choice);
         }
-        groupByName.values().forEach(choiceGroups::add);
+        for (ObjectNode group : groupByName.values()) {
+            if (group.path("toggleable").asBoolean()) {
+                ArrayNode choices = (ArrayNode) group.get("choices");
+                if (choices.size() == 1) {
+                    group.put("defaultChoiceKey", choices.get(0).path("choiceKey").asText());
+                } else {
+                    for (JsonNode choice : choices) {
+                        if (choice.path("label").asText().contains("보통")) {
+                            group.put("defaultChoiceKey", choice.path("choiceKey").asText());
+                            break;
+                        }
+                    }
+                }
+            }
+            choiceGroups.add(group);
+        }
+
+        Map<String, ObjectNode> categoryByKey = new LinkedHashMap<>();
+        qtyItems.forEach(item -> addToCategory(categoryByKey, (ObjectNode) item, "qtyItems"));
+        choiceGroups.forEach(group -> addToCategory(categoryByKey, (ObjectNode) group, "choiceGroups"));
+        ArrayNode categories = objectMapper.createArrayNode();
+        categoryByKey.values().forEach(categories::add);
 
         result.put("hasCustom", qtyItems.size() > 0 || choiceGroups.size() > 0);
         result.set("qtyItems", qtyItems);
         result.set("choiceGroups", choiceGroups);
+        result.set("categories", categories);
         return result;
     }
 
-    /** 라디오 그룹의 표시명: 인접한 앞쪽 h3 텍스트에서 가격 부분 제거 */
     private String resolveGroupTitle(Element radio) {
-        Element container = radio.closest("div.option_select");
-        if (container != null) {
-            Element prev = container.previousElementSibling();
-            while (prev != null && !prev.tagName().equalsIgnoreCase("h3")) {
-                prev = prev.previousElementSibling();
-            }
-            if (prev != null) {
-                String text = prev.text().split("\\(")[0].trim();
-                if (!text.isBlank()) {
-                    return text;
-                }
-            }
+        Element item = radio.closest("div.items");
+        Element label = item != null ? item.selectFirst("h3 .label") : null;
+        if (label != null && !label.text().isBlank()) {
+            return label.text().trim();
         }
         return radio.attr("name");
+    }
+
+    private static void putCategoryFields(ObjectNode node, Element element) {
+        Element article = element.closest("article.collapse");
+        String categoryKey = "custom";
+        String categoryName = "퍼스널 옵션";
+        if (article != null) {
+            Element header = article.selectFirst(".collapse-header [data-action=collapse]");
+            Element name = article.selectFirst(".collapse-header .name");
+            if (header != null && !header.attr("data-id").isBlank()) {
+                categoryKey = header.attr("data-id");
+            }
+            if (name != null && !name.text().isBlank()) {
+                categoryName = name.text().trim();
+            }
+        }
+        node.put("categoryKey", categoryKey);
+        node.put("categoryName", categoryName);
+    }
+
+    private void addToCategory(Map<String, ObjectNode> categories, ObjectNode item, String itemType) {
+        String key = item.path("categoryKey").asText("custom");
+        ObjectNode category = categories.computeIfAbsent(key, categoryKey -> {
+            ObjectNode created = objectMapper.createObjectNode();
+            created.put("categoryKey", categoryKey);
+            created.put("categoryName", item.path("categoryName").asText("퍼스널 옵션"));
+            created.set("qtyItems", objectMapper.createArrayNode());
+            created.set("choiceGroups", objectMapper.createArrayNode());
+            return created;
+        });
+        ((ArrayNode) category.get(itemType)).add(item);
     }
 
     /** hidden input 값 조회 */

@@ -6,9 +6,11 @@ import ConfirmModal from '../components/ConfirmModal';
 import OrderChangeModal from '../components/OrderChangeModal';
 import ReorderModal from '../components/ReorderModal';
 import RepSelectModal from '../components/RepSelectModal';
+import CustomOptionsPanel from '../components/CustomOptionsPanel';
 import Modal from '../components/Modal';
 import useModal from '../hooks/useModal';
 import { isWithinStoreHours } from '../utils/storeHours';
+import { needsOptionConfirmation, restoreOptionSelections } from '../utils/reorderOptions';
 import './OrderPage.css';
 
 const OrderPage = ({ onAddTeamMember }) => {
@@ -166,8 +168,45 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
+  const prepareReorderOptions = async (order) => {
+    setIsReorderModalOpen(false);
+    const entry = Object.entries(twosomeMenus).find(([, menus]) =>
+      menus.some((menu) => menu.id === order.twosomeMenuId));
+    if (!entry) {
+      showAlert('현재 판매 메뉴에서 이전 메뉴를 찾을 수 없습니다. 메뉴를 직접 선택해주세요.');
+      return;
+    }
+    const [category, menus] = entry;
+    const menu = menus.find((item) => item.id === order.twosomeMenuId);
+    if (menu.salesPsblQty === 0) {
+      showAlert('이전 메뉴는 현재 품절입니다. 다른 메뉴를 선택해주세요.');
+      return;
+    }
+
+    setIsCartLoading(true);
+    setSelectedCategory(category);
+    setMenuSearchQuery('');
+    try {
+      const options = await handleTwosomeMenuSelect(
+        menu.id.toString(), menu.menuCd, order.personalOption);
+      if (!options?.parsed) {
+        showAlert('이전 주문의 옵션을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+        return;
+      }
+      setLatestOrder(null);
+      showAlert('이전 주문에 저장되지 않은 옵션이 있어 현재 메뉴의 옵션을 불러왔습니다. 선택 옵션과 퍼스널 옵션을 확인한 후 주문 버튼을 눌러주세요.');
+      orderFormRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    } finally {
+      setIsCartLoading(false);
+    }
+  };
+
   const handleReorderConfirm = async () => {
     if (!latestOrder || !selectedTeam) return;
+    if (needsOptionConfirmation(latestOrder)) {
+      await prepareReorderOptions(latestOrder);
+      return;
+    }
     const orderData = {
       departmentId: selectedDepartmentId,
       teamId: parseInt(selectedTeam, 10),
@@ -524,7 +563,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   };
 
   // 투썸 메뉴 선택 시 서버 기반 옵션 그룹 로드 (기본값 미리 선택)
-  const handleTwosomeMenuSelect = async (menuId, menuCd) => {
+  const handleTwosomeMenuSelect = async (menuId, menuCd, savedOptionText = '') => {
     setSelectedTwosomeMenu(menuId);
     setMenuOptions(null);
     setOptionsLoading(true);
@@ -539,28 +578,22 @@ const OrderPage = ({ onAddTeamMember }) => {
 
     if (!menuCd) {
       setOptionsLoading(false);
-      return;
+      return null;
     }
     try {
       const options = await twosomeStoreAPI.getMenuOptions(menuCd);
-      if (!options) return;
+      if (!options) return null;
       if (!options.parsed) {
         setMenuOptions(options);
         setOptionsError(options.message || '옵션 정보를 파싱하지 못했습니다.');
-        return;
+        return options;
       }
       setMenuOptions(options);
-      // 기본 선택이 있는 그룹은 미리 선택
-      const defaults = {};
-      for (const group of options.groups || []) {
-        const defaultOpt = (group.options || []).find((o) => o.defaultOpt);
-        if (defaultOpt) {
-          defaults[group.grpCd] = defaultOpt.opts;
-        }
-      }
-      setSelectedOpts(defaults);
+      setSelectedOpts(restoreOptionSelections(options, savedOptionText));
+      return options;
     } catch (err) {
       setOptionsError('옵션을 불러오지 못했습니다. 옵션 확인 전에는 실제 장바구니에 담지 않습니다.');
+      return null;
     } finally {
       setOptionsLoading(false);
     }
@@ -1361,70 +1394,12 @@ const OrderPage = ({ onAddTeamMember }) => {
             </button>
             {customOptionsOpen && (
             <div className="custom-accordion-body">
-            {(customOptions.qtyItems || []).map((item) => {
-              const qty = selectedCustom.qty[item.key] || 0;
-              return (
-                <div key={item.key} className="custom-qty-row">
-                  <span className="custom-qty-name">
-                    {item.name}
-                    <span className="custom-qty-price">(+{item.unitPrice.toLocaleString()}원)</span>
-                  </span>
-                  <div className="cart-qty-controls">
-                    <button
-                      type="button"
-                      className="cart-qty-btn"
-                      onClick={() => setSelectedCustom({
-                        ...selectedCustom,
-                        qty: { ...selectedCustom.qty, [item.key]: Math.max(0, qty - 1) },
-                      })}
-                      disabled={!orderAvailable || qty <= 0}
-                    >
-                      -
-                    </button>
-                    <span className="cart-qty">{qty}</span>
-                    <button
-                      type="button"
-                      className="cart-qty-btn"
-                      onClick={() => setSelectedCustom({
-                        ...selectedCustom,
-                        qty: { ...selectedCustom.qty, [item.key]: Math.min(item.maxQty || 2, qty + 1) },
-                      })}
-                      disabled={!orderAvailable || qty >= (item.maxQty || 2)}
-                    >
-                      +
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-            {(customOptions.choiceGroups || []).map((group) => (
-              <div key={group.groupKey} className="custom-group-block">
-                <label className="custom-group-label">{group.name}</label>
-                <div className="option-buttons-grid">
-                  {(group.choices || []).map((choice) => (
-                    <button
-                      key={choice.choiceKey}
-                      type="button"
-                      className={`option-chip ${selectedCustom.choices[group.groupKey] === choice.choiceKey ? 'selected' : ''}`}
-                      onClick={() => {
-                        const current = selectedCustom.choices[group.groupKey];
-                        setSelectedCustom({
-                          ...selectedCustom,
-                          choices: {
-                            ...selectedCustom.choices,
-                            [group.groupKey]: current === choice.choiceKey ? null : choice.choiceKey,
-                          },
-                        });
-                      }}
-                      disabled={!orderAvailable}
-                    >
-                      {choice.label}
-                      {choice.price > 0 && ` (+${choice.price.toLocaleString()}원)`}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+              <CustomOptionsPanel
+                customOptions={customOptions}
+                selectedCustom={selectedCustom}
+                onChange={setSelectedCustom}
+                disabled={!orderAvailable}
+              />
               <button
                 type="button"
                 className="custom-accordion-close"

@@ -1,4 +1,5 @@
 import React from 'react';
+import { needsOptionConfirmation } from '../utils/reorderOptions';
 import './ReorderModal.css';
 
 const ReorderModal = ({
@@ -9,6 +10,7 @@ const ReorderModal = ({
   isLoading
 }) => {
   if (!isOpen || !latestOrder) return null;
+  const needsOptions = needsOptionConfirmation(latestOrder);
 
   const handleConfirm = () => {
     onConfirm();
@@ -41,7 +43,9 @@ const ReorderModal = ({
         </div>
         <div className="reorder-modal-body">
           <p className="reorder-message">
-            아래 내용으로 주문하시겠습니까?
+            {needsOptions
+              ? '이전 주문에 일부 옵션 정보가 없습니다. 현재 메뉴에서 옵션을 확인한 후 주문해주세요.'
+              : '아래 내용으로 주문하시겠습니까?'}
           </p>
 
           <div className="reorder-details">
@@ -71,7 +75,7 @@ const ReorderModal = ({
             onClick={handleConfirm}
             disabled={isLoading}
           >
-            {isLoading ? '주문 중...' : '주문하기'}
+            {isLoading ? (needsOptions ? '옵션 불러오는 중...' : '주문 중...') : (needsOptions ? '옵션 확인' : '주문하기')}
           </button>
         </div>
       </div>

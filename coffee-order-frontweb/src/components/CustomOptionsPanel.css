@@ -1,0 +1,131 @@
+.custom-categories {
+  border-top: 1px solid #e5e5e5;
+}
+
+.custom-category {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.custom-category-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.75rem 0.2rem;
+  border: 0;
+  background: #fff;
+  color: #222;
+  text-align: left;
+  cursor: pointer;
+}
+
+.custom-category-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.custom-category-price {
+  margin-left: auto;
+  padding-right: 0.75rem;
+  color: #555;
+  font-size: 0.85rem;
+}
+
+.custom-category-chevron {
+  width: 8px;
+  height: 8px;
+  margin: -4px 0.35rem 0 auto;
+  border-right: 1.5px solid #666;
+  border-bottom: 1.5px solid #666;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.custom-category-price + .custom-category-chevron {
+  margin-left: 0;
+}
+
+.custom-category-chevron.open {
+  margin-top: 4px;
+  transform: rotate(225deg);
+}
+
+.custom-category-body {
+  padding: 0.15rem 0 0.75rem;
+}
+
+.custom-choice-item {
+  padding: 0.6rem 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.custom-choice-item:last-child {
+  border-bottom: 0;
+}
+
+.custom-choice-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  gap: 0.75rem;
+}
+
+.custom-choice-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: #222;
+  font-size: 0.92rem;
+  cursor: pointer;
+}
+
+.custom-choice-toggle input,
+.custom-choice-option input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  accent-color: #333;
+  cursor: pointer;
+}
+
+.custom-choice-price {
+  color: #666;
+  font-size: 0.83rem;
+  white-space: nowrap;
+}
+
+.custom-choice-title {
+  color: #333;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.custom-choice-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.25rem;
+  margin: 0.75rem 0 0.15rem 1.6rem;
+}
+
+.custom-choice-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 28px;
+  color: #444;
+  font-size: 0.86rem;
+  cursor: pointer;
+}
+
+.custom-choice-toggle input:disabled,
+.custom-choice-option input:disabled {
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .custom-choice-options {
+    gap: 0.5rem 1rem;
+    margin-left: 1.55rem;
+  }
+}
