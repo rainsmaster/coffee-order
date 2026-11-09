@@ -37,8 +37,10 @@ class TwosomeSessionPersistenceIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        String host = System.getProperty("spring.data.redis.host", "localhost");
-        int port = Integer.parseInt(System.getProperty("spring.data.redis.port", "6379"));
+        String host = System.getProperty("spring.data.redis.host",
+                System.getenv().getOrDefault("SPRING_DATA_REDIS_HOST", "localhost"));
+        int port = Integer.parseInt(System.getProperty("spring.data.redis.port",
+                System.getenv().getOrDefault("SPRING_DATA_REDIS_PORT", "6379")));
         connectionFactory = new LettuceConnectionFactory(host, port);
         connectionFactory.afterPropertiesSet();
         redisTemplate = new StringRedisTemplate();
