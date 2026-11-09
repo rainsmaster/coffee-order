@@ -33,9 +33,17 @@ export function register(config) {
 
 function registerValidSW(swUrl, config) {
   navigator.serviceWorker
-    .register(swUrl)
+    .register(swUrl, { updateViaCache: 'none' })
     .then((registration) => {
       console.log('Service Worker 등록 성공:', registration.scope);
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') {
+          registration.update().catch((error) => {
+            console.log('Service Worker 업데이트 확인 실패:', error);
+          });
+        }
+      });
 
       registration.onupdatefound = () => {
         const installingWorker = registration.installing;
