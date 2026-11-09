@@ -79,7 +79,7 @@ class RenewalApiIntegrationTest {
                         new TwosomeSessionResponse("NONE", null, null, 0L, null)));
         when(integrationService.addItemsToCart(anyString(), any())).thenAnswer(invocation ->
                 new TwosomeCartAddResponse(1, 1, 0,
-                        List.of(new TwosomeCartItemResult("테스트 아메리칸호", "TEST-MENU", true, null))));
+                        List.of(new TwosomeCartItemResult("테스트 Americano", "TEST-MENU", true, null))));
         when(integrationService.getCartItems(anyString())).thenReturn(List.of());
     }
 
@@ -162,7 +162,7 @@ class RenewalApiIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].teamName").value("과거주문자"))
-                .andExpect(jsonPath("$[0].menuName").value("테스트 아메리칸호"));
+                .andExpect(jsonPath("$[0].menuName").value("테스트 Americano"));
         mockMvc.perform(get("/api/orders/today").param("departmentId", fixture.department().getId().toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
@@ -240,7 +240,7 @@ class RenewalApiIntegrationTest {
         team = teamRepository.save(team);
         TwosomeMenu menu = new TwosomeMenu();
         menu.setMenuCd(menuCode + "-" + team.getId());
-        menu.setMenuNm("테스트 아메리칸호");
+        menu.setMenuNm("테스트 Americano");
         menu.setMidNm("커피");
         menu.setSaleAmt(4500);
         menu.setSalesPsblQty(10);

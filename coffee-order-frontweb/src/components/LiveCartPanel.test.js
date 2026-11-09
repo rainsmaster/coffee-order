@@ -36,15 +36,15 @@ describe('대표별 실시간 장바구니', () => {
 
   test('대표 전환 시 이전 장바구니 항목을 섞지 않는다', async () => {
     repAPI.repGetCart.mockImplementation((id) => Promise.resolve(id === 1 ? [{
-      cartNo: 'c1', cartDtlNo: '1', menuCd: 'm1', menuNm: '아메리칸호', qty: 1, price: 4500,
+      cartNo: 'c1', cartDtlNo: '1', menuCd: 'm1', menuNm: 'Americano', qty: 1, price: 4500,
     }] : []));
     render(<LiveCartPanel departmentId={1} onOrderClick={jest.fn()} />);
-    expect(await screen.findByText('아메리칸호')).toBeInTheDocument();
+    expect(await screen.findByText('Americano')).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText('장바구니 대표'), { target: { value: '2' } });
 
     expect(await screen.findByText('현재는 김대리의 장바구니가 비어 있습니다.')).toBeInTheDocument();
-    expect(screen.queryByText('아메리칸호')).not.toBeInTheDocument();
+    expect(screen.queryByText('Americano')).not.toBeInTheDocument();
     expect(repAPI.repGetCart).toHaveBeenCalledWith(2);
   });
 

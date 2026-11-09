@@ -11,9 +11,12 @@ import com.example.coffeeorder.dto.TwosomeCartItemResult;
 import com.example.coffeeorder.dto.TwosomeCartQtyAdjustRequest;
 import com.example.coffeeorder.dto.TwosomeLoginRequest;
 import com.example.coffeeorder.dto.TwosomeLoginResponse;
+import com.example.coffeeorder.dto.TwosomeMenuOptionsResponse;
 import com.example.coffeeorder.dto.TwosomeMenuResponse.TwosomeMenuItem;
 import com.example.coffeeorder.dto.TwosomeSessionResponse;
 import com.example.coffeeorder.dto.TwosomeStoreInfoResponse;
+import com.example.coffeeorder.dto.TwosomeVariantResolveRequest;
+import com.example.coffeeorder.dto.TwosomeVariantResolveResponse;
 import com.example.coffeeorder.entity.TwosomeMenu;
 import com.example.coffeeorder.exception.TwosomeStoreException;
 import com.example.coffeeorder.exception.TwosomeStoreSessionExpiredException;
@@ -63,6 +66,7 @@ public class TwosomeStoreIntegrationService {
     private final TwosomeSessionRedisStore sessionRedisStore;
     private final TwosomeHealthService healthService;
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
+    private final org.springframework.beans.factory.ObjectProvider<TwosomeMenuOptionService> twosomeMenuOptionServiceProvider;
 
     // 매장 정보 상수 (CJENM커머스부문점)
     private static final String STORE_CD = "1102115";
@@ -346,10 +350,14 @@ public class TwosomeStoreIntegrationService {
                 throw new TwosomeStoreException("매장 메뉴를 가져오지 못했습니다.");
             }
 
-            // 실행 직전 스냅샷 (diff 비교용)
+            // upsert는 삭제 행까지 조회해 재판매 메뉴를 복구하고, 정리 대상은 현재 활성 행만 비교한다.
             Map<String, TwosomeMenu> beforeByMenuCd = new HashMap<>();
-            for (TwosomeMenu menu : twosomeMenuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")) {
+            for (TwosomeMenu menu : twosomeMenuRepository.findAll()) {
                 beforeByMenuCd.put(menu.getMenuCd(), menu);
+            }
+            Map<String, TwosomeMenu> activeBeforeByMenuCd = new HashMap<>();
+            for (TwosomeMenu menu : twosomeMenuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")) {
+                activeBeforeByMenuCd.put(menu.getMenuCd(), menu);
             }
 
             int savedCount = upsertStoreMenus(items, beforeByMenuCd);
@@ -365,7 +373,7 @@ public class TwosomeStoreIntegrationService {
                     fetchedCds.add(item.getMenuCd());
                 }
             }
-            for (TwosomeMenu prev : beforeByMenuCd.values()) {
+            for (TwosomeMenu prev : activeBeforeByMenuCd.values()) {
                 if (fetchedCds.contains(prev.getMenuCd())) {
                     continue;
                 }
@@ -502,9 +510,11 @@ public class TwosomeStoreIntegrationService {
     public TwosomeCartAddResponse addItemsToCart(String sessionKey, TwosomeCartAddRequest request) {
         try {
             TwosomeCartAddResponse response = doAddItemsToCart(sessionKey, request);
-            healthService.record(TwosomeHealthEventType.CART_ADD_SUCCESS, true,
+            boolean success = response.getFailed() == 0;
+            healthService.record(success ? TwosomeHealthEventType.CART_ADD_SUCCESS : TwosomeHealthEventType.CART_ADD_FAIL,
+                    success,
                     "[" + ownerLabel(sessionKey) + "] 전체 " + response.getTotal()
-                            + "건 중 성공 " + response.getSuccess() + "건");
+                            + "건 중 성공 " + response.getSuccess() + "건, 실패 " + response.getFailed() + "건");
             return response;
         } catch (TwosomeStoreException e) {
             healthService.record(TwosomeHealthEventType.CART_ADD_FAIL, false,
@@ -533,13 +543,26 @@ public class TwosomeStoreIntegrationService {
             String menuNm = (menu != null) ? menu.getMenuNm() : null;
 
             try {
+                validateCartItem(sessionKey, item, menu);
+                List<TwosomeCartItemResponse> beforeCart = getCartItems(sessionKey);
                 String cartInfoJson = buildCartInfoJson(item, menu);
                 TwosomeStoreApiClient.CartAddResult cartResult =
                         twosomeStoreApiClient.addToCart(session.getContext(), cartInfoJson);
 
                 if (cartResult.success()) {
-                    successCount++;
-                    results.add(new TwosomeCartItemResult(menuNm, item.getMenuCd(), true, "담기 완료"));
+                    List<TwosomeCartItemResponse> afterCart = getCartItems(sessionKey);
+                    TwosomeCartItemResponse zeroPriced = findNewZeroPricedItem(beforeCart, afterCart, item);
+                    if (zeroPriced != null) {
+                        boolean removed = twosomeStoreApiClient.deleteCartItem(
+                                session.getContext(), zeroPriced.getCartNo(), zeroPriced.getCartDtlNo());
+                        results.add(new TwosomeCartItemResult(menuNm, item.getMenuCd(), false,
+                                removed
+                                        ? "가격이 0원으로 확인되어 담은 항목을 자동 제거했습니다. 옵션을 다시 선택해주세요."
+                                        : "가격이 0원으로 확인되었습니다. 투썸 장바구니에서 해당 항목을 직접 제거해주세요."));
+                    } else {
+                        successCount++;
+                        results.add(new TwosomeCartItemResult(menuNm, item.getMenuCd(), true, "담기 완료"));
+                    }
                 } else {
                     String message = (cartResult.resultMsg() != null && !cartResult.resultMsg().isBlank())
                             ? cartResult.resultMsg()
@@ -826,7 +849,7 @@ public class TwosomeStoreIntegrationService {
         return null;
     }
 
-    private static int firstInt(JsonNode node, Integer defaultValue, String... fieldNames) {
+    private static Integer firstInt(JsonNode node, Integer defaultValue, String... fieldNames) {
         for (String fieldName : fieldNames) {
             JsonNode value = node.get(fieldName);
             if (value != null && value.isNumber()) {
@@ -840,7 +863,7 @@ public class TwosomeStoreIntegrationService {
                 }
             }
         }
-        return defaultValue != null ? defaultValue : 0;
+        return defaultValue;
     }
 
     // ==================== 메뉴 상세 옵션 / 변형 코드 ====================
@@ -1056,6 +1079,66 @@ public class TwosomeStoreIntegrationService {
     private void purgeExpiredPendingSessions() {
         sessionStore.entrySet().removeIf(entry ->
                 entry.getValue().isPending() && entry.getValue().isPendingExpired());
+    }
+
+    private void validateCartItem(String sessionKey, TwosomeCartItemRequest item, TwosomeMenu menu) {
+        if (menu == null) {
+            throw new TwosomeStoreException("메뉴 정보를 찾을 수 없습니다. 메뉴를 새로고침한 뒤 다시 선택해주세요.");
+        }
+        TwosomeMenuOptionService optionService = twosomeMenuOptionServiceProvider.getObject();
+        TwosomeMenuOptionsResponse options = optionService.getMenuOptions(sessionKey, item.getMenuCd());
+        if (!options.isParsed()) {
+            throw new TwosomeStoreException(options.getMessage() != null
+                    ? options.getMessage()
+                    : "옵션 정보를 확인하지 못해 장바구니에 담을 수 없습니다.");
+        }
+        if (options.getGroups() == null || options.getGroups().isEmpty()) {
+            return;
+        }
+        if (item.getVariantMenuCd() == null || item.getVariantMenuCd().isBlank()
+                || item.getOpts() == null || item.getOpts().isEmpty()) {
+            throw new TwosomeStoreException("옵션과 변형 메뉴 코드가 없어 장바구니에 담을 수 없습니다. 모든 옵션을 선택해주세요.");
+        }
+        for (TwosomeMenuOptionsResponse.OptionGroup group : options.getGroups()) {
+            boolean selected = group.getOptions() != null && group.getOptions().stream()
+                    .anyMatch(option -> item.getOpts().contains(option.getOpts()));
+            if (!selected) {
+                throw new TwosomeStoreException("'" + group.getGrpNm() + "' 옵션을 선택해주세요.");
+            }
+        }
+        TwosomeVariantResolveResponse resolved = optionService.resolveVariant(sessionKey,
+                new TwosomeVariantResolveRequest(item.getMenuCd(), item.getOpts()));
+        if (resolved == null || resolved.getVariantMenuCd() == null
+                || !resolved.getVariantMenuCd().equals(item.getVariantMenuCd())
+                || resolved.getPrice() == null || resolved.getPrice() <= 0) {
+            throw new TwosomeStoreException("옵션 조합 또는 가격이 올바르지 않아 장바구니에 담을 수 없습니다. 옵션을 다시 선택해주세요.");
+        }
+    }
+
+    private TwosomeCartItemResponse findNewZeroPricedItem(
+            List<TwosomeCartItemResponse> beforeCart,
+            List<TwosomeCartItemResponse> afterCart,
+            TwosomeCartItemRequest request) {
+        Set<String> beforeKeys = new HashSet<>();
+        for (TwosomeCartItemResponse item : beforeCart) {
+            beforeKeys.add(cartKey(item));
+        }
+        String expectedMenuCd = request.getVariantMenuCd() != null && !request.getVariantMenuCd().isBlank()
+                ? request.getVariantMenuCd()
+                : request.getMenuCd();
+        for (TwosomeCartItemResponse item : afterCart) {
+            boolean sameMenu = expectedMenuCd.equals(item.getMenuCd())
+                    || request.getMenuCd().equals(item.getUpMenuCd());
+            if (sameMenu && !beforeKeys.contains(cartKey(item))
+                    && item.getPrice() != null && item.getPrice() <= 0) {
+                return item;
+            }
+        }
+        return null;
+    }
+
+    private String cartKey(TwosomeCartItemResponse item) {
+        return item.getCartNo() + ":" + item.getCartDtlNo();
     }
 
     private String buildCartInfoJson(TwosomeCartItemRequest item, TwosomeMenu menu) {

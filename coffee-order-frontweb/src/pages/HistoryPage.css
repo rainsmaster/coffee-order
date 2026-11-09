@@ -681,18 +681,46 @@
 .live-cart-toolbar label {
   display: flex;
   flex: 1;
+  min-width: 0;
   flex-direction: column;
-  gap: 0.35rem;
+  gap: 0.4rem;
+  color: #3d4650;
   font-size: 0.9rem;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .live-cart-toolbar select {
+  width: 100%;
+  height: 44px;
   min-height: 44px;
-  padding: 0.5rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  box-sizing: border-box;
+  padding: 0 0.75rem;
+  border: 1px solid #ccd5df;
+  border-radius: 8px;
   background: #fff;
+  color: #27313b;
+  font: inherit;
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(31, 45, 61, 0.04);
+}
+
+.live-cart-toolbar select:focus {
+  border-color: #4a90a4;
+  outline: 3px solid rgba(74, 144, 164, 0.14);
+}
+
+.live-cart-toolbar .today-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-end;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 0 1rem;
+  border-radius: 8px;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .cart-live-status,

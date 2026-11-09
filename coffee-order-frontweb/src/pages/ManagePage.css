@@ -723,9 +723,61 @@
   color: #666;
 }
 
+.admin-tools-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e4e8ec;
+}
+
+.admin-tools-header h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.2rem;
+}
+
+.admin-tools-tabs {
+  display: inline-flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 8px;
+  background: #f0f3f6;
+}
+
+.admin-tools-tabs button {
+  min-height: 40px;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #58616b;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-tools-tabs button.active {
+  background: #fff;
+  color: #263645;
+  box-shadow: 0 1px 4px rgba(31, 45, 61, 0.14);
+}
+
 @media (max-width: 600px) {
   .store-settings-list > div {
     grid-template-columns: 1fr;
     gap: 0.25rem;
+  }
+
+  .admin-tools-header {
+    flex-direction: column;
+  }
+
+  .admin-tools-tabs {
+    display: flex;
+  }
+
+  .admin-tools-tabs button {
+    flex: 1;
   }
 }

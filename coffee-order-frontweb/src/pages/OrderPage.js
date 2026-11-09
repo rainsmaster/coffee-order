@@ -21,6 +21,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [selectedTwosomeMenu, setSelectedTwosomeMenu] = useState('');
   // 서버 기반 옵션 그룹 (메뉴 상세 페이지 파싱 결과) + 선택값 + 변형 코드
   const [menuOptions, setMenuOptions] = useState(null); // {menuCd, parsed, groups:[...]}
+  const [optionsLoading, setOptionsLoading] = useState(false);
   const [selectedOpts, setSelectedOpts] = useState({}); // {grpCd: opts}
   const [variantInfo, setVariantInfo] = useState(null); // {variantMenuCd, variantMenuNm, price}
   const [customOptions, setCustomOptions] = useState(null); // 퍼스널 옵션 (수량형+선택형)
@@ -49,7 +50,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [isCombinedResultOpen, setIsCombinedResultOpen] = useState(false);
   const [isCartLoading, setIsCartLoading] = useState(false); // 주문~장바구니 통합 처리 중
 
-  const [repInfo, setRepInfo] = useState(null);
+  const [, setRepInfo] = useState(null);
   const [isStoreOpen, setIsStoreOpen] = useState(false); // 폐점 게이팅용 개점 여부 (조회 실패 시 false=폐점 취급)
   const [repModalMode, setRepModalMode] = useState(null); // 'login' | 'setup' | 'change' | null
   const [repList, setRepList] = useState([]); // GET /api/reps
@@ -59,7 +60,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [pendingCartOrder, setPendingCartOrder] = useState(null);
   const [repForm, setRepForm] = useState({ memberId: '', teamMemberId: '', pin: '', newPin: '', newPinConfirm: '', currentPin: '' });
   const [repLoading, setRepLoading] = useState(false);
-  const [repTwosomeStatus, setRepTwosomeStatus] = useState('NONE'); // 대표 투썸 세션 상태
+  const [, setRepTwosomeStatus] = useState('NONE');
   const [repMe, setRepMe] = useState(null); // GET /api/rep/me (twosomeAccount 등)
   const [repTwosomeModal, setRepTwosomeModal] = useState(null); // 'login' | null
   const [repCaptcha, setRepCaptcha] = useState(null); // {contextId, imageBase64}
@@ -225,7 +226,11 @@ const OrderPage = ({ onAddTeamMember }) => {
       return;
     }
 
-    // 투썸 메뉴 옵션 그룹 필수 선택 체크 (required 그룹만)
+    if (optionsLoading) {
+      showAlert('옵션 정보를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+
     if (menuOptions && menuOptions.parsed) {
       const missingGroup = (menuOptions.groups || []).find(
         (group) => group.required && !selectedOpts[group.grpCd]
@@ -234,9 +239,12 @@ const OrderPage = ({ onAddTeamMember }) => {
         showAlert(`'${missingGroup.grpNm}' 옵션을 선택해주세요.`);
         return;
       }
-      // 옵션 그룹이 있는 메뉴는 전체 선택 완료 + 변형 검증 통과 필수 (비정상 조합 담기 차단)
       const hasGroups = (menuOptions.groups || []).length > 0;
-      if (hasGroups && isAllGroupsSelected() && (!variantInfo || variantFailed)) {
+      if (hasGroups && !isAllGroupsSelected()) {
+        showAlert('모든 옵션을 선택해주세요.');
+        return;
+      }
+      if (hasGroups && (!variantInfo || variantFailed)) {
         showAlert('선택한 옵션 조합은 판매되지 않습니다. 옵션을 다시 선택해주세요.');
         return;
       }
@@ -315,8 +323,8 @@ const OrderPage = ({ onAddTeamMember }) => {
     const latestReps = await loadRepList();
     if (latestReps.length === 0) {
       setPendingCartOrder(createdOrder);
-      setCombinedResult({ cartOutcome: { type: 'no-reps' } });
-      setIsCombinedResultOpen(true);
+      resetRepForm('', createdOrder.teamId);
+      setRepModalMode('setup');
       return;
     }
 
@@ -529,6 +537,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   const handleTwosomeMenuSelect = async (menuId, menuCd) => {
     setSelectedTwosomeMenu(menuId);
     setMenuOptions(null);
+    setOptionsLoading(true);
     setSelectedOpts({});
     setVariantInfo(null);
     setVariantFailed(false);
@@ -538,7 +547,10 @@ const OrderPage = ({ onAddTeamMember }) => {
     setAvailableOpts({});
     setOptionsError('');
 
-    if (!menuCd) return;
+    if (!menuCd) {
+      setOptionsLoading(false);
+      return;
+    }
     try {
       const options = await twosomeStoreAPI.getMenuOptions(menuCd);
       if (!options) return;
@@ -558,8 +570,9 @@ const OrderPage = ({ onAddTeamMember }) => {
       }
       setSelectedOpts(defaults);
     } catch (err) {
-      // 세션 없음 등으로 옵션 조회 불가 — 기본 코드로 주문 가능
-      setOptionsError('옵션을 불러오지 못했습니다. 투썸 로그인 상태를 확인해주세요. (기본 옵션으로 주문됩니다)');
+      setOptionsError('옵션을 불러오지 못했습니다. 옵션 확인 전에는 실제 장바구니에 담지 않습니다.');
+    } finally {
+      setOptionsLoading(false);
     }
   };
 
@@ -1006,19 +1019,8 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
-  const handleRepTwosomeLogout = async () => {
-    try {
-      await repAPI.twosomeLogout();
-    } catch (err) {
-      // 세션 없어도 로컬 상태는 초기화
-    }
-    setRepTwosomeStatus('NONE');
-    const mode = await detectOrderCartMode();
-    await loadStoreOpen(mode);
-  };
-
-  const resetRepForm = (memberId = '') => {
-    setRepForm({ memberId: memberId ? String(memberId) : '', teamMemberId: '', pin: '', newPin: '', newPinConfirm: '', currentPin: '' });
+  const resetRepForm = (memberId = '', teamMemberId = '') => {
+    setRepForm({ memberId: memberId ? String(memberId) : '', teamMemberId: teamMemberId ? String(teamMemberId) : '', pin: '', newPin: '', newPinConfirm: '', currentPin: '' });
   };
 
   const openRepLoginModal = async (preferredMemberId = null) => {
@@ -1103,11 +1105,6 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
-  const handleRepLogout = () => {
-    localStorage.removeItem('repToken');
-    setRepInfo(null);
-  };
-
   if (loading) {
     return <div className="loading">로딩 중...</div>;
   }
@@ -1126,22 +1123,6 @@ const OrderPage = ({ onAddTeamMember }) => {
           <span>{repList.length > 0 ? repList.map((rep) => `${rep.name}(${rep.statusReason})`).join(', ') : '주문 후 대표 등록과 투썸 로그인을 진행할 수 있습니다.'}</span>
           <span>매장 상태: {isStoreOpen ? '영업 중 · 실제 장바구니 담기 가능' : '매장 닫힘 또는 확인 불가 · 로컬 주문서만 저장'}</span>
         </div>
-        <div className="rep-auth-bar">
-          {repInfo ? (
-            <>
-              <span className="rep-auth-info">내 대표 계정: {repInfo.name}({repInfo.teamName})<span className={`rep-twosome-status ${repTwosomeStatus.toLowerCase()}`}>{repTwosomeStatus === 'ACTIVE' ? ' · 투썸 로그인됨' : ' · 투썸 미로그인'}</span></span>
-              {repTwosomeStatus === 'ACTIVE' ? <button className="rep-auth-btn" onClick={handleRepTwosomeLogout}>투썸 로그아웃</button> : <button className="rep-auth-btn primary" onClick={() => openRepTwosomeLoginModal()}>투썸 로그인</button>}
-              <button className="rep-auth-btn" onClick={() => { resetRepForm(); setRepModalMode('change'); }}>PIN 변경</button>
-              <button className="rep-auth-btn" onClick={handleRepLogout}>대표 로그아웃</button>
-            </>
-          ) : (
-            <>
-              <button className="rep-auth-btn primary" onClick={() => openRepLoginModal()}>대표 로그인</button>
-              <button className="rep-auth-btn" onClick={() => { resetRepForm(); setRepModalMode('setup'); }}>대표 등록</button>
-            </>
-          )}
-        </div>
-
         <div className="form-group">
           <label>이름 선택</label>
           <select

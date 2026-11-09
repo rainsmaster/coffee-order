@@ -16,6 +16,8 @@ public class RepAdminItem {
 
     private Long id;
     private String name;
+    private Long departmentId;
+    private String departmentName;
     private Long teamId;
     private String teamName;
     private boolean pinSet;

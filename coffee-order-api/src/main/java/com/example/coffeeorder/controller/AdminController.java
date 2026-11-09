@@ -21,8 +21,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 관리자 전용 API. /login 외 모든 엔드포인트는 X-Admin-Token 필요.
- * PIN 관련 값은 어떤 응답에도 포함하지 않는다.
+ * 관리자 로그인과 공개 대표 관리 API.
+ * 대표 관리는 누구나 사용할 수 있으며 PIN 관련 값은 어떤 응답에도 포함하지 않는다.
  */
 @Slf4j
 @RestController
@@ -50,7 +50,7 @@ public class AdminController {
     @Transactional(readOnly = true)
     public ResponseEntity<List<RepAdminItem>> getReps(
             @RequestHeader(value = "X-Admin-Token", required = false) String token) {
-        adminAuthService.requireToken(token);
+        // 대표 관리는 로그인 없이 사용할 수 있는 공개 영역이다.
         List<RepAdminItem> reps = memberRepository.findByDelYnOrderByIdAsc("N").stream()
                 .map(this::toAdminItem)
                 .toList();
@@ -62,7 +62,7 @@ public class AdminController {
     public ResponseEntity<RepAdminItem> createRep(
             @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @RequestBody RepCreateRequest request) {
-        adminAuthService.requireToken(token);
+        // 대표 관리는 로그인 없이 사용할 수 있는 공개 영역이다.
         Member member = new Member();
         member.setName(requireName(request.getName()));
         member.setTeam(requireTeam(request.getTeamId()));
@@ -76,7 +76,7 @@ public class AdminController {
             @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @PathVariable Long id,
             @RequestBody RepCreateRequest request) {
-        adminAuthService.requireToken(token);
+        // 대표 관리는 로그인 없이 사용할 수 있는 공개 영역이다.
         Member member = requireMember(id);
         member.setName(requireName(request.getName()));
         member.setTeam(requireTeam(request.getTeamId()));
@@ -89,7 +89,7 @@ public class AdminController {
     public ResponseEntity<Map<String, Object>> deleteRep(
             @RequestHeader(value = "X-Admin-Token", required = false) String token,
             @PathVariable Long id) {
-        adminAuthService.requireToken(token);
+        // 대표 관리는 로그인 없이 사용할 수 있는 공개 영역이다.
         Member member = requireMember(id);
         member.setDelYn("Y");
         memberRepository.save(member);
@@ -107,6 +107,8 @@ public class AdminController {
         return new RepAdminItem(
                 member.getId(),
                 member.getName(),
+                member.getTeam().getDepartment().getId(),
+                member.getTeam().getDepartment().getName(),
                 member.getTeam().getId(),
                 member.getTeam().getName(),
                 member.isPinSet(),

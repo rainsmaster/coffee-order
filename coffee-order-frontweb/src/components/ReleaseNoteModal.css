@@ -11,11 +11,32 @@
 }
 
 .release-note-detail {
-  display: inline-flex;
-  min-height: 40px;
-  padding: 0;
-  color: #315f9e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 1rem;
+  border: 1px solid #c7d2df;
+  border-radius: 8px;
+  background: #f5f8fc;
+  color: #285787;
+  font: inherit;
   font-weight: 600;
+  line-height: 1.4;
+  cursor: pointer;
+  appearance: none;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.release-note-detail:hover {
+  border-color: #8fa9c2;
+  background: #eaf1f8;
+}
+
+.release-note-detail:focus-visible {
+  outline: 3px solid rgba(40, 87, 135, 0.2);
+  outline-offset: 2px;
 }
 
 .release-note-actions {

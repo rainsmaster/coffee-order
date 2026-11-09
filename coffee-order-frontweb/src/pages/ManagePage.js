@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { teamAPI, departmentAPI, twosomeStoreAPI } from '../services/api';
+import { teamAPI, departmentAPI, twosomeStoreAPI, adminAPI } from '../services/api';
 import { useDepartment } from '../context/DepartmentContext';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
@@ -25,6 +25,10 @@ const ManagePage = ({ initialTab }) => {
   const [twosomeForm, setTwosomeForm] = useState({ loginId: '', loginPwd: '', answerCd: '' });
   const [isTwosomeLoading, setIsTwosomeLoading] = useState(false);
   const [twosomeNotice, setTwosomeNotice] = useState('');
+  const [adminSection, setAdminSection] = useState('twosome');
+  const [adminToken, setAdminToken] = useState(localStorage.getItem('adminToken'));
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminLoginLoading, setAdminLoginLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create');
   const [modalType, setModalType] = useState('');
@@ -39,9 +43,10 @@ const ManagePage = ({ initialTab }) => {
   }, [initialTab]);
 
   useEffect(() => {
-    if (['department', 'twosome', 'settings'].includes(activeTab) || selectedDepartmentId) loadData();
+    if (['department', 'settings'].includes(activeTab) || selectedDepartmentId
+      || (activeTab === 'admin' && adminSection === 'twosome' && adminToken)) loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedDepartmentId]);
+  }, [activeTab, adminSection, adminToken, selectedDepartmentId]);
 
   const loadData = async () => {
     try {
@@ -49,7 +54,7 @@ const ManagePage = ({ initialTab }) => {
         setTeams(await teamAPI.getAll(selectedDepartmentId));
       } else if (activeTab === 'department') {
         setDepartments(await departmentAPI.getAll());
-      } else if (activeTab === 'twosome') {
+      } else if (activeTab === 'admin' && adminSection === 'twosome' && adminToken) {
         await loadTwosomeSession();
       } else if (activeTab === 'settings') {
         const [info, health, diff] = await Promise.all([
@@ -150,6 +155,29 @@ const ManagePage = ({ initialTab }) => {
     });
   };
 
+  const handleAdminLogin = async () => {
+    if (!adminPassword) {
+      showAlert('관리자 비밀번호를 입력해주세요.');
+      return;
+    }
+    setAdminLoginLoading(true);
+    try {
+      const result = await adminAPI.login(adminPassword);
+      localStorage.setItem('adminToken', result.token);
+      setAdminToken(result.token);
+      setAdminPassword('');
+    } catch (err) {
+      showAlert(err.message || '관리자 로그인에 실패했습니다.');
+    } finally {
+      setAdminLoginLoading(false);
+    }
+  };
+
+  const handleAdminLogout = () => {
+    localStorage.removeItem('adminToken');
+    setAdminToken(null);
+  };
+
   // ==================== 투썸 연동 (PoC) ====================
 
   const loadTwosomeSession = async () => {
@@ -177,16 +205,16 @@ const ManagePage = ({ initialTab }) => {
     }
   };
 
-  // 투썸 연동 탭이 열린 동안 60초 간격으로 상태 패널 갱신
+  // 관리자 투썸 연동 화면이 열린 동안 60초 간격으로 상태 패널 갱신
   useEffect(() => {
-    if (activeTab !== 'twosome') {
+    if (activeTab !== 'admin' || adminSection !== 'twosome' || !adminToken) {
       return undefined;
     }
     loadTwosomeHealth();
     const intervalId = setInterval(loadTwosomeHealth, 60000);
     return () => clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
+  }, [activeTab, adminSection, adminToken]);
 
   // 마지막 성공 시각으로부터 경과 시간(분) 문자열
   const formatMinutesAgo = (isoDateTime) => {
@@ -341,9 +369,8 @@ const ManagePage = ({ initialTab }) => {
           팀원 관리
         </button>
         <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>매장·주문 안내</button>
-        <button className={activeTab === 'twosome' ? 'active' : ''} onClick={() => setActiveTab('twosome')}>관리자 투썸 연동</button>
         <button className={activeTab === 'reps' ? 'active' : ''} onClick={() => setActiveTab('reps')}>대표 관리</button>
-        <button className={activeTab === 'release-notes' ? 'active' : ''} onClick={() => setActiveTab('release-notes')}>릴리즈 노트</button>
+        <button className={activeTab === 'admin' ? 'active' : ''} onClick={() => setActiveTab('admin')}>관리자</button>
       </div>
 
       <div className="manage-content">
@@ -426,10 +453,30 @@ const ManagePage = ({ initialTab }) => {
           </div>
         )}
         {activeTab === 'reps' && <AdminPage embedded />}
-        {activeTab === 'release-notes' && <ReleaseNotesAdmin onError={showAlert} onSaved={showAlert} />}
+        {activeTab === 'admin' && !adminToken && (
+          <div className="admin-login-card">
+            <h2>관리자 로그인</h2>
+            <p className="admin-login-desc">투썸 연동과 릴리즈 노트는 관리자만 설정할 수 있습니다.</p>
+            <input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && handleAdminLogin()} placeholder="관리자 비밀번호" autoFocus />
+            <button className="admin-btn primary" onClick={handleAdminLogin} disabled={adminLoginLoading}>{adminLoginLoading ? '로그인 중...' : '로그인'}</button>
+          </div>
+        )}
+        {activeTab === 'admin' && adminToken && (
+          <div className="admin-tools-header">
+            <div>
+              <h2>관리자 설정</h2>
+              <div className="admin-tools-tabs" role="tablist" aria-label="관리자 설정 메뉴">
+                <button role="tab" aria-selected={adminSection === 'twosome'} className={adminSection === 'twosome' ? 'active' : ''} onClick={() => setAdminSection('twosome')}>투썸 연동</button>
+                <button role="tab" aria-selected={adminSection === 'release-notes'} className={adminSection === 'release-notes' ? 'active' : ''} onClick={() => setAdminSection('release-notes')}>릴리즈 노트</button>
+              </div>
+            </div>
+            <button className="admin-btn" onClick={handleAdminLogout}>관리자 로그아웃</button>
+          </div>
+        )}
+        {activeTab === 'admin' && adminToken && adminSection === 'release-notes' && <ReleaseNotesAdmin onError={showAlert} onSaved={showAlert} />}
 
         {/* 관리자 계정의 메뉴 갱신·세션 상태 */}
-        {activeTab === 'twosome' && (
+        {activeTab === 'admin' && adminToken && adminSection === 'twosome' && (
           <div className="twosome-section">
             <div className="section-header">
               <h2>투썸 연동</h2>

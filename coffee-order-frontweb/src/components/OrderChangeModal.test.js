@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import OrderChangeModal from './OrderChangeModal';
 
 const existingOrders = [
-  { id: 10, menuName: '아메리칸호', personalOption: '아이스', teamId: 1 },
+  { id: 10, menuName: 'Americano', personalOption: '아이스', teamId: 1 },
   { id: 11, menuName: '카페 라떼', personalOption: '핫', teamId: 1 },
 ];
 
