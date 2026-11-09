@@ -30,7 +30,6 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [availableOpts, setAvailableOpts] = useState({}); // 그룹 의존성 {grpCd: [가능 opts...]} (서버 조회 실패 시 빈 맵=전체 렌더)
   const [variantFailed, setVariantFailed] = useState(false); // 변형 조회 실패 (비정상 옵션 조합)
   const [optionsError, setOptionsError] = useState('');
-  const [personalOption, setPersonalOption] = useState(''); // 텍스트 입력 옵션
   const orderAvailable = true; // 마감 개념 제거 — 항상 주문 가능
   const [menuSearchQuery, setMenuSearchQuery] = useState(''); // 메뉴 검색어
 
@@ -250,15 +249,7 @@ const OrderPage = ({ onAddTeamMember }) => {
       }
     }
 
-    // 옵션 선택 문자열 + 퍼스널 옵션(커스텀) + 퍼스널 텍스트 결합
-    const customStr = getCustomOptionString();
-    const optionParts = [getTwosomeOptionString(), customStr].filter(Boolean).join(' | ');
-    let finalOption = '';
-    if (optionParts && personalOption) {
-      finalOption = `${optionParts}, ${personalOption}`;
-    } else {
-      finalOption = optionParts || personalOption;
-    }
+    const finalOption = [getTwosomeOptionString(), getCustomOptionString()].filter(Boolean).join(' | ');
 
     const existingOrders = orders.filter((order) => order.teamId === parseInt(selectedTeam, 10));
     if (existingOrders.length > 0) {
@@ -448,7 +439,6 @@ const OrderPage = ({ onAddTeamMember }) => {
     setCustomOptionsOpen(false);
     setAvailableOpts({});
     setOptionsError('');
-    setPersonalOption('');
   };
 
   // 카테고리 선택 시 메뉴 초기화
@@ -1451,19 +1441,6 @@ const OrderPage = ({ onAddTeamMember }) => {
         {selectedTwosomeMenu && optionsError && (
           <div className="option-error-notice">{optionsError}</div>
         )}
-
-        {/* 요청 사항 - 자유 텍스트 (매장 전달 코멘트) */}
-        <div className="form-group">
-          <label>요청 사항 (선택)</label>
-          <input
-            type="text"
-            value={personalOption}
-            onChange={(e) => setPersonalOption(e.target.value)}
-            placeholder="예: 덜 달게 해주세요, 받는 시간 10분 뒤로"
-            disabled={!orderAvailable}
-            className="personal-option-input"
-          />
-        </div>
 
         {/* 주문 버튼 (저장 + 투썸 장바구니 담기 통합) */}
         <button
