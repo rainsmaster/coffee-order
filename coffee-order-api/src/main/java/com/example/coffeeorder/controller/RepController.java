@@ -131,7 +131,7 @@ public class RepController {
         return ResponseEntity.ok(result);
     }
 
-    // 대표 투썸 로그인용 캡차 발급 (수동 입력, OCR 자동화는 관리자 전용)
+    // 대표 투썸 로그인용 캡차 발급 (수동 입력, 세션 만료 시 OCR 자동 재로그인)
     @PostMapping("/api/rep/twosome/captcha")
     public ResponseEntity<TwosomeCaptchaResponse> issueTwosomeCaptcha(
             @RequestHeader(value = "X-Rep-Token", required = false) String token) {

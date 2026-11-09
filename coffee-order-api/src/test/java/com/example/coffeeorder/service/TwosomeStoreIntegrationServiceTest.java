@@ -48,6 +48,8 @@ class TwosomeStoreIntegrationServiceTest {
     @Mock
     private TwosomeHealthService healthService;
     @Mock
+    private TwosomeAutoReloginGuard autoReloginGuard;
+    @Mock
     private StringRedisTemplate stringRedisTemplate;
     @Mock
     private ObjectProvider<TwosomeMenuOptionService> optionServiceProvider;
@@ -64,7 +66,7 @@ class TwosomeStoreIntegrationServiceTest {
         org.mockito.Mockito.lenient().when(optionServiceProvider.getObject()).thenReturn(optionService);
         service = new TwosomeStoreIntegrationService(
                 apiClient, menuRepository, orderRepository, objectMapper,
-                sessionRedisStore, healthService, stringRedisTemplate, optionServiceProvider);
+                sessionRedisStore, healthService, autoReloginGuard, stringRedisTemplate, optionServiceProvider);
     }
 
     @Test
@@ -186,6 +188,69 @@ class TwosomeStoreIntegrationServiceTest {
         assertThat(response.getSuccess()).isEqualTo(1);
         assertThat(response.getFailed()).isZero();
         verify(apiClient, never()).deleteCartItem(any(), anyString(), anyString());
+    }
+
+    @Test
+    void marksHttpLoginRejectionAsNonRetryable() {
+        when(apiClient.fetchCaptchaImage(any())).thenReturn(new byte[]{1});
+        TwosomeCaptchaResponse captcha = service.issueCaptcha();
+        when(apiClient.login(any(), anyString(), anyString(), anyString()))
+                .thenThrow(new com.example.coffeeorder.exception.TwosomeStoreException(
+                        "투썸 서버가 오류를 반환했습니다. (HTTP 403)"));
+
+        com.example.coffeeorder.dto.TwosomeLoginResponse response = service.loginForRep(1L,
+                new TwosomeLoginRequest(captcha.getContextId(), "tester", "wrong-password", "123456"));
+
+        assertThat(response.getStatus()).isEqualTo("FAILED");
+        assertThat(response.getRstCd()).isEqualTo("LOGIN_ERROR");
+    }
+
+    @Test
+    void persistsRepresentativeSessionOnLogin() {
+        activateRepSession();
+
+        verify(sessionRedisStore).save(eq("rep:1"), any(TwosomeSessionRedisStore.StoredSession.class));
+        verify(autoReloginGuard).clear("rep:1");
+    }
+
+    @Test
+    void restoresAdminAndRepresentativeSessionsTogether() {
+        TwosomeSessionRedisStore.StoredSession admin = new TwosomeSessionRedisStore.StoredSession(
+                java.util.Map.of("session", "admin-cookie"), "CJENM커머스부문점", "admin",
+                java.time.LocalDateTime.now().minusHours(1));
+        TwosomeSessionRedisStore.StoredSession rep = new TwosomeSessionRedisStore.StoredSession(
+                java.util.Map.of("session", "rep-cookie"), "CJENM커머스부문점", "rep-user",
+                java.time.LocalDateTime.now().minusHours(1));
+        when(sessionRedisStore.loadAll()).thenReturn(java.util.Map.of("active", admin, "rep:42", rep));
+        when(apiClient.setStoreInfo(any(), eq("1102115"), anyDouble(), anyDouble()))
+                .thenReturn("CJENM커머스부문점");
+
+        service.restoreSessionFromRedis();
+
+        assertThat(service.getSessionStatus().getStatus()).isEqualTo("ACTIVE");
+        assertThat(service.getSessionStatus().getSource()).isEqualTo("RESTORED");
+        assertThat(service.getSessionStatus("rep:42").getStatus()).isEqualTo("ACTIVE");
+        assertThat(service.getSessionStatus("rep:42").getSource()).isEqualTo("RESTORED");
+        verify(sessionRedisStore).save(eq("active"), any(TwosomeSessionRedisStore.StoredSession.class));
+        verify(sessionRedisStore).save(eq("rep:42"), any(TwosomeSessionRedisStore.StoredSession.class));
+    }
+
+    @Test
+    void expiresOnlyTheRejectedRepresentativeSession() {
+        activateRepSession();
+        TwosomeCaptchaResponse secondCaptcha = issueCaptcha();
+        service.loginForRep(2L, new TwosomeLoginRequest(
+                secondCaptcha.getContextId(), "tester2", "password", "123456"));
+        when(apiClient.setStoreInfo(any(), eq("1102115"), anyDouble(), anyDouble()))
+                .thenThrow(new com.example.coffeeorder.exception.TwosomeStoreSessionExpiredException("401"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.keepAliveRepSession(1L))
+                .isInstanceOf(com.example.coffeeorder.exception.TwosomeStoreSessionExpiredException.class);
+
+        verify(sessionRedisStore).delete("rep:1");
+        verify(sessionRedisStore, never()).delete("rep:2");
+        assertThat(service.getSessionStatus("rep:1").getStatus()).isEqualTo("EXPIRED");
+        assertThat(service.getSessionStatus("rep:2").getStatus()).isEqualTo("ACTIVE");
     }
 
     private TwosomeMenu menu(String menuCd) {

@@ -13,16 +13,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-/**
- * 투썸 세션 KEEP-ALIVE 스케줄러.
- *
- * 관리자 세션과 대표 세션("rep:{memberId}")의 30분 유휴 슬라이딩 타이머를
- * 경량 인증 호출(매장 설정)로 리셋한다.
- * 관리자 세션 호출 실패/만료 감지 시 자동 재로그인을 트리거한다.
- * 대표 세션은 개별 실패/만료를 조용히 스킵한다.
- *
- * twosome.keepalive.enabled=true 일 때만 등록된다 (기본 false).
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -33,10 +23,11 @@ public class TwosomeSessionKeepAliveScheduler {
     private final TwosomeAutoReloginService autoReloginService;
     private final TwosomeHealthService healthService;
 
-    @Scheduled(fixedDelayString = "${twosome.keepalive.interval:900000}", initialDelayString = "${twosome.keepalive.interval:900000}")
+    @Scheduled(fixedDelayString = "${twosome.keepalive.interval:600000}",
+            initialDelayString = "${twosome.keepalive.interval:600000}")
     public void keepAlive() {
         boolean adminTouched = keepAdminAlive();
-        int repTouched = integrationService.keepAliveRepSessions();
+        int repTouched = keepRepSessionsAlive();
 
         if (adminTouched || repTouched > 0) {
             log.info("Twosome keep-alive touched sessions: 관리자 {} + 대표 {}",
@@ -44,29 +35,47 @@ public class TwosomeSessionKeepAliveScheduler {
         }
     }
 
-    /** 관리자 세션 keep-alive. 만료 감지 시 자동 재로그인 트리거. */
     private boolean keepAdminAlive() {
-        boolean touched;
         try {
-            touched = integrationService.keepAliveSession();
+            boolean touched = integrationService.keepAliveSession();
+            if (touched) {
+                healthService.record(TwosomeHealthEventType.KEEPALIVE_SUCCESS, true, "세션 슬라이딩 타이머 리셋");
+            }
+            return touched;
         } catch (TwosomeStoreSessionExpiredException e) {
             healthService.record(TwosomeHealthEventType.KEEPALIVE_FAIL, false, e.getMessage());
-            log.warn("Twosome keep-alive detected expired session, triggering auto relogin: {}", e.getMessage());
+            log.warn("Twosome keep-alive detected expired admin session, triggering auto relogin");
             triggerAutoRelogin();
             return false;
         } catch (TwosomeStoreException e) {
             healthService.record(TwosomeHealthEventType.KEEPALIVE_FAIL, false, e.getMessage());
-            log.warn("Twosome keep-alive failed (ignored): {}", e.getMessage());
+            log.warn("Twosome admin keep-alive failed (ignored): {}", e.getMessage());
             return false;
         } catch (Exception e) {
             healthService.record(TwosomeHealthEventType.KEEPALIVE_FAIL, false,
                     e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            log.error("Twosome keep-alive failed with unexpected error (ignored)", e);
+            log.error("Twosome admin keep-alive failed with unexpected error (ignored)", e);
             return false;
         }
+    }
 
-        if (touched) {
-            healthService.record(TwosomeHealthEventType.KEEPALIVE_SUCCESS, true, "세션 슬라이딩 타이머 리셋");
+    private int keepRepSessionsAlive() {
+        int touched = 0;
+        for (Long memberId : integrationService.getRepSessionMemberIds()) {
+            try {
+                if (integrationService.keepAliveRepSession(memberId)) {
+                    touched++;
+                }
+            } catch (TwosomeStoreSessionExpiredException e) {
+                healthService.record(TwosomeHealthEventType.KEEPALIVE_FAIL, false,
+                        "[대표 memberId=" + memberId + "] " + e.getMessage());
+                triggerRepAutoRelogin(memberId);
+            } catch (TwosomeStoreException e) {
+                log.warn("Twosome rep keep-alive failed temporarily (memberId={}): {}",
+                        memberId, e.getMessage());
+            } catch (Exception e) {
+                log.error("Twosome rep keep-alive failed unexpectedly (memberId={}, ignored)", memberId, e);
+            }
         }
         return touched;
     }
@@ -74,14 +83,35 @@ public class TwosomeSessionKeepAliveScheduler {
     private void triggerAutoRelogin() {
         try {
             TwosomeAutoReloginResult result = autoReloginService.autoLogin();
-            // 재로그인 결과는 TwosomeAutoReloginService가 AUTO_RELOGIN_SUCCESS/FAIL로 기록한다
             if (result.isSuccess()) {
-                log.info("Twosome auto relogin succeeded after keep-alive failure (attempts={})", result.getAttempts());
+                log.info("Twosome admin auto relogin succeeded (attempts={})", result.getAttempts());
             } else {
-                log.error("Twosome auto relogin failed after keep-alive failure: {}", result.getMessage());
+                logAutoReloginFailure("admin", result);
             }
         } catch (Exception e) {
-            log.error("Twosome auto relogin triggered by keep-alive failed: {}", e.getMessage());
+            log.error("Twosome admin auto relogin failed: {}", e.getMessage());
+        }
+    }
+
+    private void triggerRepAutoRelogin(Long memberId) {
+        try {
+            TwosomeAutoReloginResult result = autoReloginService.autoLoginForRep(memberId);
+            if (result.isSuccess()) {
+                log.info("Twosome rep auto relogin succeeded (memberId={}, attempts={})",
+                        memberId, result.getAttempts());
+            } else {
+                logAutoReloginFailure("rep:" + memberId, result);
+            }
+        } catch (Exception e) {
+            log.error("Twosome rep auto relogin failed (memberId={}): {}", memberId, e.getMessage());
+        }
+    }
+
+    private void logAutoReloginFailure(String owner, TwosomeAutoReloginResult result) {
+        if (result.getAttempts() == 0) {
+            log.info("Twosome auto relogin skipped (owner={}): {}", owner, result.getMessage());
+        } else {
+            log.warn("Twosome auto relogin failed (owner={}): {}", owner, result.getMessage());
         }
     }
 }

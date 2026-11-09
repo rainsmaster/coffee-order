@@ -6,31 +6,26 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
-/**
- * 투썸 ACTIVE 세션의 Redis 영속화 저장소.
- *
- * 애플리케이션 재시작/재배포 후에도 로그인 세션(쿠키 jar)을 복구하기 위해
- * 로그인 성공 시 저장하고, 로그아웃/만료 시 삭제한다.
- * 쿠키 자체의 유효기간은 투썸 서버의 30분 유휴 슬라이딩 규칙이 지배하므로
- * 복구된 세션도 첫 실사용에서 401이면 기존 만료 흐름으로 처리한다.
- */
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class TwosomeSessionRedisStore {
 
     public static final String REDIS_KEY = "twosome:session:active";
+    private static final String KEY_PREFIX = "twosome:session:";
+    private static final Duration SESSION_TTL = Duration.ofHours(24);
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
 
-    /**
-     * 저장 페이로드. 쿠키 jar(Map) + 표시용 메타 정보.
-     */
     public record StoredSession(Map<String, String> cookieJar,
                                 String storeNm,
                                 String loginId,
@@ -38,32 +33,87 @@ public class TwosomeSessionRedisStore {
     }
 
     public void save(StoredSession session) {
+        save("active", session);
+    }
+
+    public void save(String sessionKey, StoredSession session) {
         try {
-            stringRedisTemplate.opsForValue().set(REDIS_KEY, objectMapper.writeValueAsString(session));
-            log.info("Saved twosome session to redis (loginId={}, storeNm={})", session.loginId(), session.storeNm());
+            stringRedisTemplate.opsForValue().set(
+                    redisKey(sessionKey), objectMapper.writeValueAsString(session), SESSION_TTL);
+            log.info("Saved twosome session to redis (key={}, storeNm={})", sessionKey, session.storeNm());
         } catch (Exception e) {
-            log.warn("Failed to save twosome session to redis (ignored): {}", e.getMessage());
+            log.warn("Failed to save twosome session to redis (key={}, ignored): {}", sessionKey, e.getMessage());
         }
     }
 
     public Optional<StoredSession> load() {
+        return load("active");
+    }
+
+    public Optional<StoredSession> load(String sessionKey) {
         try {
-            String json = stringRedisTemplate.opsForValue().get(REDIS_KEY);
-            if (json == null || json.isBlank()) {
-                return Optional.empty();
-            }
-            return Optional.of(objectMapper.readValue(json, StoredSession.class));
+            String json = stringRedisTemplate.opsForValue().get(redisKey(sessionKey));
+            return parse(json);
         } catch (Exception e) {
-            log.warn("Failed to load twosome session from redis (ignored): {}", e.getMessage());
+            log.warn("Failed to load twosome session from redis (key={}, ignored): {}", sessionKey, e.getMessage());
             return Optional.empty();
         }
     }
 
-    public void delete() {
+    public Map<String, StoredSession> loadAll() {
+        Set<String> keys;
         try {
-            stringRedisTemplate.delete(REDIS_KEY);
+            keys = stringRedisTemplate.keys(KEY_PREFIX + "*");
         } catch (Exception e) {
-            log.warn("Failed to delete twosome session from redis (ignored): {}", e.getMessage());
+            log.warn("Failed to find twosome sessions from redis (ignored): {}", e.getMessage());
+            return Collections.emptyMap();
         }
+        if (keys == null || keys.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, StoredSession> sessions = new LinkedHashMap<>();
+        for (String redisKey : keys) {
+            String sessionKey = redisKey.substring(KEY_PREFIX.length());
+            try {
+                String json = stringRedisTemplate.opsForValue().get(redisKey);
+                parse(json).ifPresent(stored -> sessions.put(sessionKey, stored));
+            } catch (Exception e) {
+                log.warn("Skipping broken twosome session in redis (key={}): {}", sessionKey, e.getMessage());
+            }
+        }
+        return sessions;
+    }
+
+    public void delete() {
+        delete("active");
+    }
+
+    public void delete(String sessionKey) {
+        try {
+            stringRedisTemplate.delete(redisKey(sessionKey));
+        } catch (Exception e) {
+            log.warn("Failed to delete twosome session from redis (key={}, ignored): {}", sessionKey, e.getMessage());
+        }
+    }
+
+    private Optional<StoredSession> parse(String json) {
+        try {
+            if (json == null || json.isBlank()) {
+                return Optional.empty();
+            }
+            StoredSession stored = objectMapper.readValue(json, StoredSession.class);
+            if (stored.cookieJar() == null || stored.cookieJar().isEmpty()) {
+                return Optional.empty();
+            }
+            return Optional.of(stored);
+        } catch (Exception e) {
+            log.warn("Failed to parse twosome session from redis (ignored): {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private static String redisKey(String sessionKey) {
+        return KEY_PREFIX + sessionKey;
     }
 }

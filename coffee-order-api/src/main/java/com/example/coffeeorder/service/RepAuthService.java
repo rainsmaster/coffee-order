@@ -171,6 +171,16 @@ public class RepAuthService {
                 twosomeCredentialCrypto.decrypt(member.getTwosomePw()));
     }
 
+    @Transactional(readOnly = true)
+    public TwosomeCredentials requireTwosomeCredentialsForAutoLogin(Long memberId) {
+        Member member = requireActiveMember(memberId);
+        if (member.getTwosomeId() == null || member.getTwosomePw() == null) {
+            throw new AuthException("NO_TWOSOME_ACCOUNT", "등록된 투썸 계정이 없습니다. 먼저 투썸 계정을 등록해주세요.");
+        }
+        return new TwosomeCredentials(member.getId(), member.getTwosomeId(),
+                twosomeCredentialCrypto.decrypt(member.getTwosomePw()));
+    }
+
     public record TwosomeCredentials(Long memberId, String twosomeId, String twosomePw) {
     }
 

@@ -51,7 +51,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * 세션은 memberId 기반 다중 세션으로 관리한다.
  * - 관리자 세션: 고정 key "active" (Redis 영속화로 재시작 복구, 메뉴 배치/자동재로그인/keep-alive 사용)
- * - 대표 세션: key "rep:{memberId}" (대표 개인 투썸 계정 로그인, 인메모리만)
+ * - 대표 세션: key "rep:{memberId}" (대표 개인 투썸 계정 로그인, Redis 영속화/자동재로그인/keep-alive 사용)
  * - 캡차 발급 시 만든 pending 컨텍스트: UUID key, 5분 만료
  */
 @Slf4j
@@ -65,6 +65,7 @@ public class TwosomeStoreIntegrationService {
     private final ObjectMapper objectMapper;
     private final TwosomeSessionRedisStore sessionRedisStore;
     private final TwosomeHealthService healthService;
+    private final TwosomeAutoReloginGuard autoReloginGuard;
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
     private final org.springframework.beans.factory.ObjectProvider<TwosomeMenuOptionService> twosomeMenuOptionServiceProvider;
 
@@ -94,38 +95,42 @@ public class TwosomeStoreIntegrationService {
     /** 세션 상태 전이 동시 실행 방지 */
     private final Object sessionLock = new Object();
 
-    // ==================== 시작 시 Redis 세션 복구 (관리자 세션) ====================
+    // ==================== 시작 시 Redis 세션 복구 ====================
 
-    /**
-     * 애플리케이션 시작 시 Redis에 저장된 ACTIVE 세션이 있으면 인메모리로 복구한다.
-     * 쿠키 만료 자체는 투썸 서버의 30분 유휴 규칙이 지배하므로,
-     * 복구된 세션도 첫 실사용에서 401이면 기존 만료 흐름(EXPIRED + Redis 삭제)으로 처리한다.
-     */
     @PostConstruct
     void restoreSessionFromRedis() {
-        sessionRedisStore.load().ifPresentOrElse(stored -> {
+        Map<String, TwosomeSessionRedisStore.StoredSession> storedSessions = sessionRedisStore.loadAll();
+        if (storedSessions.isEmpty()) {
+            log.info("No stored twosome sessions in redis");
+            return;
+        }
+
+        for (Map.Entry<String, TwosomeSessionRedisStore.StoredSession> entry : storedSessions.entrySet()) {
+            String sessionKey = entry.getKey();
+            TwosomeSessionRedisStore.StoredSession stored = entry.getValue();
             StoreSession session = new StoreSession(new TwosomeStoreSessionContext());
             session.getContext().getCookieJar().putAll(stored.cookieJar());
             session.setStoreNm(stored.storeNm());
-            session.promoteToActive();
+            session.setLoggedInAt(stored.loggedInAt());
+            session.promoteToActive(sessionKey, stored.loginId());
             session.markAsRestored();
             synchronized (sessionLock) {
-                sessionStore.put(ACTIVE_KEY, session);
+                sessionStore.put(sessionKey, session);
             }
+
             healthService.record(TwosomeHealthEventType.SESSION_RESTORED, true,
-                    "loginId=" + stored.loginId() + ", storeNm=" + stored.storeNm());
-            log.info("Restored twosome session from redis (loginId={}, storeNm={}, loggedInAt={})",
-                    stored.loginId(), stored.storeNm(), stored.loggedInAt());
-            // 매장 바인딩은 투썸 서버의 세션 상태라 복구 쿠키만으로는 유지되지 않는다.
-            // 복구 직후 매장을 다시 설정해 첫 실사용 실패(주문가능한 매장이 없습니다)를 방지한다.
+                    "key=" + sessionKey + ", storeNm=" + stored.storeNm());
+            log.info("Restored twosome session from redis (key={}, storeNm={}, loggedInAt={})",
+                    sessionKey, stored.storeNm(), stored.loggedInAt());
             try {
                 String storeNm = setStoreInfo(session);
-                session.setStoreNm(storeNm);
-                log.info("Re-bound twosome store on session restore: {}", storeNm);
+                log.info("Re-bound twosome store on session restore (key={}): {}", sessionKey, storeNm);
+            } catch (TwosomeStoreSessionExpiredException e) {
+                expire(sessionKey, session);
             } catch (Exception e) {
-                log.warn("Failed to re-bind store on session restore: {}", e.getMessage());
+                log.warn("Failed to re-bind store on session restore (key={}): {}", sessionKey, e.getMessage());
             }
-        }, () -> log.info("No stored twosome session in redis"));
+        }
     }
 
     // ==================== 캡차 / 로그인 ====================
@@ -153,18 +158,17 @@ public class TwosomeStoreIntegrationService {
      * 로그인: pending 컨텍스트로 로그인 처리 후 성공 시 ACTIVE 세션으로 승격한다.
      */
     public TwosomeLoginResponse login(TwosomeLoginRequest request) {
-        return doLogin(ACTIVE_KEY, request, true);
+        return doLogin(ACTIVE_KEY, request);
     }
 
     /**
      * 대표 로그인: 성공 시 해당 대표의 개인 세션("rep:{memberId}")으로 승격한다.
-     * Redis 영속화는 관리자 세션 전용이므로 대표 세션은 인메모리만 유지한다.
      */
     public TwosomeLoginResponse loginForRep(Long memberId, TwosomeLoginRequest request) {
-        return doLogin(repKey(memberId), request, false);
+        return doLogin(repKey(memberId), request);
     }
 
-    private TwosomeLoginResponse doLogin(String sessionKey, TwosomeLoginRequest request, boolean persistToRedis) {
+    private TwosomeLoginResponse doLogin(String sessionKey, TwosomeLoginRequest request) {
         StoreSession session;
         synchronized (sessionLock) {
             session = sessionStore.get(request.getContextId());
@@ -178,32 +182,32 @@ public class TwosomeStoreIntegrationService {
                     request.getLoginId(), request.getLoginPwd(), request.getAnswerCd());
         } catch (TwosomeStoreException e) {
             log.warn("Twosome login failed: rstCd={}, message={}", e.getRstCd(), e.getMessage());
-            return new TwosomeLoginResponse("FAILED", e.getMessage(), e.getRstCd());
+            String failureCode = e.getRstCd();
+            String message = e.getMessage();
+            boolean transientFailure = message != null && (message.contains("네트워크 오류")
+                    || message.contains("호출이 중단") || message.contains("HTTP 429")
+                    || message.contains("HTTP 5"));
+            if (failureCode == null && !transientFailure) {
+                failureCode = "LOGIN_ERROR";
+            }
+            return new TwosomeLoginResponse("FAILED", message, failureCode);
         }
 
         // 로그인 성공: 같은 key의 기존 세션 정리 후 승격 (다른 대표 세션은 유지)
         synchronized (sessionLock) {
             sessionStore.remove(sessionKey);
             sessionStore.remove(request.getContextId());
-            session.promoteToActive();
+            session.promoteToActive(sessionKey, request.getLoginId());
             sessionStore.put(sessionKey, session);
         }
+        autoReloginGuard.clear(sessionKey);
 
-        // 매장 설정 (실패필수는 아님 - 로그인 자체는 성공)
         try {
             String storeNm = setStoreInfo(session);
             session.setStoreNm(storeNm);
         } catch (TwosomeStoreException e) {
             log.warn("Failed to set store info after login (ignored): {}", e.getMessage());
-        }
-
-        if (persistToRedis) {
-            // Redis에 관리자 ACTIVE 세션 영속화 (재시작 후 복구용)
-            sessionRedisStore.save(new TwosomeSessionRedisStore.StoredSession(
-                    new LinkedHashMap<>(session.getContext().getCookieJar()),
-                    session.getStoreNm(),
-                    request.getLoginId(),
-                    LocalDateTime.now()));
+            persistSession(session);
         }
 
         log.info("Twosome session activated (key={}, storeNm={})", sessionKey, session.getStoreNm());
@@ -242,81 +246,55 @@ public class TwosomeStoreIntegrationService {
         logout(ACTIVE_KEY);
     }
 
-    /**
-     * 지정 key 세션 로그아웃. 관리자 세션은 Redis에서도 삭제한다.
-     */
     public void logout(String sessionKey) {
         StoreSession session;
         synchronized (sessionLock) {
             session = sessionStore.remove(sessionKey);
         }
-        if (ACTIVE_KEY.equals(sessionKey)) {
-            sessionRedisStore.delete();
-        }
+        sessionRedisStore.delete(sessionKey);
         if (session != null) {
             twosomeStoreApiClient.logout(session.getContext());
         }
         log.info("Twosome session logged out (key={})", sessionKey);
     }
 
-    /**
-     * KEEP-ALIVE용 경량 호출: ACTIVE 세션이면 매장 설정 호출로 서버 세션의
-     * 30분 유휴 슬라이딩 타이머를 리셋한다.
-     *
-     * @return ACTIVE 세션을 터치했으면 true, 세션 없음/만료 예외 시 false/예외
-     */
     public boolean keepAliveSession() {
-        StoreSession session = sessionStore.get(ACTIVE_KEY);
+        return keepAliveSessionByKey(ACTIVE_KEY);
+    }
+
+    public boolean keepAliveRepSession(Long memberId) {
+        return keepAliveSessionByKey(repKey(memberId));
+    }
+
+    private boolean keepAliveSessionByKey(String sessionKey) {
+        StoreSession session = sessionStore.get(sessionKey);
         if (session == null) {
             return false;
         }
         synchronized (sessionLock) {
             if (session.getStatus() == SessionStatus.EXPIRED || session.isIdleExpired()) {
-                session.setStatus(SessionStatus.EXPIRED);
+                expire(sessionKey, session);
                 throw new TwosomeStoreSessionExpiredException(
                         "투썸 세션이 만료되었습니다. 다시 로그인해주세요.");
             }
         }
         try {
             setStoreInfo(session);
+            log.debug("Twosome keep-alive touched session (key={})", sessionKey);
+            return true;
         } catch (TwosomeStoreSessionExpiredException e) {
-            expire(ACTIVE_KEY, session);
+            expire(sessionKey, session);
             throw e;
         }
-        log.debug("Twosome keep-alive touched session");
-        return true;
     }
 
-    /**
-     * 모든 대표 세션("rep:" 키)의 슬라이딩 타이머 리셋 (keep-alive 스케줄러용).
-     * 개별 세션의 실패/만료는 조용히 스킵한다.
-     *
-     * @return 터치한 대표 세션 수
-     */
-    public int keepAliveRepSessions() {
-        int touched = 0;
-        for (Map.Entry<String, StoreSession> entry : sessionStore.entrySet()) {
-            if (!entry.getKey().startsWith(REP_KEY_PREFIX)) {
-                continue;
-            }
-            StoreSession session = entry.getValue();
-            if (session.isPending()) {
-                continue;
-            }
-            synchronized (sessionLock) {
-                if (session.getStatus() == SessionStatus.EXPIRED || session.isIdleExpired()) {
-                    session.setStatus(SessionStatus.EXPIRED);
-                    continue;
-                }
-            }
-            try {
-                setStoreInfo(session);
-                touched++;
-            } catch (Exception e) {
-                log.debug("Rep keep-alive skipped (key={}): {}", entry.getKey(), e.getMessage());
-            }
-        }
-        return touched;
+    public List<Long> getRepSessionMemberIds() {
+        return sessionStore.entrySet().stream()
+                .filter(entry -> entry.getKey().startsWith(REP_KEY_PREFIX))
+                .filter(entry -> !entry.getValue().isPending())
+                .map(entry -> Long.valueOf(entry.getKey().substring(REP_KEY_PREFIX.length())))
+                .sorted()
+                .toList();
     }
 
     // ==================== 메뉴 새로고침 ====================
@@ -361,7 +339,7 @@ public class TwosomeStoreIntegrationService {
             }
 
             int savedCount = upsertStoreMenus(items, beforeByMenuCd);
-            session.touch();
+            touchAndPersist(session);
 
             // 사라짐 분기: 주문 이력 없음 → 소프트삭제(정리), 이력 있음 → 시즌종료(보존)
             List<TwosomeMenu> toClean = new ArrayList<>();
@@ -585,7 +563,7 @@ public class TwosomeStoreIntegrationService {
             }
         }
 
-        session.touch();
+        touchAndPersist(session);
         int failedCount = results.size() - successCount;
         return new TwosomeCartAddResponse(results.size(), successCount, failedCount, results);
     }
@@ -613,7 +591,7 @@ public class TwosomeStoreIntegrationService {
             expire(sessionKey, session);
             throw e;
         }
-        session.touch();
+        touchAndPersist(session);
 
         JsonNode items = body.path("cartStoreMenuList");
         List<TwosomeCartItemResponse> result = new ArrayList<>();
@@ -635,7 +613,7 @@ public class TwosomeStoreIntegrationService {
         try {
             JsonNode body = twosomeStoreApiClient.fetchAvailableOptions(
                     session.getContext(), menuCd, opts, groupOptCds);
-            session.touch();
+            touchAndPersist(session);
             return body.path("fetchResultListSet");
         } catch (TwosomeStoreSessionExpiredException e) {
             expire(sessionKey, session);
@@ -651,7 +629,7 @@ public class TwosomeStoreIntegrationService {
         try {
             JsonNode body = twosomeStoreApiClient.fetchMenuCustomList(
                     session.getContext(), cartNo, cartDtlNo);
-            session.touch();
+            touchAndPersist(session);
             return body.path("fetchResultListSet");
         } catch (TwosomeStoreSessionExpiredException e) {
             expire(sessionKey, session);
@@ -676,7 +654,7 @@ public class TwosomeStoreIntegrationService {
             if (!deleted) {
                 throw new TwosomeStoreException("장바구니 항목 삭제를 투썸 서버가 거부했습니다.");
             }
-            session.touch();
+            touchAndPersist(session);
             healthService.record(TwosomeHealthEventType.CART_ADD_SUCCESS, true,
                     "[" + ownerLabel(sessionKey) + "] 장바구니 항목 삭제 (cartNo=" + cartNo + ")");
         } catch (TwosomeStoreSessionExpiredException e) {
@@ -783,7 +761,7 @@ public class TwosomeStoreIntegrationService {
                         : "수량 조정 재담기 실패 (resultCd=" + cartResult.resultCd() + ")";
                 throw new TwosomeStoreException(message);
             }
-            session.touch();
+            touchAndPersist(session);
             healthService.record(TwosomeHealthEventType.CART_ADD_SUCCESS, true,
                     "[" + ownerLabel(sessionKey) + "] 장바구니 수량 조정 (menuCd=" + request.getMenuCd()
                             + ", qty=" + request.getQty() + ")");
@@ -881,7 +859,7 @@ public class TwosomeStoreIntegrationService {
                 setStoreInfo(session);
                 html = twosomeStoreApiClient.fetchMenuDetailHtml(session.getContext(), menuCd, midCd);
             }
-            session.touch();
+            touchAndPersist(session);
             return html;
         } catch (TwosomeStoreSessionExpiredException e) {
             expire(sessionKey, session);
@@ -900,7 +878,7 @@ public class TwosomeStoreIntegrationService {
         try {
             String html = twosomeStoreApiClient.fetchMenuCustomOptionsHtml(
                     session.getContext(), variantMenuCd, STORE_CD, "Y");
-            session.touch();
+            touchAndPersist(session);
             return html;
         } catch (TwosomeStoreSessionExpiredException e) {
             expire(sessionKey, session);
@@ -916,7 +894,7 @@ public class TwosomeStoreIntegrationService {
         try {
             JsonNode variant = twosomeStoreApiClient.resolveVariantMenu(
                     session.getContext(), menuCd, STORE_CD, opts);
-            session.touch();
+            touchAndPersist(session);
             return variant;
         } catch (TwosomeStoreSessionExpiredException e) {
             expire(sessionKey, session);
@@ -1062,17 +1040,41 @@ public class TwosomeStoreIntegrationService {
     private String setStoreInfo(StoreSession session) {
         String storeNm = twosomeStoreApiClient.setStoreInfo(
                 session.getContext(), STORE_CD, STORE_LAT, STORE_LONGI);
-        session.touch();
+        session.setStoreNm(storeNm);
+        touchAndPersist(session);
         return storeNm;
+    }
+
+    private void touchAndPersist(StoreSession session) {
+        session.touch();
+        persistSession(session);
+    }
+
+    private void persistSession(StoreSession session) {
+        String sessionKey = session.getSessionKey();
+        if (sessionKey == null) {
+            return;
+        }
+        synchronized (sessionLock) {
+            if (sessionStore.get(sessionKey) != session || session.getStatus() != SessionStatus.ACTIVE) {
+                return;
+            }
+        }
+        sessionRedisStore.save(sessionKey, new TwosomeSessionRedisStore.StoredSession(
+                new LinkedHashMap<>(session.getContext().getCookieJar()),
+                session.getStoreNm(),
+                session.getLoginId(),
+                session.getLoggedInAt() != null ? session.getLoggedInAt() : LocalDateTime.now()));
     }
 
     private void expire(String sessionKey, StoreSession session) {
         synchronized (sessionLock) {
+            if (sessionStore.get(sessionKey) != session) {
+                return;
+            }
             session.setStatus(SessionStatus.EXPIRED);
         }
-        if (ACTIVE_KEY.equals(sessionKey)) {
-            sessionRedisStore.delete();
-        }
+        sessionRedisStore.delete(sessionKey);
         log.info("Twosome session expired (key={})", sessionKey);
     }
 
@@ -1248,6 +1250,10 @@ public class TwosomeStoreIntegrationService {
         private volatile SessionStatus status;
         private volatile LocalDateTime lastUsedAt;
         private volatile String source = "FRESH";
+        private String sessionKey;
+        private String loginId;
+        @Setter
+        private LocalDateTime loggedInAt;
         @Setter
         private volatile String storeNm;
 
@@ -1281,9 +1287,14 @@ public class TwosomeStoreIntegrationService {
             return Math.max(0, SESSION_IDLE_TIMEOUT.toMinutes() - elapsed);
         }
 
-        void promoteToActive() {
+        void promoteToActive(String sessionKey, String loginId) {
             this.pending = false;
             this.status = SessionStatus.ACTIVE;
+            this.sessionKey = sessionKey;
+            this.loginId = loginId;
+            if (this.loggedInAt == null) {
+                this.loggedInAt = LocalDateTime.now();
+            }
             touch();
         }
 
