@@ -1,7 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import AdminPage from './AdminPage';
-import { adminAPI, departmentAPI, teamAPI } from '../services/api';
+import { adminAPI, departmentAPI, teamAPI, repAPI } from '../services/api';
 
 jest.mock('../services/api', () => ({
   adminAPI: {
@@ -13,7 +13,17 @@ jest.mock('../services/api', () => ({
   },
   departmentAPI: { getAll: jest.fn() },
   teamAPI: { getAll: jest.fn() },
+  repAPI: {
+    login: jest.fn(),
+    me: jest.fn(),
+    twosomeCaptcha: jest.fn(),
+    twosomeLogin: jest.fn(),
+  },
 }));
+
+beforeEach(() => {
+  localStorage.clear();
+});
 
 test('대표 관리는 관리자 로그인 없이 열리고 소속을 실제 부서명으로 표시한다', async () => {
   adminAPI.getReps.mockResolvedValue([{
@@ -100,4 +110,45 @@ test('자동 로그인 차단 상태와 사유를 표시한다', async () => {
 
   expect(await screen.findByText('자동 로그인 중단')).toBeInTheDocument();
   expect(screen.getByText('비밀번호 확인 후 수동 로그인이 필요합니다.')).toBeInTheDocument();
+});
+
+test('대표 행에서 PIN과 캡차로 직접 로그인한다', async () => {
+  const rep = {
+    id: 2,
+    name: '허규선',
+    departmentId: 137,
+    departmentName: 'MSA TF',
+    teamId: 247,
+    teamName: '허규선',
+    pinSet: true,
+    twosomeStatus: 'NONE',
+    autoReloginBlocked: false,
+  };
+  adminAPI.getReps
+    .mockResolvedValueOnce([rep])
+    .mockResolvedValueOnce([{ ...rep, twosomeStatus: 'ACTIVE', twosomeSource: 'FRESH' }]);
+  departmentAPI.getAll.mockResolvedValue([]);
+  teamAPI.getAll.mockResolvedValue([]);
+  repAPI.login.mockResolvedValue({ token: 'rep-token' });
+  repAPI.me.mockResolvedValue({ id: 2, name: '허규선', twosomeId: 'saved-id' });
+  repAPI.twosomeCaptcha.mockResolvedValue({ contextId: 'captcha-context', imageBase64: 'data:image/png;base64,abc' });
+  repAPI.twosomeLogin.mockResolvedValue({ status: 'SUCCESS' });
+
+  render(<AdminPage embedded />);
+
+  fireEvent.click(await screen.findByRole('button', { name: '로그인' }));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText('PIN (숫자 6자리)'), { target: { value: '123456' } });
+  fireEvent.click(screen.getByRole('button', { name: '다음' }));
+
+  expect(await screen.findByLabelText('투썸 아이디')).toHaveValue('saved-id');
+  fireEvent.change(screen.getByLabelText('패스워드'), { target: { value: 'secret' } });
+  fireEvent.change(screen.getByLabelText('캡차 입력 (6자리 숫자)'), { target: { value: '654321' } });
+  fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: '로그인' }));
+
+  expect(await screen.findByText('투썸 로그인에 성공했습니다. 지금 확인으로 검증할 수 있습니다.')).toBeInTheDocument();
+  expect(await screen.findByText('정상')).toBeInTheDocument();
+  expect(repAPI.login).toHaveBeenCalledWith(2, '123456');
+  expect(repAPI.twosomeLogin).toHaveBeenCalledWith('captcha-context', '654321', 'saved-id', 'secret');
+  expect(localStorage.getItem('repToken')).toBe('rep-token');
 });

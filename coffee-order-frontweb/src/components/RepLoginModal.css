@@ -1,0 +1,76 @@
+.rep-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.rep-login-form label {
+  margin-top: 0.35rem;
+  color: #555;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.rep-login-form input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font: inherit;
+}
+
+.rep-login-form input:focus {
+  outline: 2px solid rgba(46, 125, 50, 0.18);
+  border-color: #2e7d32;
+}
+
+.rep-login-guide {
+  margin: 0 0 0.4rem;
+  color: #777;
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.rep-login-error {
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  background: #fff1f1;
+  color: #b42318;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.rep-login-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.rep-login-actions .admin-btn {
+  flex: 1;
+  min-height: 44px;
+}
+
+.rep-login-captcha {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 64px;
+  margin-top: 0.35rem;
+  color: #888;
+  font-size: 0.82rem;
+}
+
+.rep-login-captcha img {
+  display: block;
+  width: 150px;
+  height: 60px;
+  object-fit: contain;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.rep-login-captcha .admin-btn {
+  flex-shrink: 0;
+}

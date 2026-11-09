@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { adminAPI, departmentAPI, teamAPI } from '../services/api';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
+import RepLoginModal from '../components/RepLoginModal';
 import useModal from '../hooks/useModal';
 import './AdminPage.css';
 
@@ -14,6 +15,7 @@ const AdminPage = ({ embedded = false }) => {
   const [formTeamId, setFormTeamId] = useState('');
   const [verifyingRepIds, setVerifyingRepIds] = useState({});
   const [verificationResults, setVerificationResults] = useState({});
+  const [loginRep, setLoginRep] = useState(null);
   const {
     isAlertOpen, alertConfig, showAlert, closeAlert,
     isConfirmOpen, confirmConfig, showConfirm, closeConfirm,
@@ -109,6 +111,18 @@ const AdminPage = ({ embedded = false }) => {
     }
   };
 
+  const handleLoginSuccess = (rep) => {
+    setLoginRep(null);
+    setVerificationResults((current) => ({
+      ...current,
+      [rep.id]: {
+        result: 'RELOGINED',
+        message: '투썸 로그인에 성공했습니다. 지금 확인으로 검증할 수 있습니다.',
+      },
+    }));
+    loadReps();
+  };
+
   const getTwosomeStatus = (rep) => {
     if (verifyingRepIds[rep.id]) return { label: '확인 중...', className: 'checking' };
     if (verificationResults[rep.id]?.result === 'TEMPORARY_ERROR') {
@@ -176,6 +190,7 @@ const AdminPage = ({ embedded = false }) => {
                     )}
                   </td>
                   <td className="admin-table-actions">
+                    <button className="admin-btn small" onClick={() => setLoginRep(rep)}>로그인</button>
                     <button className="admin-btn small" disabled={verifyingRepIds[rep.id]} onClick={() => handleVerifyTwosome(rep)}>
                       {verifyingRepIds[rep.id] ? '확인 중...' : '지금 확인'}
                     </button>
@@ -188,6 +203,13 @@ const AdminPage = ({ embedded = false }) => {
           </table></div>
         )}
       </div>
+      {loginRep && (
+        <RepLoginModal
+          rep={loginRep}
+          onClose={() => setLoginRep(null)}
+          onSuccess={() => handleLoginSuccess(loginRep)}
+        />
+      )}
       <AlertModal isOpen={isAlertOpen} onClose={closeAlert} message={alertConfig.message} title={alertConfig.title} />
       <ConfirmModal isOpen={isConfirmOpen} onClose={closeConfirm} onConfirm={confirmConfig.onConfirm} message={confirmConfig.message} title={confirmConfig.title} />
     </div>
