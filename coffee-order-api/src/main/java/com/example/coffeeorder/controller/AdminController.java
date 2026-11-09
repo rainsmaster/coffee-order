@@ -9,8 +9,17 @@ import com.example.coffeeorder.exception.AuthException;
 import com.example.coffeeorder.repository.MemberRepository;
 import com.example.coffeeorder.repository.TeamRepository;
 import com.example.coffeeorder.service.AdminAuthService;
+import com.example.coffeeorder.service.TwosomeAutoReloginGuard;
+import com.example.coffeeorder.service.TwosomeAutoReloginService;
+import com.example.coffeeorder.service.TwosomeStoreIntegrationService;
+import com.example.coffeeorder.dto.RepTwosomeVerifyResponse;
+import com.example.coffeeorder.dto.TwosomeAutoReloginResult;
+import com.example.coffeeorder.dto.TwosomeSessionResponse;
+import com.example.coffeeorder.exception.TwosomeStoreException;
+import com.example.coffeeorder.exception.TwosomeStoreSessionExpiredException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +43,10 @@ public class AdminController {
     private final AdminAuthService adminAuthService;
     private final MemberRepository memberRepository;
     private final TeamRepository teamRepository;
+    private final TwosomeStoreIntegrationService twosomeStoreIntegrationService;
+    private final TwosomeAutoReloginService twosomeAutoReloginService;
+    private final TwosomeAutoReloginGuard twosomeAutoReloginGuard;
+    private final StringRedisTemplate stringRedisTemplate;
 
     // 관리자 로그인 (토큰 불필요)
     @PostMapping("/login")
@@ -101,9 +114,72 @@ public class AdminController {
         return ResponseEntity.ok(result);
     }
 
-    // ==================== 헬퍼 ====================
+    @PostMapping("/reps/{id}/twosome/verify")
+    public ResponseEntity<RepTwosomeVerifyResponse> verifyRepTwosome(@PathVariable Long id) {
+        Member member = requireMember(id);
+        String permitKey = "twosome:verify:rep:" + id;
+        try {
+            if (!Boolean.TRUE.equals(stringRedisTemplate.opsForValue().setIfAbsent(
+                    permitKey, "1", java.time.Duration.ofSeconds(30)))) {
+                return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                        RepTwosomeVerifyResponse.Result.RATE_LIMITED,
+                        "이미 확인 중이거나 30초 이내에 확인했습니다. 잠시 후 다시 시도해주세요.", toAdminItem(member)));
+            }
+        } catch (Exception e) {
+            log.warn("Failed to acquire twosome verification permit (memberId={}): {}", id, e.getMessage());
+            return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                    RepTwosomeVerifyResponse.Result.TEMPORARY_ERROR,
+                    "확인 요청을 제한하는 상태를 저장하지 못했습니다. 잠시 후 다시 시도해주세요.", toAdminItem(member)));
+        }
+
+        try {
+            if (!twosomeStoreIntegrationService.keepAliveRepSession(id)) {
+                return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                        RepTwosomeVerifyResponse.Result.NONE,
+                        "저장된 투썸 세션이 없습니다. 수동 로그인이 필요합니다.", toAdminItem(member)));
+            }
+            return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                    RepTwosomeVerifyResponse.Result.VALID,
+                    "실제 투썸 서버에서 로그인 상태를 확인했습니다.", toAdminItem(member)));
+        } catch (TwosomeStoreSessionExpiredException e) {
+            return reloginAndVerify(member);
+        } catch (TwosomeStoreException e) {
+            log.warn("Twosome verification failed temporarily (memberId={}): {}", id, e.getMessage());
+            return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                    RepTwosomeVerifyResponse.Result.TEMPORARY_ERROR,
+                    "일시적 오류로 확인하지 못했습니다. 기존 세션은 유지됩니다.", toAdminItem(member)));
+        }
+    }
+
+    private ResponseEntity<RepTwosomeVerifyResponse> reloginAndVerify(Member member) {
+        try {
+            TwosomeAutoReloginResult result = twosomeAutoReloginService.autoLoginForRep(member.getId());
+            if (result.isSuccess()) {
+                return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                        RepTwosomeVerifyResponse.Result.RELOGINED,
+                        "OCR 자동 재로그인 후 실제 로그인 상태를 확인했습니다.", toAdminItem(member)));
+            }
+            String blockedReason = twosomeAutoReloginGuard.blockedReason(
+                    TwosomeStoreIntegrationService.repSessionKey(member.getId())).orElse(null);
+            if (blockedReason != null) {
+                return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                        RepTwosomeVerifyResponse.Result.BLOCKED, blockedReason, toAdminItem(member)));
+            }
+            return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                    RepTwosomeVerifyResponse.Result.EXPIRED,
+                    "자동 재로그인에 실패했습니다. 수동 로그인이 필요합니다.", toAdminItem(member)));
+        } catch (TwosomeStoreException e) {
+            log.warn("Twosome auto relogin failed temporarily (memberId={}): {}", member.getId(), e.getMessage());
+            return ResponseEntity.ok(new RepTwosomeVerifyResponse(
+                    RepTwosomeVerifyResponse.Result.TEMPORARY_ERROR,
+                    "일시적 오류로 자동 재로그인하지 못했습니다. 기존 상태를 유지합니다.", toAdminItem(member)));
+        }
+    }
 
     private RepAdminItem toAdminItem(Member member) {
+        String sessionKey = TwosomeStoreIntegrationService.repSessionKey(member.getId());
+        TwosomeSessionResponse session = twosomeStoreIntegrationService.getSessionStatus(sessionKey);
+        String blockedReason = twosomeAutoReloginGuard.blockedReason(sessionKey).orElse(null);
         return new RepAdminItem(
                 member.getId(),
                 member.getName(),
@@ -113,7 +189,13 @@ public class AdminController {
                 member.getTeam().getName(),
                 member.isPinSet(),
                 member.getLastLoginAt(),
-                member.getCreatedDate());
+                member.getCreatedDate(),
+                session.getStatus(),
+                session.getStoreNm(),
+                session.getLastUsedAt(),
+                session.getSource(),
+                blockedReason != null,
+                blockedReason);
     }
 
     private Member requireMember(Long id) {

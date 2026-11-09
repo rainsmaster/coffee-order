@@ -12,6 +12,8 @@ const AdminPage = ({ embedded = false }) => {
   const [editingRep, setEditingRep] = useState(null);
   const [formName, setFormName] = useState('');
   const [formTeamId, setFormTeamId] = useState('');
+  const [verifyingRepIds, setVerifyingRepIds] = useState({});
+  const [verificationResults, setVerificationResults] = useState({});
   const {
     isAlertOpen, alertConfig, showAlert, closeAlert,
     isConfirmOpen, confirmConfig, showConfirm, closeConfirm,
@@ -88,6 +90,36 @@ const AdminPage = ({ embedded = false }) => {
     });
   };
 
+  const handleVerifyTwosome = async (rep) => {
+    setVerifyingRepIds((current) => ({ ...current, [rep.id]: true }));
+    try {
+      const response = await adminAPI.verifyRepTwosome(rep.id);
+      setReps((current) => current.map((item) => item.id === rep.id ? response.rep : item));
+      setVerificationResults((current) => ({ ...current, [rep.id]: response }));
+    } catch (err) {
+      setVerificationResults((current) => ({
+        ...current,
+        [rep.id]: {
+          result: 'TEMPORARY_ERROR',
+          message: err.message || '일시적 오류로 확인하지 못했습니다. 기존 세션은 유지됩니다.',
+        },
+      }));
+    } finally {
+      setVerifyingRepIds((current) => ({ ...current, [rep.id]: false }));
+    }
+  };
+
+  const getTwosomeStatus = (rep) => {
+    if (verifyingRepIds[rep.id]) return { label: '확인 중...', className: 'checking' };
+    if (verificationResults[rep.id]?.result === 'TEMPORARY_ERROR') {
+      return { label: '확인 불가', className: 'unknown' };
+    }
+    if (rep.autoReloginBlocked) return { label: '자동 로그인 중단', className: 'blocked' };
+    if (rep.twosomeStatus === 'ACTIVE') return { label: '정상', className: 'active' };
+    if (rep.twosomeStatus === 'EXPIRED') return { label: '만료', className: 'expired' };
+    return { label: '로그인 없음', className: 'none' };
+  };
+
   const formatDateTime = (value) => value ? new Date(value).toLocaleString('ko-KR') : '-';
 
   return (
@@ -96,6 +128,7 @@ const AdminPage = ({ embedded = false }) => {
         <h2>팀 대표 관리</h2>
       </div>
       <p className="admin-principle">누구나 대표를 조회하고 관리할 수 있습니다. 주문자는 주문할 때 대표를 선택하며, 본인의 PIN은 본인만 관리할 수 있습니다.</p>
+      <p className="twosome-session-guide">투썸 세션은 10분마다 자동 확인합니다. 버튼을 클릭하면 저장된 상태가 아니라 실제 투썸 서버로 즉시 검증합니다.</p>
       <div className="admin-form-card">
         <h3>{editingRep ? '대표 소속·이름 수정' : '대표 직접 등록'}</h3>
         <div className="admin-form-row">
@@ -114,16 +147,44 @@ const AdminPage = ({ embedded = false }) => {
           <div className="no-data">등록된 팀 대표가 없습니다.</div>
         ) : (
           <div className="admin-table-scroll"><table className="admin-table">
-            <thead><tr><th>이름</th><th>소속</th><th>PIN 설정</th><th>최종 로그인</th><th>관리</th></tr></thead>
-            <tbody>{reps.map((rep) => (
-              <tr key={rep.id}>
-                <td>{rep.name}</td><td>{rep.departmentName}</td><td>{rep.pinSet ? '설정됨' : '미설정'}</td><td>{formatDateTime(rep.lastLoginAt)}</td>
-                <td className="admin-table-actions">
-                  <button className="admin-btn small" onClick={() => { setEditingRep(rep); setFormName(rep.name); setFormTeamId(String(rep.teamId)); }}>수정</button>
-                  <button className="admin-btn small danger" onClick={() => handleDelete(rep)}>삭제</button>
-                </td>
-              </tr>
-            ))}</tbody>
+            <thead><tr><th>이름</th><th>소속</th><th>PIN 설정</th><th>PIN 최종 로그인</th><th>투썸 상태</th><th>관리</th></tr></thead>
+            <tbody>{reps.map((rep) => {
+              const status = getTwosomeStatus(rep);
+              const verification = verificationResults[rep.id];
+              return (
+                <tr key={rep.id}>
+                  <td>{rep.name}</td>
+                  <td>{rep.departmentName}</td>
+                  <td>{rep.pinSet ? '설정됨' : '미설정'}</td>
+                  <td>{formatDateTime(rep.lastLoginAt)}</td>
+                  <td className="twosome-status-cell">
+                    <div className={`twosome-status-badge ${status.className}`}>{status.label}</div>
+                    <div className="twosome-meta">
+                      {rep.twosomeStoreNm && <span>{rep.twosomeStoreNm} · </span>}
+                      {rep.twosomeLastVerifiedAt
+                        ? `마지막 확인 ${formatDateTime(rep.twosomeLastVerifiedAt)}`
+                        : '실제 확인 기록 없음'}
+                      {rep.twosomeSource === 'RESTORED' && ' · Redis 복구'}
+                    </div>
+                    {rep.autoReloginBlocked && rep.autoReloginMessage && (
+                      <div className="twosome-meta">{rep.autoReloginMessage}</div>
+                    )}
+                    {verification?.message && (
+                      <div className={`twosome-verify-result ${verification.result.toLowerCase()}`}>
+                        {verification.message}
+                      </div>
+                    )}
+                  </td>
+                  <td className="admin-table-actions">
+                    <button className="admin-btn small" disabled={verifyingRepIds[rep.id]} onClick={() => handleVerifyTwosome(rep)}>
+                      {verifyingRepIds[rep.id] ? '확인 중...' : '지금 확인'}
+                    </button>
+                    <button className="admin-btn small" onClick={() => { setEditingRep(rep); setFormName(rep.name); setFormTeamId(String(rep.teamId)); }}>수정</button>
+                    <button className="admin-btn small danger" onClick={() => handleDelete(rep)}>삭제</button>
+                  </td>
+                </tr>
+              );
+            })}</tbody>
           </table></div>
         )}
       </div>

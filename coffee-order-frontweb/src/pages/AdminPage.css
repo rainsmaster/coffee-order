@@ -178,6 +178,67 @@
   overflow-x: auto;
 }
 
+.twosome-session-guide {
+  margin: -0.4rem 0 1rem;
+  color: #666;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.twosome-status-cell {
+  min-width: 220px;
+  max-width: 320px;
+}
+
+.twosome-status-badge {
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.twosome-status-badge.active {
+  color: #2e7d32;
+}
+
+.twosome-status-badge.expired,
+.twosome-status-badge.blocked {
+  color: #c62828;
+}
+
+.twosome-status-badge.none,
+.twosome-status-badge.unknown,
+.twosome-status-badge.checking {
+  color: #6b5b3e;
+}
+
+.twosome-meta,
+.twosome-verify-result {
+  margin-top: 0.25rem;
+  color: #777;
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
+.twosome-verify-result.valid,
+.twosome-verify-result.relogined {
+  color: #2e7d32;
+}
+
+.twosome-verify-result.blocked,
+.twosome-verify-result.expired {
+  color: #c62828;
+}
+
+.twosome-verify-result.temporary_error,
+.twosome-verify-result.rate_limited {
+  color: #8a5a00;
+}
+
+@media (max-width: 600px) {
+  .admin-table-actions .admin-btn {
+    margin-bottom: 0.25rem;
+  }
+}
+
 .admin-form-card label,
 .release-notes-admin > .admin-form-card > label {
   display: flex;

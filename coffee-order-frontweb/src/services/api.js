@@ -266,6 +266,11 @@ export const adminAPI = {
     headers: adminTokenHeader(),
   }),
 
+  verifyRepTwosome: (id) => fetchAPI(`/admin/reps/${id}/twosome/verify`, {
+    method: 'POST',
+    headers: adminTokenHeader(),
+  }),
+
   getReleaseNotes: () => fetchAPI('/admin/release-notes', { headers: adminTokenHeader() }),
 
   createReleaseNote: (data) => fetchAPI('/admin/release-notes', {

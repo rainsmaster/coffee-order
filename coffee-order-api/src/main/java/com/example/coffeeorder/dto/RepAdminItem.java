@@ -23,4 +23,10 @@ public class RepAdminItem {
     private boolean pinSet;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdDate;
+    private String twosomeStatus;
+    private String twosomeStoreNm;
+    private LocalDateTime twosomeLastVerifiedAt;
+    private String twosomeSource;
+    private boolean autoReloginBlocked;
+    private String autoReloginMessage;
 }
