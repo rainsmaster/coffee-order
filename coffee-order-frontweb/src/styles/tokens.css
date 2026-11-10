@@ -1,0 +1,64 @@
+:root {
+  color-scheme: light;
+  --font-sans: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, system-ui, 'Segoe UI', sans-serif;
+  --color-canvas: #f4f5f4;
+  --color-surface: #ffffff;
+  --color-ink: #252a27;
+  --color-muted: #66706a;
+  --color-subtle: #8a928d;
+  --color-line: #dce2de;
+  --color-brand: #304c40;
+  --color-brand-hover: #253d33;
+  --color-brand-soft: #e8efeb;
+  --color-focus-ring: rgba(48, 76, 64, 0.28);
+  --color-danger: #a43a3a;
+  --color-warning: #835c16;
+  --radius-control: 7px;
+  --radius-card: 11px;
+  --shadow-overlay: 0 16px 48px rgba(25, 33, 29, 0.14);
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  touch-action: manipulation;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+::placeholder {
+  color: var(--color-subtle);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  text-wrap: balance;
+}

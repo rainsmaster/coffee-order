@@ -4,8 +4,10 @@ import { useDepartment } from '../context/DepartmentContext';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 import LiveCartPanel from '../components/LiveCartPanel';
+import PageHeader from '../components/PageHeader';
 import useModal from '../hooks/useModal';
 import './HistoryPage.css';
+import './HistoryLayout.css';
 
 const HistoryPage = ({ onOrderClick }) => {
   const { selectedDepartmentId } = useDepartment();
@@ -102,6 +104,7 @@ const HistoryPage = ({ onOrderClick }) => {
 
   return (
     <div className="history-page">
+      <PageHeader title="주문 내역" description="현재 장바구니와 지난 팀 주문을 확인하세요." />
       <div className="history-tabs" role="tablist" aria-label="장바구니와 주문 내역">
         <button role="tab" aria-selected={activeTab === 'cart'} className={activeTab === 'cart' ? 'active' : ''} onClick={() => setActiveTab('cart')}>실시간 장바구니</button>
         <button role="tab" aria-selected={activeTab === 'history'} className={activeTab === 'history' ? 'active' : ''} onClick={() => setActiveTab('history')}>과거 주문 내역</button>

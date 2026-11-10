@@ -1,0 +1,299 @@
+.suggestion-page {
+  max-width: 900px;
+  padding: 0;
+}
+
+.suggestion-page .page-header {
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.suggestion-page .page-header .page-heading {
+  margin-bottom: 0;
+}
+
+.suggestion-page .write-btn,
+.suggestion-page .submit-btn {
+  min-height: 40px;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.suggestion-page .write-btn {
+  flex: 0 0 auto;
+}
+
+.suggestion-page .write-btn:hover,
+.suggestion-page .submit-btn:hover {
+  border-color: var(--color-brand-hover);
+  background: var(--color-brand-hover);
+}
+
+.suggestion-page .cancel-btn {
+  min-height: 40px;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.suggestion-page .cancel-btn:hover {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.suggestion-page .suggestion-list {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+.suggestion-page .suggestion-item {
+  display: block;
+  width: 100%;
+  padding: 1rem 1.1rem;
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.suggestion-page .suggestion-item:hover {
+  background: var(--color-brand-soft);
+}
+
+.suggestion-page .suggestion-item.pinned {
+  border-left: 3px solid var(--color-warning);
+  background: #fff9e9;
+}
+
+.suggestion-page .suggestion-item.pinned:hover {
+  background: #fff3d6;
+}
+
+.suggestion-page .suggestion-title,
+.suggestion-page .detail-header h2,
+.suggestion-page .comment-content,
+.suggestion-page .detail-content p {
+  color: var(--color-ink);
+}
+
+.suggestion-page .pin-badge,
+.suggestion-page .detail-header h2.pinned-title {
+  color: var(--color-warning);
+}
+
+.suggestion-page .comment-count {
+  color: var(--color-brand);
+  font-variant-numeric: tabular-nums;
+}
+
+.suggestion-page .suggestion-meta,
+.suggestion-page .detail-meta,
+.suggestion-page .comment-date,
+.suggestion-page .total-count {
+  color: var(--color-muted);
+}
+
+.suggestion-page .suggestion-meta {
+  flex-wrap: wrap;
+}
+
+.suggestion-page .empty-message,
+.suggestion-page .loading {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  padding: 2rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  text-align: center;
+}
+
+.suggestion-page .page-btn {
+  min-width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.suggestion-page .page-btn:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.suggestion-page .page-btn.active {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.suggestion-page .form-group label,
+.suggestion-page .form-label {
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.suggestion-page .form-group input,
+.suggestion-page .form-group textarea,
+.suggestion-page .password-form input,
+.suggestion-page .comment-form textarea,
+.suggestion-page .comment-form-row input,
+.suggestion-page .comment-edit-form textarea {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.suggestion-page .form-group input:focus-visible,
+.suggestion-page .form-group textarea:focus-visible,
+.suggestion-page .password-form input:focus-visible,
+.suggestion-page .comment-form textarea:focus-visible,
+.suggestion-page .comment-form-row input:focus-visible,
+.suggestion-page .comment-edit-form textarea:focus-visible {
+  border-color: var(--color-brand);
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.suggestion-page .detail-header,
+.suggestion-page .detail-content {
+  border-bottom-color: var(--color-line);
+}
+
+.suggestion-page .detail-meta {
+  flex-wrap: wrap;
+}
+
+.suggestion-page .action-btn {
+  min-height: 36px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-muted);
+}
+
+.suggestion-page .action-btn:hover {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.suggestion-page .action-btn.delete {
+  border-color: var(--color-danger);
+  background: var(--color-surface);
+  color: var(--color-danger);
+}
+
+.suggestion-page .action-btn.delete:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.suggestion-page .action-btn.admin {
+  border-color: var(--color-warning);
+  background: var(--color-surface);
+  color: var(--color-warning);
+}
+
+.suggestion-page .action-btn.admin:hover {
+  background: var(--color-warning);
+  color: #fff;
+}
+
+.suggestion-page .comment-item {
+  padding: 0.85rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.suggestion-page .comment-author {
+  color: var(--color-ink);
+}
+
+.suggestion-page .comment-actions button {
+  padding: 0.25rem 0.4rem;
+  border-radius: var(--radius-control);
+  color: var(--color-muted);
+}
+
+.suggestion-page .comment-actions button:hover {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.suggestion-page .comment-form {
+  padding: 0.85rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.suggestion-page .comment-form-row button,
+.suggestion-page .comment-edit-actions button:last-child {
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.suggestion-page .comment-edit-actions button:first-child {
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+  color: var(--color-muted);
+}
+
+.suggestion-page .release-note-detail-card {
+  padding: 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-brand-soft);
+}
+
+.suggestion-page .release-note-detail-meta {
+  color: var(--color-muted);
+}
+
+.suggestion-page .form-actions,
+.suggestion-page .detail-actions,
+.suggestion-page .release-note-detail-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 600px) {
+  .suggestion-page {
+    padding: 0;
+  }
+
+  .suggestion-page .page-header {
+    align-items: flex-start;
+  }
+
+  .suggestion-page .comment-form-row {
+    flex-direction: column;
+  }
+
+  .suggestion-page .comment-form-row button {
+    width: 100%;
+    min-height: 40px;
+  }
+}

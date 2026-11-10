@@ -1,0 +1,36 @@
+@media (pointer: coarse) {
+  .App button,
+  .App [role='button'],
+  .App select,
+  .App input:not([type='checkbox']):not([type='radio']) {
+    min-height: 44px;
+  }
+
+  .App .history-page .today-button,
+  .App .history-page .btn-bulk-add,
+  .App .manage-page .admin-btn {
+    min-height: 44px;
+  }
+
+  .App .admin-btn.small,
+  .App .cart-qty-btn,
+  .App .custom-accordion-reset,
+  .App .custom-accordion-close,
+  .App .custom-choice-clear,
+  .App .cart-custom-toggle,
+  .App .comment-actions button {
+    min-height: 44px;
+  }
+
+  .App .custom-choice-toggle,
+  .App .custom-choice-option {
+    min-height: 44px;
+  }
+
+  .App input[type='checkbox'],
+  .App input[type='radio'] {
+    width: 20px;
+    height: 20px;
+    min-height: 20px;
+  }
+}

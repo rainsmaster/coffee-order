@@ -204,6 +204,22 @@ test('체크한 퍼스널 옵션의 기본값과 코드가 주문서와 장바�
   fireEvent.click(screen.getByRole('checkbox', { name: '카라멜드리즐' }));
 
   expect(screen.getByRole('radio', { name: '드리즐보통' })).toBeChecked();
+  expect(screen.getByText(/예상 가격:/)).toHaveTextContent('예상 가격: 6,100원');
+  const summary = screen.getByLabelText('주문 요약');
+  expect(summary).toHaveTextContent('디카페인 콜드브루');
+  expect(summary).toHaveTextContent('6,100원');
+  expect(summary).toHaveTextContent('박성훈 대표의 투썸 장바구니');
+  fireEvent.click(screen.getByRole('button', { name: '초기화' }));
+  expect(screen.queryByRole('radio', { name: '드리즐보통' })).not.toBeInTheDocument();
+  expect(screen.getByRole('checkbox', { name: '카라멜드리즐' })).not.toBeChecked();
+  expect(screen.getByRole('button', { name: '초기화' })).toBeDisabled();
+  expect(screen.getByText(/예상 가격:/)).toHaveTextContent('예상 가격: 5,300원');
+  expect(summary).toHaveTextContent('5,300원');
+  expect(summary).not.toHaveTextContent('드리즐보통');
+
+  fireEvent.click(screen.getByRole('checkbox', { name: '카라멜드리즐' }));
+  expect(screen.getByRole('radio', { name: '드리즐보통' })).toBeChecked();
+  expect(screen.getByText(/예상 가격:/)).toHaveTextContent('예상 가격: 6,100원');
   fireEvent.click(screen.getByRole('button', { name: '투썸 장바구니 담기 (박성훈 계정)' }));
 
   expect(await screen.findByText(/실제 투썸 장바구니 반영: 성공 1건/)).toBeInTheDocument();
@@ -226,4 +242,48 @@ test('체크한 퍼스널 옵션의 기본값과 코드가 주문서와 장바�
     CSTM_ORD_CNT: 1,
     CSTM_ORD_AMT: 800,
   }));
+});
+
+test('퍼스널 옵션 로딩과 빈 상태가 주문 버튼 앞의 같은 영역에 표시된다', async () => {
+  let resolveCustom;
+  twosomeStoreAPI.getMenuCustomOptions.mockReturnValue(new Promise((resolve) => {
+    resolveCustom = resolve;
+  }));
+
+  render(<OrderPage />);
+  fireEvent.change(await screen.findByRole('combobox'), { target: { value: '128' } });
+  await screen.findByText('최근 주문');
+  fireEvent.change(screen.getByPlaceholderText(/메뉴 검색/), { target: { value: '디카페인' } });
+  fireEvent.click(await screen.findByRole('button', { name: /디카페인 콜드브루/ }));
+  fireEvent.click(await screen.findByRole('button', { name: '일회용컵' }));
+
+  const loading = await screen.findByText('퍼스널 옵션을 불러오는 중…');
+  const statusArea = loading.closest('.custom-accordion');
+  const orderButton = screen.getByRole('button', { name: '투썸 장바구니 담기 (박성훈 계정)' });
+  expect(orderButton.previousElementSibling).toBe(statusArea);
+
+  resolveCustom({ menuCd: '10191496', hasCustom: false, qtyItems: [], choiceGroups: [], categories: [] });
+
+  const empty = await screen.findByText('퍼스널 옵션 없음');
+  expect(empty.closest('.custom-accordion')).toBe(statusArea);
+  expect(orderButton.previousElementSibling).toBe(statusArea);
+});
+
+test('퍼스널 옵션 조회 실패 후 재시도하면 정상 옵션으로 전환된다', async () => {
+  twosomeStoreAPI.getMenuCustomOptions
+    .mockRejectedValueOnce(new Error('일시적 네트워크 오류'))
+    .mockResolvedValueOnce({ menuCd: '10191496', hasCustom: true, qtyItems: [], choiceGroups: [], categories: [] });
+
+  render(<OrderPage />);
+  fireEvent.change(await screen.findByRole('combobox'), { target: { value: '128' } });
+  await screen.findByText('최근 주문');
+  fireEvent.change(screen.getByPlaceholderText(/메뉴 검색/), { target: { value: '디카페인' } });
+  fireEvent.click(await screen.findByRole('button', { name: /디카페인 콜드브루/ }));
+  fireEvent.click(await screen.findByRole('button', { name: '일회용컵' }));
+
+  expect(await screen.findByText('퍼스널 옵션을 불러오지 못했습니다.')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+
+  expect(await screen.findByRole('button', { name: /퍼스널 옵션 \(선택\)/ })).toBeInTheDocument();
+  expect(twosomeStoreAPI.getMenuCustomOptions).toHaveBeenCalledTimes(2);
 });

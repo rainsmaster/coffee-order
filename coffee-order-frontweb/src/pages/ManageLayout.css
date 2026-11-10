@@ -1,0 +1,527 @@
+.manage-page .manage-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.manage-page .manage-tabs button {
+  min-height: 44px;
+  padding: 0.55rem 0.65rem;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 0.88rem;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.manage-page .manage-tabs button:hover:not(.active) {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.manage-page .manage-tabs button.active {
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.manage-page .manage-content {
+  padding: 1.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.manage-page .section-header {
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.manage-page .section-header h2,
+.manage-page .list-item,
+.manage-page .health-label,
+.manage-page .health-events-title {
+  color: var(--color-ink);
+}
+
+.manage-page .section-header h2 {
+  overflow-wrap: anywhere;
+}
+
+.manage-page .btn-add {
+  min-height: 40px;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.manage-page .btn-add:hover {
+  border-color: var(--color-brand-hover);
+  background: var(--color-brand-hover);
+}
+
+.manage-page .list-item {
+  padding: 0.85rem;
+  border: 1px solid var(--color-line);
+  border-left: 3px solid var(--color-brand);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.manage-page .list-item.current {
+  border-left-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.manage-page .list-item.clickable:hover,
+.manage-page .list-item.clickable.current:hover {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.manage-page .current-badge {
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.manage-page .item-category,
+.manage-page .form-hint,
+.manage-page .sync-info,
+.manage-page .twosome-meta,
+.manage-page .twosome-session-guide,
+.manage-page .health-detail,
+.manage-page .health-events-empty {
+  color: var(--color-muted);
+}
+
+.manage-page .item-actions button {
+  min-height: 34px;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.manage-page .item-actions button:first-child,
+.manage-page .item-actions button:last-child {
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.manage-page .item-actions button:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.manage-page .item-actions button:last-child:hover:not(:disabled) {
+  border-color: var(--color-danger);
+  background: var(--color-danger);
+  color: #fff;
+}
+
+.manage-page .settings-form select,
+.manage-page .modal-form input,
+.manage-page .modal-form select,
+.manage-page .twosome-login-form input,
+.manage-page .admin-login-card input,
+.manage-page .admin-form-row input,
+.manage-page .admin-form-row select,
+.manage-page .release-notes-admin input,
+.manage-page .release-notes-admin textarea {
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-ink);
+}
+
+.manage-page .settings-form select:focus-visible,
+.manage-page .modal-form input:focus-visible,
+.manage-page .modal-form select:focus-visible,
+.manage-page .twosome-login-form input:focus-visible,
+.manage-page .admin-login-card input:focus-visible,
+.manage-page .admin-form-row input:focus-visible,
+.manage-page .admin-form-row select:focus-visible,
+.manage-page .release-notes-admin input:focus-visible,
+.manage-page .release-notes-admin textarea:focus-visible {
+  border-color: var(--color-brand);
+  outline: 3px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+.manage-page .btn-sync {
+  min-height: 44px;
+  border: 1px solid var(--color-brand);
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.manage-page .btn-sync:hover {
+  border-color: var(--color-brand-hover);
+  background: var(--color-brand-hover);
+  box-shadow: none;
+}
+
+.manage-page .btn-sync:disabled {
+  border-color: var(--color-line);
+  background: #c7cec9;
+  box-shadow: none;
+}
+
+.manage-page .twosome-actions .btn-secondary,
+.manage-page .twosome-login-buttons .btn-secondary,
+.manage-page .twosome-captcha-row .btn-secondary {
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.manage-page .twosome-actions .btn-secondary:hover,
+.manage-page .twosome-login-buttons .btn-secondary:hover,
+.manage-page .twosome-captcha-row .btn-secondary:hover {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.manage-page .sync-progress-container,
+.manage-page .twosome-login-form {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.manage-page .sync-progress-fill {
+  border-radius: var(--radius-control);
+  background: var(--color-brand);
+}
+
+.manage-page .sync-percentage,
+.manage-page .sync-status {
+  color: var(--color-brand);
+}
+
+.manage-page .twosome-status-badge {
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.manage-page .twosome-status-badge.none,
+.manage-page .twosome-status-badge.unknown,
+.manage-page .twosome-status-badge.checking {
+  background: var(--color-canvas);
+  color: var(--color-muted);
+}
+
+.manage-page .twosome-status-badge.expired,
+.manage-page .twosome-status-badge.blocked {
+  border-color: var(--color-danger);
+  background: #fff7f7;
+  color: var(--color-danger);
+}
+
+.manage-page .twosome-health-panel {
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.manage-page .health-row {
+  display: grid;
+  grid-template-columns: 90px 90px minmax(0, 1fr);
+  gap: 0.6rem;
+  align-items: baseline;
+  border-bottom-color: var(--color-line);
+}
+
+.manage-page .health-ok,
+.manage-page .health-status.active,
+.manage-page .health-event-ok .health-event-result {
+  color: var(--color-brand);
+}
+
+.manage-page .health-bad,
+.manage-page .health-status.expired,
+.manage-page .health-status.none,
+.manage-page .health-event-bad .health-event-result {
+  color: var(--color-danger);
+}
+
+.manage-page .health-event-list li {
+  display: grid;
+  grid-template-columns: 140px minmax(120px, auto) 36px minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: baseline;
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.manage-page .health-event-list li:last-child {
+  border-bottom: 0;
+}
+
+.manage-page .health-event-type {
+  min-width: 0;
+  color: var(--color-muted);
+  font-family: var(--font-sans);
+  overflow-wrap: anywhere;
+}
+
+.manage-page .health-event-msg,
+.manage-page .health-event-time {
+  overflow-wrap: anywhere;
+}
+
+.manage-page .twosome-notice {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
+.manage-page .store-settings-list > div {
+  grid-template-columns: 140px minmax(0, 1fr);
+  border-bottom-color: var(--color-line);
+}
+
+.manage-page .store-settings-list dt,
+.manage-page .store-settings-list dd {
+  overflow-wrap: anywhere;
+}
+
+.manage-page .admin-tools-header {
+  border-bottom-color: var(--color-line);
+}
+
+.manage-page .admin-tools-tabs {
+  gap: 0.25rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-canvas);
+}
+
+.manage-page .admin-tools-tabs button.active {
+  background: var(--color-brand);
+  color: #fff;
+  box-shadow: none;
+}
+
+.manage-page .admin-page {
+  max-width: none;
+  padding: 0;
+}
+
+.manage-page .admin-form-card,
+.manage-page .admin-list-card,
+.manage-page .admin-login-card {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: none;
+}
+
+.manage-page .admin-principle {
+  border: 1px solid #eadfbd;
+  border-radius: var(--radius-control);
+  background: #fff9e9;
+  color: var(--color-warning);
+}
+
+.manage-page .admin-login-card {
+  margin-top: 2rem;
+  padding: 1.5rem;
+}
+
+.manage-page .admin-login-card h2,
+.manage-page .admin-form-card h2,
+.manage-page .admin-list-card h2,
+.manage-page .admin-form-card h3,
+.manage-page .admin-list-card h3 {
+  color: var(--color-ink);
+}
+
+.manage-page .admin-btn {
+  min-height: 36px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-muted);
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.manage-page .admin-btn.primary {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.manage-page .admin-btn.danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.manage-page .admin-btn.small {
+  min-height: 32px;
+}
+
+.manage-page .admin-table {
+  color: var(--color-ink);
+  font-size: 0.85rem;
+}
+
+.manage-page .admin-table th {
+  background: var(--color-canvas);
+  color: var(--color-muted);
+}
+
+.manage-page .admin-table td {
+  border-bottom-color: var(--color-line);
+  color: var(--color-ink);
+  vertical-align: top;
+}
+
+.manage-page .admin-table-actions {
+  white-space: normal;
+}
+
+@media (max-width: 768px) {
+  .manage-page .manage-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .manage-page .manage-content {
+    padding: 1rem;
+  }
+
+  .manage-page .twosome-actions,
+  .manage-page .twosome-login-buttons {
+    flex-direction: column;
+  }
+
+  .manage-page .health-row {
+    grid-template-columns: 80px 80px minmax(0, 1fr);
+  }
+
+  .manage-page .health-event-list li {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+    padding: 0.5rem 0;
+  }
+
+  .manage-page .admin-form-row {
+    flex-direction: column;
+  }
+
+  .manage-page .admin-form-row input,
+  .manage-page .admin-form-row select,
+  .manage-page .admin-form-row .admin-btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .manage-page .admin-table-scroll {
+    overflow-x: visible;
+  }
+
+  .manage-page .admin-table,
+  .manage-page .admin-table tbody,
+  .manage-page .admin-table tr,
+  .manage-page .admin-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .manage-page .admin-table thead {
+    display: none;
+  }
+
+  .manage-page .admin-table tr {
+    margin-bottom: 0.75rem;
+    padding: 0.75rem;
+    border: 1px solid var(--color-line);
+    border-radius: var(--radius-control);
+    background: var(--color-canvas);
+  }
+
+  .manage-page .admin-table tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .manage-page .admin-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.25rem 0;
+    border: 0;
+  }
+
+  .manage-page .admin-table td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    color: var(--color-muted);
+    font-weight: 600;
+  }
+
+  .manage-page .admin-table .twosome-status-cell {
+    display: block;
+    min-width: 0;
+    max-width: none;
+  }
+
+  .manage-page .admin-table .twosome-status-cell::before {
+    display: block;
+    margin-bottom: 0.35rem;
+  }
+
+  .manage-page .admin-table .twosome-status-cell .twosome-status-badge {
+    display: inline-block;
+  }
+
+  .manage-page .admin-table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding-top: 0.5rem;
+  }
+
+  .manage-page .admin-table-actions .admin-btn {
+    margin-right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .manage-page .manage-tabs button {
+    padding: 0.5rem 0.35rem;
+    font-size: 0.82rem;
+  }
+
+  .manage-page .admin-tools-header {
+    flex-direction: column;
+  }
+
+  .manage-page .admin-tools-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}

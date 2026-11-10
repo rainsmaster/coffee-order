@@ -6,8 +6,8 @@
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #e8e8e8;
+  font-family: var(--font-sans);
+  background-color: var(--color-canvas);
 }
 
 .App {
@@ -19,10 +19,26 @@ body {
 
 /* 헤더 */
 .App-header {
-  background: linear-gradient(135deg, #4a4a4a 0%, #6a6a6a 100%);
+  background: var(--color-brand);
   color: white;
   padding: 1rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.skip-link {
+  position: absolute;
+  top: -60px;
+  left: 1rem;
+  z-index: 3000;
+  padding: 0.65rem 1rem;
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-brand);
+  font-weight: 600;
+}
+
+.skip-link:focus {
+  top: 0.5rem;
 }
 
 .App-header h1,
@@ -75,12 +91,11 @@ body {
   left: 0;
   right: 0;
   height: 60px;
-  background-color: #ffffff;
+  background-color: var(--color-surface);
   display: flex;
   justify-content: space-around;
   align-items: center;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  border-top: 1px solid #e0e0e0;
+  border-top: 1px solid var(--color-line);
   z-index: 1000;
   padding-bottom: env(safe-area-inset-bottom); /* iOS 노치 대응 */
 }
@@ -95,8 +110,8 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  color: #888;
-  transition: all 0.2s ease;
+  color: var(--color-muted);
+  transition: color 0.15s ease, background-color 0.15s ease;
   padding: 8px 0;
   gap: 4px;
 }
@@ -104,21 +119,20 @@ body {
 .bottom-nav .nav-item svg {
   width: 24px;
   height: 24px;
-  transition: all 0.2s ease;
 }
 
 .bottom-nav .nav-item span {
   font-size: 11px;
   font-weight: 500;
-  transition: all 0.2s ease;
 }
 
 .bottom-nav .nav-item:hover {
-  color: #555;
+  color: var(--color-brand);
+  background-color: var(--color-brand-soft);
 }
 
 .bottom-nav .nav-item.active {
-  color: #4a4a4a;
+  color: var(--color-brand);
 }
 
 .bottom-nav .nav-item.active svg {
@@ -126,7 +140,7 @@ body {
 }
 
 .bottom-nav .nav-item.active span {
-  font-weight: 600;
+  font-weight: 700;
 }
 
 /* 활성 상태 인디케이터 */
@@ -138,7 +152,7 @@ body {
   transform: translateX(-50%);
   width: 40px;
   height: 3px;
-  background-color: #4a4a4a;
+  background-color: var(--color-brand);
   border-radius: 0 0 3px 3px;
 }
 

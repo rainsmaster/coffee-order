@@ -8,10 +8,10 @@
 .order-form-card,
 .orders-section,
 .summary-section {
-  background: white;
-  border-radius: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
   padding: 1.25rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* 로딩 & 에러 */
@@ -77,28 +77,29 @@
 .form-group label {
   display: block;
   margin-bottom: 0.5rem;
-  font-weight: 500;
-  color: #555;
-  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-muted);
+  font-size: 0.9rem;
 }
 
 .form-group select {
   width: 100%;
+  min-height: 44px;
   padding: 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  color: var(--color-ink);
   font-size: 0.95rem;
-  transition: border-color 0.2s;
-  background-color: white;
+  transition: border-color 0.15s ease;
+  background-color: var(--color-surface);
 }
 
-.form-group select:focus {
-  outline: none;
-  border-color: #666;
+.form-group select:focus-visible {
+  border-color: var(--color-brand);
 }
 
 .form-group select:disabled {
-  background-color: #f5f5f5;
+  background-color: var(--color-canvas);
   cursor: not-allowed;
 }
 
@@ -109,7 +110,7 @@
 
 .category-title {
   font-weight: 500;
-  color: #666;
+  color: var(--color-muted);
   margin-bottom: 0.5rem;
   font-size: 0.9rem;
 }
@@ -117,36 +118,39 @@
 .option-display {
   margin-top: 0.5rem;
   padding: 0.6rem;
-  background-color: #f5f5f5;
-  border-radius: 4px;
+  background-color: var(--color-canvas);
+  border-radius: var(--radius-control);
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.5rem;
   justify-content: space-between;
   align-items: center;
   font-size: 0.9rem;
-  color: #555;
+  color: var(--color-muted);
 }
 
 /* 주문 버튼 */
 .order-button {
   width: 100%;
+  min-height: 48px;
   padding: 0.75rem;
-  background: #666;
+  background: var(--color-brand);
   color: white;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 1rem;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 0.15s ease;
 }
 
 .order-button:hover:not(:disabled) {
-  background: #555;
+  background: var(--color-brand-hover);
 }
 
 .order-button.disabled,
 .order-button:disabled {
-  background: #ccc;
+  background: #c7cec9;
   cursor: not-allowed;
 }
 
@@ -203,7 +207,7 @@
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 400;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-edit {
@@ -279,9 +283,8 @@
   resize: vertical;
 }
 
-.modal-form textarea:focus {
-  outline: none;
-  border-color: #666;
+.modal-form textarea:focus-visible {
+  border-color: var(--color-brand);
 }
 
 .modal-buttons {
@@ -299,7 +302,7 @@
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-primary {
@@ -388,9 +391,8 @@
   box-sizing: border-box;
 }
 
-.menu-search-input:focus {
-  outline: none;
-  border-color: #6F4E37;
+.menu-search-input:focus-visible {
+  border-color: var(--color-brand);
 }
 
 .menu-search-input::placeholder {
@@ -415,7 +417,7 @@
   padding: 0.25rem;
   line-height: 1;
   border-radius: 50%;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .menu-search-clear:hover {
@@ -451,25 +453,26 @@
 }
 
 .category-btn {
-  padding: 0.75rem 1.25rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  background: white;
+  min-height: 44px;
+  padding: 0.65rem 1.1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   font-weight: 500;
-  transition: all 0.2s;
-  color: #333;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  color: var(--color-ink);
 }
 
 .category-btn:hover:not(:disabled) {
-  border-color: #999;
-  background-color: #f5f5f5;
+  border-color: var(--color-brand);
+  background-color: var(--color-brand-soft);
 }
 
 .category-btn.selected {
-  border-color: #666;
-  background-color: #666;
+  border-color: var(--color-brand);
+  background-color: var(--color-brand);
   color: white;
 }
 
@@ -482,23 +485,24 @@
   font-size: 0.8rem;
   opacity: 0.8;
   margin-left: 0.25rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .category-back-btn {
   background: none;
   border: none;
-  color: #666;
+  color: var(--color-muted);
   font-size: 0.85rem;
   cursor: pointer;
   margin-left: 0.75rem;
   padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  transition: all 0.2s;
+  border-radius: var(--radius-control);
+  transition: color 0.15s ease, background-color 0.15s ease;
 }
 
 .category-back-btn:hover {
-  background-color: #f0f0f0;
-  color: #333;
+  background-color: var(--color-brand-soft);
+  color: var(--color-brand);
 }
 
 /* 투썸 카드 그리드 */
@@ -514,23 +518,22 @@
   flex-direction: column;
   align-items: center;
   padding: 0.75rem;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  background: white;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
 .twosome-card:hover:not(:disabled) {
-  border-color: #999;
-  transform: translateY(-2px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-color: var(--color-brand);
+  background-color: var(--color-brand-soft);
 }
 
 .twosome-card.selected {
-  border-color: #666;
-  background-color: #f5f5f5;
-  box-shadow: 0 0 0 2px rgba(102, 102, 102, 0.2);
+  border-color: var(--color-brand);
+  background-color: var(--color-brand-soft);
+  box-shadow: 0 0 0 1px var(--color-brand);
 }
 
 .twosome-card:disabled {
@@ -538,7 +541,7 @@
   cursor: not-allowed;
 }
 
-.twosome-card img {
+.twosome-card .menu-thumbnail {
   width: 100px;
   height: 100px;
   object-fit: cover;
@@ -547,8 +550,9 @@
 }
 
 .twosome-card-name {
+  min-height: 2.6em;
+  color: var(--color-ink);
   font-size: 0.85rem;
-  color: #333;
   text-align: center;
   word-break: keep-all;
   line-height: 1.3;
@@ -566,7 +570,7 @@
   padding: 0.5rem;
 }
 
-.modal-grid .twosome-card img {
+.modal-grid .twosome-card .menu-thumbnail {
   width: 70px;
   height: 70px;
 }
@@ -600,7 +604,7 @@
   background: white;
   cursor: pointer;
   font-size: 0.85rem;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .option-chip:hover:not(:disabled) {
@@ -626,7 +630,7 @@
     gap: 0.5rem;
   }
 
-  .twosome-card img {
+  .twosome-card .menu-thumbnail {
     width: 80px;
     height: 80px;
   }
@@ -646,7 +650,7 @@
     padding: 0.5rem;
   }
 
-  .twosome-card img {
+  .twosome-card .menu-thumbnail {
     width: 60px;
     height: 60px;
   }
@@ -699,7 +703,7 @@
   color: #5a7d9a;
   font-size: 0.85rem;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .edit-mode-cancel:hover {
@@ -832,7 +836,7 @@
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
   white-space: nowrap;
 }
 
@@ -1075,8 +1079,8 @@
 
 /* 퍼스널 옵션 아코디언 (변형 완료 후 헤더 한 줄, 기본 접힘) */
 .custom-accordion {
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
   padding: 0;
   overflow: hidden;
 }
@@ -1084,18 +1088,66 @@
 .custom-accordion-header {
   display: block;
   width: 100%;
+  min-height: 48px;
   text-align: left;
   padding: 0.6rem 0.8rem;
   border: none;
-  background-color: #fafafa;
-  color: #333;
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
   font-size: 0.9rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color 0.15s ease;
 }
 
 .custom-accordion-header:hover {
-  background-color: #f0f0f0;
+  background-color: var(--color-brand-soft);
+}
+
+.custom-options-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  min-height: 48px;
+  padding: 0.65rem 0.8rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.custom-options-status.is-error {
+  justify-content: space-between;
+}
+
+.custom-options-spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--color-line);
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: custom-options-spin 0.75s linear infinite;
+}
+
+.custom-options-retry {
+  flex: 0 0 auto;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-brand);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+@keyframes custom-options-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .custom-options-spinner {
+    animation: none;
+  }
 }
 
 .custom-accordion-body {

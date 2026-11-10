@@ -90,7 +90,7 @@ test('우유와 식물성 음료는 서로 배타적으로 선택된다', () => 
   expect(selection().choices).toEqual({ '3004-50': '3004-50-20' });
 });
 
-test('조정 전용 옵션은 바로 보이고 수량형 옵션은 기존처럼 조절된다', () => {
+test('조정 전용 옵션은 개별 해제할 수 있고 수량형 옵션은 기존처럼 조절된다', () => {
   render(<Harness />);
 
   fireEvent.click(screen.getByRole('button', { name: '샷 조절' }));
@@ -98,9 +98,39 @@ test('조정 전용 옵션은 바로 보이고 수량형 옵션은 기존처럼 
   fireEvent.click(screen.getByRole('radio', { name: '연하게' }));
   expect(selection().choices).toEqual({ '1000-10': '1000-10-10' });
 
+  fireEvent.click(screen.getByRole('button', { name: '에스프레소 샷 선택 해제' }));
+  expect(selection().choices).toEqual({});
+  expect(screen.getByRole('radio', { name: '연하게' })).not.toBeChecked();
+  expect(screen.queryByRole('button', { name: '에스프레소 샷 선택 해제' })).not.toBeInTheDocument();
+
   fireEvent.click(screen.getByRole('button', { name: '샷 추가' }));
   fireEvent.click(screen.getByRole('button', { name: '에스프레소 샷 추가 수량 늘리기' }));
   expect(selection().qty).toEqual({ '1001-10': 1 });
   fireEvent.click(screen.getByRole('button', { name: '에스프레소 샷 추가 수량 줄이기' }));
   expect(selection().qty).toEqual({ '1001-10': 0 });
+});
+
+test('전체 초기화는 모든 퍼스널 옵션만 해제하고 열린 카테고리는 유지한다', () => {
+  render(<Harness />);
+
+  fireEvent.click(screen.getByRole('button', { name: '드리즐' }));
+  fireEvent.click(screen.getByRole('checkbox', { name: '카라멜드리즐' }));
+  fireEvent.click(screen.getByRole('button', { name: '샷 조절' }));
+  fireEvent.click(screen.getByRole('radio', { name: '연하게' }));
+  fireEvent.click(screen.getByRole('button', { name: '샷 추가' }));
+  fireEvent.click(screen.getByRole('button', { name: '에스프레소 샷 추가 수량 늘리기' }));
+  expect(selection()).toEqual({
+    qty: { '1001-10': 1 },
+    choices: { '9004-10': '9004-10-20', '1000-10': '1000-10-10' },
+  });
+
+  fireEvent.click(screen.getByRole('button', { name: '초기화' }));
+
+  expect(selection()).toEqual({ qty: {}, choices: {} });
+  expect(screen.getByRole('checkbox', { name: '카라멜드리즐' })).not.toBeChecked();
+  expect(screen.queryByRole('radio', { name: '드리즐보통' })).not.toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: '연하게' })).not.toBeChecked();
+  expect(screen.getByRole('button', { name: '초기화' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '드리즐' })).toHaveAttribute('aria-expanded', 'true');
+  expect(screen.getByRole('button', { name: '샷 추가' })).toHaveAttribute('aria-expanded', 'true');
 });

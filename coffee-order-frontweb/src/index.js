@@ -1,7 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import 'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css';
 import './index.css';
+import './styles/tokens.css';
 import App from './App';
+import './styles/responsive-controls.css';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));

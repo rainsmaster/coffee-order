@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './CustomOptionsPanel.css';
 
-const CustomOptionsPanel = ({ customOptions, selectedCustom, onChange, disabled = false }) => {
+const CustomOptionsPanel = ({ customOptions, selectedCustom, onChange, onClose, disabled = false }) => {
   const [openCategories, setOpenCategories] = useState({});
   const [activeGroups, setActiveGroups] = useState({});
 
@@ -65,6 +65,21 @@ const CustomOptionsPanel = ({ customOptions, selectedCustom, onChange, disabled 
       ...selectedCustom,
       choices: { ...selectedCustom.choices, [group.groupKey]: choiceKey },
     });
+  };
+
+  const clearChoice = (group) => {
+    const nextChoices = { ...selectedCustom.choices };
+    delete nextChoices[group.groupKey];
+    setActiveGroups((previous) => ({ ...previous, [group.groupKey]: false }));
+    onChange({ ...selectedCustom, choices: nextChoices });
+  };
+
+  const hasSelection = Object.values(selectedCustom.qty).some((quantity) => quantity > 0)
+    || Object.values(selectedCustom.choices).some(Boolean);
+
+  const resetAll = () => {
+    setActiveGroups({});
+    onChange({ qty: {}, choices: {} });
   };
 
   const selectedPrice = (category) => {
@@ -155,7 +170,20 @@ const CustomOptionsPanel = ({ customOptions, selectedCustom, onChange, disabled 
                           </span>
                         </div>
                       ) : (
-                        <div className="custom-choice-title">{group.name}</div>
+                        <div className="custom-choice-heading">
+                          <div className="custom-choice-title">{group.name}</div>
+                          {selectedKey && (
+                            <button
+                              type="button"
+                              className="custom-choice-clear"
+                              aria-label={`${group.name} 선택 해제`}
+                              onClick={() => clearChoice(group)}
+                              disabled={disabled}
+                            >
+                              해제
+                            </button>
+                          )}
+                        </div>
                       )}
                       {(!group.toggleable || isChecked) && (
                         <div className="custom-choice-options">
@@ -181,6 +209,24 @@ const CustomOptionsPanel = ({ customOptions, selectedCustom, onChange, disabled 
           </section>
         );
       })}
+      <div className="custom-accordion-actions">
+        <button
+          type="button"
+          className="custom-accordion-reset"
+          onClick={resetAll}
+          disabled={disabled || !hasSelection}
+          title="선택한 퍼스널 옵션을 모두 해제합니다"
+        >
+          초기화
+        </button>
+        <button
+          type="button"
+          className="custom-accordion-close"
+          onClick={onClose}
+        >
+          닫기
+        </button>
+      </div>
     </div>
   );
 };

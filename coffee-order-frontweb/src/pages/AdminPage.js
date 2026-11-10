@@ -193,11 +193,11 @@ const AdminPage = ({ embedded = false }) => {
               const verification = verificationResults[rep.id];
               return (
                 <tr key={rep.id}>
-                  <td>{rep.name}</td>
-                  <td>{rep.departmentName}</td>
-                  <td>{rep.pinSet ? '설정됨' : '미설정'}</td>
-                  <td>{formatDateTime(rep.lastLoginAt)}</td>
-                  <td className="twosome-status-cell">
+                  <td data-label="이름">{rep.name}</td>
+                  <td data-label="소속">{rep.departmentName}</td>
+                  <td data-label="PIN 설정">{rep.pinSet ? '설정됨' : '미설정'}</td>
+                  <td data-label="PIN 최종 로그인">{formatDateTime(rep.lastLoginAt)}</td>
+                  <td data-label="투썸 상태" className="twosome-status-cell">
                     <div className={`twosome-status-badge ${status.className}`}>{status.label}</div>
                     <div className="twosome-meta">
                       {rep.twosomeStoreNm && <span>{rep.twosomeStoreNm} · </span>}
@@ -215,7 +215,7 @@ const AdminPage = ({ embedded = false }) => {
                       </div>
                     )}
                   </td>
-                  <td className="admin-table-actions">
+                  <td data-label="관리" className="admin-table-actions">
                     {rep.twosomeStatus === 'ACTIVE' ? (
                       <button className="admin-btn small" disabled={logoutRepIds[rep.id]} onClick={() => handleTwosomeLogout(rep)}>
                         {logoutRepIds[rep.id] ? '로그아웃 중...' : '로그아웃'}

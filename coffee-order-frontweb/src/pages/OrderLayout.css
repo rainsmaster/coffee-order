@@ -1,0 +1,122 @@
+.order-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.order-main {
+  min-width: 0;
+}
+
+.order-summary {
+  position: sticky;
+  top: 1rem;
+  padding: 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-canvas);
+}
+
+.order-summary-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.order-summary-heading h3 {
+  margin: 0;
+  color: var(--color-ink);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.order-summary-caption {
+  color: var(--color-muted);
+  font-size: 0.78rem;
+}
+
+.order-summary-menu {
+  margin-top: 0.45rem;
+  color: var(--color-ink);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.order-summary-options {
+  margin: 0.4rem 0 0;
+  color: var(--color-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.order-summary-price {
+  margin-top: 0.75rem;
+  color: var(--color-brand);
+  font-size: 1.3rem;
+  font-weight: 750;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.order-summary-destination {
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 1023px) {
+  .order-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .order-main {
+    width: 100%;
+  }
+
+  .order-summary {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+    order: -1;
+    width: 100%;
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+  }
+
+  .order-summary.is-empty {
+    display: none;
+  }
+
+  .order-summary-menu,
+  .order-summary-options {
+    grid-column: 1;
+    margin-top: 0;
+    font-size: 0.8rem;
+  }
+
+  .order-summary-price {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    align-self: center;
+    margin-top: 0;
+    font-size: 1.05rem;
+  }
+
+  .order-summary-destination {
+    grid-column: 1 / -1;
+    margin-top: 0.35rem;
+    padding-top: 0.45rem;
+    font-size: 0.75rem;
+  }
+}

@@ -6,9 +6,11 @@ import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 import AdminPage from './AdminPage';
 import ReleaseNotesAdmin from './ReleaseNotesAdmin';
+import PageHeader from '../components/PageHeader';
 import useModal from '../hooks/useModal';
 import { isWithinStoreHours } from '../utils/storeHours';
 import './ManagePage.css';
+import './ManageLayout.css';
 
 const ManagePage = ({ initialTab }) => {
   const { selectedDepartment, selectedDepartmentId, setSelectedDepartment, refreshDepartments } = useDepartment();
@@ -355,6 +357,7 @@ const ManagePage = ({ initialTab }) => {
 
   return (
     <div className="manage-page">
+      <PageHeader title="설정" description="부서·팀원·대표와 서비스 연동을 관리합니다." />
       <div className="manage-tabs">
         <button
           className={activeTab === 'department' ? 'active' : ''}

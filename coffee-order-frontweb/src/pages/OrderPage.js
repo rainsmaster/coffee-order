@@ -7,11 +7,13 @@ import OrderChangeModal from '../components/OrderChangeModal';
 import ReorderModal from '../components/ReorderModal';
 import RepSelectModal from '../components/RepSelectModal';
 import CustomOptionsPanel from '../components/CustomOptionsPanel';
+import MenuThumbnail from '../components/MenuThumbnail';
 import Modal from '../components/Modal';
 import useModal from '../hooks/useModal';
 import { isWithinStoreHours } from '../utils/storeHours';
 import { needsOptionConfirmation, restoreOptionSelections } from '../utils/reorderOptions';
 import './OrderPage.css';
+import './OrderLayout.css';
 
 const OrderPage = ({ onAddTeamMember }) => {
   const { selectedDepartmentId } = useDepartment();
@@ -27,6 +29,8 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [selectedOpts, setSelectedOpts] = useState({}); // {grpCd: opts}
   const [variantInfo, setVariantInfo] = useState(null); // {variantMenuCd, variantMenuNm, price}
   const [customOptions, setCustomOptions] = useState(null); // 퍼스널 옵션 (수량형+선택형)
+  const [customOptionsStatus, setCustomOptionsStatus] = useState('idle');
+  const [customOptionsRetry, setCustomOptionsRetry] = useState(0);
   const [selectedCustom, setSelectedCustom] = useState({ qty: {}, choices: {} }); // {qty:{key:수량}, choices:{groupKey:choiceKey}}
   const [customOptionsOpen, setCustomOptionsOpen] = useState(false); // 퍼스널 옵션 아코디언 펼침 여부 (기본 접힘)
   const [availableOpts, setAvailableOpts] = useState({}); // 그룹 의존성 {grpCd: [가능 opts...]} (서버 조회 실패 시 빈 맵=전체 렌더)
@@ -716,11 +720,14 @@ const OrderPage = ({ onAddTeamMember }) => {
       setVariantInfo(null);
       setVariantFailed(false);
       setCustomOptions(null);
+      setCustomOptionsStatus('idle');
       setSelectedCustom({ qty: {}, choices: {} });
       setCustomOptionsOpen(false);
       return undefined;
     }
     let cancelled = false;
+    setCustomOptions(null);
+    setCustomOptionsStatus('loading');
     const fetchVariant = async () => {
       try {
         const result = await twosomeStoreAPI.resolveVariant(menuOptions.menuCd, getSelectedOptsList());
@@ -730,6 +737,7 @@ const OrderPage = ({ onAddTeamMember }) => {
           setVariantInfo(null);
           setVariantFailed(true);
           setCustomOptions(null);
+          setCustomOptionsStatus('idle');
           return;
         }
         setVariantFailed(false);
@@ -741,9 +749,13 @@ const OrderPage = ({ onAddTeamMember }) => {
         if (result?.variantMenuCd) {
           try {
             const custom = await twosomeStoreAPI.getMenuCustomOptions(result.variantMenuCd);
-            if (!cancelled) setCustomOptions(custom);
+            if (cancelled) return;
+            setCustomOptions(custom || null);
+            setCustomOptionsStatus(custom?.hasCustom ? 'success' : 'empty');
           } catch (err) {
-            if (!cancelled) setCustomOptions(null);
+            if (cancelled) return;
+            setCustomOptions(null);
+            setCustomOptionsStatus('error');
           }
         }
       } catch (err) {
@@ -751,6 +763,7 @@ const OrderPage = ({ onAddTeamMember }) => {
           setVariantInfo(null);
           setVariantFailed(true);
           setCustomOptions(null);
+          setCustomOptionsStatus('idle');
           setCustomOptionsOpen(false);
         }
       }
@@ -758,7 +771,7 @@ const OrderPage = ({ onAddTeamMember }) => {
     fetchVariant();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOpts, menuOptions]);
+  }, [selectedOpts, menuOptions, customOptionsRetry]);
 
   // 선택한 퍼스널 옵션을 cartCstmInfo 배열로 변환 (투썸 원문 필드명)
   const buildCartCstmInfo = (variantMenuCd) => {
@@ -1146,9 +1159,12 @@ const OrderPage = ({ onAddTeamMember }) => {
           <span>{repList.length > 0 ? repList.map((rep) => `${rep.name}(${rep.statusReason})`).join(', ') : '주문 후 대표 등록과 투썸 로그인을 진행할 수 있습니다.'}</span>
           <span>매장 상태: {isStoreOpen ? '영업 중 · 실제 장바구니 담기 가능' : '매장 닫힘 또는 확인 불가 · 로컬 주문서만 저장'}</span>
         </div>
+        <div className="order-layout">
+          <div className="order-main">
         <div className="form-group">
           <label>이름 선택</label>
           <select
+            aria-label="주문자 이름 선택"
             value={selectedTeam}
             onChange={(e) => {
               if (e.target.value === 'ADD_TEAM_MEMBER') {
@@ -1219,6 +1235,9 @@ const OrderPage = ({ onAddTeamMember }) => {
             <div className="menu-search-container">
               <input
                 type="text"
+                name="menuSearch"
+                autoComplete="off"
+                aria-label="메뉴 검색"
                 className="menu-search-input"
                 placeholder="메뉴 검색 (예: 아메리카노, 라떼)"
                 value={menuSearchQuery}
@@ -1228,6 +1247,7 @@ const OrderPage = ({ onAddTeamMember }) => {
               {menuSearchQuery && (
                 <button
                   className="menu-search-clear"
+                  aria-label="메뉴 검색어 지우기"
                   onClick={() => setMenuSearchQuery('')}
                   type="button"
                 >
@@ -1276,11 +1296,7 @@ const OrderPage = ({ onAddTeamMember }) => {
                     onClick={() => handleTwosomeMenuCardClick(menu)}
                     disabled={!orderAvailable}
                   >
-                    <img
-                      src={menu.localImgPath || `https://mcdn.twosome.co.kr${menu.menuImg02 || menu.menuImg}`}
-                      alt={menu.menuNm}
-                      onError={(e) => { e.target.src = 'https://via.placeholder.com/120?text=No+Image'; }}
-                    />
+                    <MenuThumbnail menu={menu} />
                     <span className="twosome-card-name">{menu.menuNm}</span>
                     <span className="twosome-card-category">{menu.category}</span>
                     {menu.salesPsblQty === 0 && <span className="sold-out-badge">품절</span>}
@@ -1305,11 +1321,7 @@ const OrderPage = ({ onAddTeamMember }) => {
                   onClick={() => handleTwosomeMenuCardClick(menu)}
                   disabled={!orderAvailable}
                 >
-                  <img
-                    src={menu.localImgPath || `https://mcdn.twosome.co.kr${menu.menuImg02 || menu.menuImg}`}
-                    alt={menu.menuNm}
-                    onError={(e) => { e.target.src = 'https://via.placeholder.com/120?text=No+Image'; }}
-                  />
+                  <MenuThumbnail menu={menu} />
                   <span className="twosome-card-name">{menu.menuNm}</span>
                   {menu.salesPsblQty === 0 && <span className="sold-out-badge">품절</span>}
                 </button>
@@ -1380,8 +1392,38 @@ const OrderPage = ({ onAddTeamMember }) => {
           </div>
         )}
 
-        {/* 투썸 메뉴 퍼스널 옵션 — 변형 완료 + 커스텀 있을 때만 헤더 노출, 기본 접힘 아코디언 */}
-        {selectedTwosomeMenu && variantInfo && customOptions && customOptions.hasCustom && (
+        {/* 로딩 상태도 같은 영역을 유지해 주문 버튼 위치가 밀리지 않게 한다 */}
+        {selectedTwosomeMenu && customOptionsStatus !== 'success' && (
+          <div className="form-group twosome-options custom-accordion">
+            {customOptionsStatus === 'loading' ? (
+              <div className="custom-options-status" role="status" aria-live="polite">
+                <span className="custom-options-spinner" aria-hidden="true" />
+                퍼스널 옵션을 불러오는 중…
+              </div>
+            ) : customOptionsStatus === 'error' ? (
+              <div className="custom-options-status is-error" role="alert">
+                <span>퍼스널 옵션을 불러오지 못했습니다.</span>
+                <button
+                  type="button"
+                  className="custom-options-retry"
+                  onClick={() => setCustomOptionsRetry((retry) => retry + 1)}
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : customOptionsStatus === 'empty' ? (
+              <div className="custom-options-status">퍼스널 옵션 없음</div>
+            ) : (
+              <div className="custom-options-status">
+                {variantFailed
+                  ? '선택한 옵션 조합에서는 퍼스널 옵션을 사용할 수 없습니다.'
+                  : '기본 옵션을 선택하면 퍼스널 옵션을 사용할 수 있습니다.'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedTwosomeMenu && customOptionsStatus === 'success' && variantInfo && customOptions?.hasCustom && (
           <div className="form-group twosome-options custom-accordion">
             <button
               type="button"
@@ -1398,15 +1440,9 @@ const OrderPage = ({ onAddTeamMember }) => {
                 customOptions={customOptions}
                 selectedCustom={selectedCustom}
                 onChange={setSelectedCustom}
+                onClose={() => setCustomOptionsOpen(false)}
                 disabled={!orderAvailable}
               />
-              <button
-                type="button"
-                className="custom-accordion-close"
-                onClick={() => setCustomOptionsOpen(false)}
-              >
-                닫기
-              </button>
             </div>
             )}
           </div>
@@ -1431,6 +1467,41 @@ const OrderPage = ({ onAddTeamMember }) => {
                 ? '대표 선택 후 투썸 장바구니 담기'
                 : '팀 주문서에 담기'}
         </button>
+          </div>
+          <aside className={`order-summary ${!selectedTwosomeMenu ? 'is-empty' : ''}`} aria-label="주문 요약">
+            <div className="order-summary-heading">
+              <h3>주문 요약</h3>
+              <span className="order-summary-caption">총 예상 금액</span>
+            </div>
+            <div className="order-summary-menu">
+              {selectedTwosomeMenu ? getSelectedMenuName() : '메뉴를 선택해주세요'}
+            </div>
+            {selectedTwosomeMenu && (
+              <>
+                <p className="order-summary-options">
+                  {[getTwosomeOptionString(), getCustomOptionString()].filter(Boolean).join(' | ') || '기본 옵션을 선택해주세요.'}
+                </p>
+                <div className="order-summary-price">
+                  {variantInfo?.price != null
+                    ? `${(variantInfo.price + getCustomTotalPrice()).toLocaleString()}원`
+                    : '가격 확인 중…'}
+                </div>
+              </>
+            )}
+            <div className="order-summary-destination">
+              {!isStoreOpen
+                ? '매장 닫힘 · 팀 주문서만 저장'
+                : repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length === 1
+                  ? `${repList.find((rep) => rep.twosomeStatus === 'ACTIVE').name} 대표의 투썸 장바구니`
+                  : repList.some((rep) => rep.twosomeStatus === 'ACTIVE')
+                    ? '대표를 선택해 투썸 장바구니에 담기'
+                    : '팀 주문서만 저장'}
+            </div>
+            <div className="order-summary-caption">
+              {getSelectedTeamName() || '주문자를 선택해주세요'}
+            </div>
+          </aside>
+        </div>
       </div>
 
       {/* Alert 모달 */}

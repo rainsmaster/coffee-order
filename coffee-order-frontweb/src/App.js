@@ -9,13 +9,15 @@ import ReleaseNoteModal from './components/ReleaseNoteModal';
 import { releaseNoteAPI } from './services/api';
 import { dismissReleaseForToday, shouldShowRelease } from './utils/releaseNotice';
 import './App.css';
+import './AppLayout.css';
 
 function HeaderTitle({ onTap }) {
   const { selectedDepartment, loading } = useDepartment();
-  if (loading) return <h1 className="header-title">커피주문</h1>;
+  if (loading) return <h1 className="header-title">허다방</h1>;
   return (
-    <button className="header-title-button" onClick={onTap}>
-      <span className="header-title-text">{selectedDepartment?.name || ''} 커피주문</span>
+    <button className="header-title-button" onClick={onTap} aria-label={`부서 선택: ${selectedDepartment?.name || ''}`}>
+      <span className="header-brand">허다방</span>
+      <span className="header-title-text">{selectedDepartment?.name || ''}</span>
       <svg className="header-title-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
     </button>
   );
@@ -94,13 +96,14 @@ function AppContent() {
 
   return (
     <div className="App">
+      <a className="skip-link" href="#main-content">본문으로 바로가기</a>
       <header className="App-header"><HeaderTitle onTap={() => setIsDepartmentSheetOpen(true)} /></header>
-      <main className="App-main">{renderPage()}</main>
+      <main id="main-content" className="App-main">{renderPage()}</main>
       <BottomSheet isOpen={isDepartmentSheetOpen} onClose={() => setIsDepartmentSheetOpen(false)} title="부서 선택">
         <DepartmentList onSelect={handleDepartmentSelect} onAddTeam={() => openManageTab('department')} />
       </BottomSheet>
       <ReleaseNoteModal note={releaseNote} onClose={() => setReleaseNote(null)} onDismissToday={dismissReleaseToday} onDetail={handleReleaseDetail} />
-      <nav className="bottom-nav">
+      <nav className="bottom-nav" aria-label="주요 메뉴">
         <button className={`nav-item ${currentPage === 'order' ? 'active' : ''}`} onClick={() => setCurrentPage('order')}>
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M6 1v3M10 1v3M14 1v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>주문</span>
         </button>

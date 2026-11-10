@@ -3,7 +3,9 @@ import { suggestionAPI, releaseNoteAPI } from '../services/api';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
+import PageHeader from '../components/PageHeader';
 import './SuggestionPage.css';
+import './SuggestionLayout.css';
 
 function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
   // 목록 상태
@@ -373,7 +375,7 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
   return (
     <div className="suggestion-page">
       <div className="page-header">
-        <h1>건의사항</h1>
+        <PageHeader title="건의와 업데이트" description="팀의 의견과 허다방 개선 소식을 확인하세요." />
         <button
           className="write-btn"
           onClick={() => {
@@ -405,41 +407,43 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
           <div className="suggestion-list">
             {/* 고정글 */}
             {pinnedSuggestions.map(suggestion => (
-              <div
+              <button
+                type="button"
                 key={`pinned-${suggestion.id}`}
                 className={`suggestion-item pinned ${suggestion.deleted ? 'deleted' : ''}`}
                 onClick={() => handleViewDetail(suggestion)}
               >
-                <div className="suggestion-header">
+                <span className="suggestion-header">
                   <span className="pin-badge">[고정]</span>
                   <span className="suggestion-title">{suggestion.title}</span>
                   <span className="comment-count">[{suggestion.commentCount}]</span>
-                </div>
-                <div className="suggestion-meta">
+                </span>
+                <span className="suggestion-meta">
                   <span className="author">{suggestion.author}</span>
                   <span className="date">{formatDate(suggestion.createdAt)}</span>
-                </div>
-              </div>
+                </span>
+              </button>
             ))}
 
             {/* 일반글 */}
             {suggestions.map(suggestion => (
-              <div
+              <button
+                type="button"
                 key={suggestion.id}
                 className={`suggestion-item ${suggestion.deleted ? 'deleted' : ''}`}
                 onClick={() => handleViewDetail(suggestion)}
               >
-                <div className="suggestion-header">
+                <span className="suggestion-header">
                   <span className="suggestion-title">{suggestion.title}</span>
                   {suggestion.commentCount > 0 && (
                     <span className="comment-count">[{suggestion.commentCount}]</span>
                   )}
-                </div>
-                <div className="suggestion-meta">
+                </span>
+                <span className="suggestion-meta">
                   <span className="author">{suggestion.author}</span>
                   <span className="date">{formatDate(suggestion.createdAt)}</span>
-                </div>
-              </div>
+                </span>
+              </button>
             ))}
 
             {pinnedSuggestions.length === 0 && suggestions.length === 0 && (

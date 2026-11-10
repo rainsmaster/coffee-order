@@ -123,6 +123,49 @@
   cursor: not-allowed;
 }
 
+.custom-choice-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.custom-choice-clear {
+  padding: 0.15rem 0;
+  border: 0;
+  background: none;
+  color: #666;
+  font-size: 0.78rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.custom-accordion-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.custom-accordion-actions .custom-accordion-reset,
+.custom-accordion-actions .custom-accordion-close {
+  margin: 0.75rem 0 0;
+}
+
+.custom-accordion-reset {
+  padding: 0.3rem 1.2rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  color: #555;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.custom-accordion-reset:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 @media (max-width: 480px) {
   .custom-choice-options {
     gap: 0.5rem 1rem;
