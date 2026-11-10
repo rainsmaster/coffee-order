@@ -539,45 +539,6 @@
   border-color: #007bff;
 }
 
-.release-note-detail-card {
-  margin-bottom: 20px;
-  padding: 20px;
-  border: 1px solid #dce4ef;
-  border-radius: 8px;
-  background: #f8fbff;
-}
-
-.release-note-detail-meta {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  color: #68778a;
-  font-size: 13px;
-}
-
-.release-note-detail-summary {
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.release-note-detail-content {
-  padding: 16px 0;
-  border-top: 1px solid #e3e9f0;
-  line-height: 1.75;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.release-note-detail-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.release-note-detail-actions button {
-  min-height: 44px;
-}
-
 /* 반응형 */
 @media (max-width: 768px) {
   .suggestion-page {

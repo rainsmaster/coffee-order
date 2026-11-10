@@ -73,6 +73,8 @@ class TwosomeStoreIntegrationServiceTest {
     void refreshesSoftDeletedMenuWithoutDuplicateInsert() {
         TwosomeMenu deleted = menu("20501763");
         deleted.setDelYn("Y");
+        deleted.setMidCd("20");
+        deleted.setMidNm("음료");
         when(menuRepository.findAll()).thenReturn(List.of(deleted));
         when(menuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")).thenReturn(List.of());
         when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -102,10 +104,86 @@ class TwosomeStoreIntegrationServiceTest {
     }
 
     @Test
+    void hidesMissingStoreMenuWhilePreservingOrderHistory() {
+        TwosomeMenu discontinued = menu("10302165");
+        discontinued.setId(34L);
+        discontinued.setMidCd("02");
+        discontinued.setMidNm("음료");
+        when(menuRepository.findAll()).thenReturn(List.of(discontinued));
+        when(menuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")).thenReturn(List.of(discontinued));
+        when(orderRepository.existsByTwosomeMenuId(34L)).thenReturn(true);
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        TwosomeMenuResponse.TwosomeMenuItem current = new TwosomeMenuResponse.TwosomeMenuItem();
+        current.setMenuCd("10401684");
+        current.setMenuNm("프랭클린(라즈베리)");
+        current.setMidCd("02");
+        current.setMidNm("음료");
+        current.setSaleAmt("4,000");
+        current.setSalesPsblQty(-1);
+        TwosomeMenuResponse response = new TwosomeMenuResponse();
+        response.setQueryCode(1000);
+        response.setFetchResultListSet(List.of(current));
+        when(apiClient.fetchStoreMenus(any(), eq("1102115"))).thenReturn(response);
+
+        activateAdminSession();
+        service.refreshStoreMenus();
+
+        assertThat(discontinued.getDelYn()).isEqualTo("Y");
+        verify(menuRepository).saveAll(org.mockito.ArgumentMatchers.argThat(menus -> {
+            for (TwosomeMenu item : menus) {
+                if (item == discontinued) return true;
+            }
+            return false;
+        }));
+    }
+
+    @Test
+    void keepsSameMenuCodeInSeparateCategories() {
+        TwosomeMenu decaf = menu("10100001");
+        decaf.setMidNm("디카페인 커피");
+        when(menuRepository.findAll()).thenReturn(List.of(decaf));
+        when(menuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")).thenReturn(List.of(decaf));
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        TwosomeMenuResponse.TwosomeMenuItem regular = new TwosomeMenuResponse.TwosomeMenuItem();
+        regular.setMenuCd("10100001");
+        regular.setMenuNm("아메리칸노");
+        regular.setMidCd("01");
+        regular.setMidNm("커피");
+        regular.setSaleAmt("5,200");
+        regular.setSalesPsblQty(-1);
+        TwosomeMenuResponse.TwosomeMenuItem decafItem = new TwosomeMenuResponse.TwosomeMenuItem();
+        decafItem.setMenuCd("10100001");
+        decafItem.setMenuNm("디카페인 아메리칸노");
+        decafItem.setMidCd("17");
+        decafItem.setMidNm("디카페인 커피");
+        decafItem.setSaleAmt("5,200");
+        decafItem.setSalesPsblQty(-1);
+        TwosomeMenuResponse response = new TwosomeMenuResponse();
+        response.setQueryCode(1000);
+        response.setFetchResultListSet(List.of(decafItem, regular));
+        when(apiClient.fetchStoreMenus(any(), eq("1102115"))).thenReturn(response);
+
+        activateAdminSession();
+        int saved = service.refreshStoreMenus();
+
+        assertThat(saved).isEqualTo(2);
+        assertThat(decaf.getMenuNm()).isEqualTo("디카페인 아메리칸노");
+        org.mockito.ArgumentCaptor<java.util.List<TwosomeMenu>> captor =
+                org.mockito.ArgumentCaptor.forClass(java.util.List.class);
+        verify(menuRepository).saveAll(captor.capture());
+        List<TwosomeMenu> savedMenus = captor.getValue();
+        assertThat(savedMenus).hasSize(2).contains(decaf);
+        assertThat(savedMenus).anyMatch(item -> "01".equals(item.getMidCd())
+                && "아메리칸노".equals(item.getMenuNm()));
+    }
+
+    @Test
     void rejectsBaseMenuWhenOptionVariantIsMissing() {
         TwosomeMenu menu = menu("10100001");
-        when(menuRepository.findByMenuCd("10100001")).thenReturn(Optional.of(menu));
-        when(optionService.getMenuOptions("rep:1", "10100001")).thenReturn(cupOptions());
+        when(menuRepository.findByMenuCdAndMidCd("10100001", "17")).thenReturn(Optional.of(menu));
+        when(optionService.getMenuOptions("rep:1", "10100001", "17")).thenReturn(cupOptions());
         activateRepSession();
 
         TwosomeCartAddResponse response = service.addItemsToCart("rep:1", new TwosomeCartAddRequest(
@@ -120,8 +198,8 @@ class TwosomeStoreIntegrationServiceTest {
     @Test
     void removesNewZeroPricedItemAfterSuccessfulCartAdd() throws Exception {
         TwosomeMenu menu = menu("10100001");
-        when(menuRepository.findByMenuCd("10100001")).thenReturn(Optional.of(menu));
-        when(optionService.getMenuOptions("rep:1", "10100001")).thenReturn(cupOptions());
+        when(menuRepository.findByMenuCdAndMidCd("10100001", "17")).thenReturn(Optional.of(menu));
+        when(optionService.getMenuOptions("rep:1", "10100001", "17")).thenReturn(cupOptions());
         when(optionService.resolveVariant(eq("rep:1"), any())).thenReturn(
                 new TwosomeVariantResolveResponse("10101001", "Americano", 5200, "Americano"));
         when(apiClient.fetchCartList(any(), eq("1102115"))).thenReturn(
@@ -146,8 +224,8 @@ class TwosomeStoreIntegrationServiceTest {
     @Test
     void acceptsValidatedVariantWithPositivePrice() throws Exception {
         TwosomeMenu menu = menu("10100001");
-        when(menuRepository.findByMenuCd("10100001")).thenReturn(Optional.of(menu));
-        when(optionService.getMenuOptions("rep:1", "10100001")).thenReturn(cupOptions());
+        when(menuRepository.findByMenuCdAndMidCd("10100001", "17")).thenReturn(Optional.of(menu));
+        when(optionService.getMenuOptions("rep:1", "10100001", "17")).thenReturn(cupOptions());
         when(optionService.resolveVariant(eq("rep:1"), any())).thenReturn(
                 new TwosomeVariantResolveResponse("10101001", "Americano", 5200, "Americano"));
         when(apiClient.fetchCartList(any(), eq("1102115"))).thenReturn(
@@ -168,10 +246,43 @@ class TwosomeStoreIntegrationServiceTest {
     }
 
     @Test
+    void usesDefaultVariantAndFinalPriceForHoneyLemonAde() throws Exception {
+        TwosomeMenu menu = menu("10302165");
+        menu.setMidCd("02");
+        menu.setMidNm("음료");
+        menu.setDefaultMenuCd("10302175");
+        when(menuRepository.findByMenuCdAndMidCd("10302165", "02")).thenReturn(Optional.of(menu));
+        when(optionService.getMenuOptions("rep:1", "10302165", "02")).thenReturn(
+                new TwosomeMenuOptionsResponse("10302165", true, "옵션이 없는 메뉴입니다.", List.of()));
+        when(apiClient.fetchCartList(any(), eq("1102115"))).thenReturn(
+                objectMapper.readTree("{\"resultCd\":\"0000\",\"cartStoreMenuList\":[]}"),
+                objectMapper.readTree("{\"resultCd\":\"0000\",\"cartStoreMenuList\":["
+                        + "{\"CART_NO\":\"cart-honey\",\"CART_DTL_NO\":\"1\",\"MENU_CD\":\"10302175\","
+                        + "\"UP_MENU_CD\":\"10302165\",\"MID_CD\":\"02\",\"SALE_AMT\":0,"
+                        + "\"FINAL_PRC\":5800,\"ORD_CNT\":1}]}"));
+        when(apiClient.addToCart(any(), anyString())).thenReturn(
+                new TwosomeStoreApiClient.CartAddResult(true, "0000", null));
+        activateRepSession();
+
+        TwosomeCartItemRequest honeyRequest = cartItem("10302165", null, null);
+        honeyRequest.setMidCd("02");
+        TwosomeCartAddResponse response = service.addItemsToCart("rep:1", new TwosomeCartAddRequest(
+                1L, List.of(honeyRequest)));
+
+        assertThat(response.getSuccess()).isEqualTo(1);
+        assertThat(response.getFailed()).isZero();
+        verify(apiClient).addToCart(any(), org.mockito.ArgumentMatchers.argThat(json ->
+                json.contains("\"MENU_CD\":\"10302175\"")
+                        && json.contains("\"UP_MENU_CD\":\"10302165\"")
+                        && json.contains("\"MID_CD\":\"02\"")));
+        verify(apiClient, never()).deleteCartItem(any(), anyString(), anyString());
+    }
+
+    @Test
     void doesNotRejectItemWhenPriceFieldIsMissing() throws Exception {
         TwosomeMenu menu = menu("10401690");
-        when(menuRepository.findByMenuCd("10401690")).thenReturn(Optional.of(menu));
-        when(optionService.getMenuOptions("rep:1", "10401690")).thenReturn(
+        when(menuRepository.findByMenuCdAndMidCd("10401690", "17")).thenReturn(Optional.of(menu));
+        when(optionService.getMenuOptions("rep:1", "10401690", "17")).thenReturn(
                 new TwosomeMenuOptionsResponse("10401690", true, null, List.of()));
         when(apiClient.fetchCartList(any(), eq("1102115"))).thenReturn(
                 objectMapper.readTree("{\"resultCd\":\"0000\",\"cartStoreMenuList\":[]}"),

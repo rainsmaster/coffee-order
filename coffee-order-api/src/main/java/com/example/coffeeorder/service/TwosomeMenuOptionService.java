@@ -51,7 +51,14 @@ public class TwosomeMenuOptionService {
      */
     @Transactional
     public TwosomeMenuOptionsResponse getMenuOptions(String sessionKey, String menuCd) {
-        TwosomeMenu menu = twosomeMenuRepository.findByMenuCd(menuCd)
+        return getMenuOptions(sessionKey, menuCd, null);
+    }
+
+    @Transactional
+    public TwosomeMenuOptionsResponse getMenuOptions(String sessionKey, String menuCd, String midCd) {
+        TwosomeMenu menu = (midCd != null && !midCd.isBlank()
+                ? twosomeMenuRepository.findByMenuCdAndMidCd(menuCd, midCd)
+                : twosomeMenuRepository.findFirstByMenuCdOrderByIdAsc(menuCd))
                 .orElseThrow(() -> new TwosomeStoreException("메뉴를 찾을 수 없습니다. (menuCd=" + menuCd + ")"));
 
         if (menu.getOptionData() != null && !menu.getOptionData().isBlank()) {

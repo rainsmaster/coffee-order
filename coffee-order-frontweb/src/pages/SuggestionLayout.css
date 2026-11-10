@@ -262,20 +262,79 @@
   color: var(--color-muted);
 }
 
-.suggestion-page .release-note-detail-card {
-  padding: 1.25rem;
+.suggestion-page .page-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.6rem;
+}
+
+.suggestion-page .release-write-btn {
+  min-height: 40px;
+  padding: 0.55rem 1rem;
   border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-brand);
+  font-weight: 600;
+}
+
+.suggestion-page .release-write-btn:hover {
+  border-color: var(--color-brand);
   background: var(--color-brand-soft);
 }
 
-.suggestion-page .release-note-detail-meta {
+.suggestion-page .release-list-status {
+  padding: 1rem;
   color: var(--color-muted);
+  text-align: center;
+}
+
+.suggestion-page .suggestion-item.release-item.pinned {
+  border-left-color: var(--color-brand);
+  background: var(--color-brand-soft);
+}
+
+.suggestion-page .suggestion-item.release-item.pinned:hover {
+  background: #e7efea;
+}
+
+.suggestion-page .suggestion-item.release-item.draft {
+  border-left: 3px solid var(--color-line);
+  background: var(--color-canvas);
+}
+
+.suggestion-page .update-badge {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  background: var(--color-brand);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.suggestion-page .release-detail-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+}
+
+.suggestion-page .release-detail-summary {
+  margin: 1rem 0;
+  color: var(--color-muted);
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.suggestion-page .release-detail-actions {
+  display: flex;
+  gap: 0.6rem;
 }
 
 .suggestion-page .form-actions,
 .suggestion-page .detail-actions,
-.suggestion-page .release-note-detail-actions {
+.suggestion-page .release-detail-actions {
   flex-wrap: wrap;
 }
 
@@ -286,6 +345,15 @@
 
   .suggestion-page .page-header {
     align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .suggestion-page .page-header-actions {
+    width: 100%;
+  }
+
+  .suggestion-page .page-header-actions > button {
+    flex: 1;
   }
 
   .suggestion-page .comment-form-row {

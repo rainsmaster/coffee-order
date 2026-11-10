@@ -239,8 +239,7 @@
   }
 }
 
-.admin-form-card label,
-.release-notes-admin > .admin-form-card > label {
+.admin-form-card label {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
@@ -249,59 +248,7 @@
   font-size: 0.88rem;
 }
 
-.release-notes-admin input,
-.release-notes-admin textarea {
-  width: 100%;
-  padding: 0.6rem;
-  border: 1px solid #ccc;
-  border-radius: 6px;
-  box-sizing: border-box;
-  font: inherit;
-}
-
-.release-note-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 2fr;
-  gap: 0.75rem;
-}
-
-.release-note-form-grid label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  font-size: 0.88rem;
-}
-
-.release-notes-admin .release-note-publish {
-  flex-direction: row;
-  align-items: center;
-}
-
-.release-notes-admin .release-note-publish input {
-  width: auto;
-}
-
-.release-note-admin-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  min-height: 44px;
-  padding: 0.65rem 0;
-  border-bottom: 1px solid #eee;
-}
-
-.release-note-admin-item p {
-  margin: 0.25rem 0 0;
-  color: #777;
-  font-size: 0.8rem;
-}
-
 @media (max-width: 600px) {
-  .release-note-form-grid {
-    grid-template-columns: 1fr;
-  }
-
   .admin-login-card {
     margin-top: 1rem;
     padding: 1.25rem;

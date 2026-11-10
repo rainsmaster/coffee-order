@@ -23,6 +23,7 @@ public class OrderResponseDto {
     private String twosomeMenuName;
     private String twosomeMenuCategory;
     private String twosomeMenuCode;  // 메뉴 옵션 조회용 코드
+    private String twosomeMenuMidCd;
     private String menuType;  // 레거시 CUSTOM 주문 구분용 (신규 주문은 항상 TWOSOME)
     private String personalOption;
     private LocalDate orderDate;
@@ -56,6 +57,7 @@ public class OrderResponseDto {
             dto.setTwosomeMenuName(sanitize(order.getTwosomeMenu().getMenuNm()));
             dto.setTwosomeMenuCategory(sanitize(order.getTwosomeMenu().getMidNm()));
             dto.setTwosomeMenuCode(order.getTwosomeMenu().getMenuCd());
+            dto.setTwosomeMenuMidCd(order.getTwosomeMenu().getMidCd());
             dto.setMenuName(dto.getTwosomeMenuName());
         } else {
             dto.setMenuName(dto.getPersonalOption());

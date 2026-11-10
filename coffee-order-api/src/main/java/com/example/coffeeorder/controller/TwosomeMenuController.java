@@ -41,8 +41,12 @@ public class TwosomeMenuController {
 
     // 메뉴코드로 조회
     @GetMapping("/code/{menuCd}")
-    public ResponseEntity<TwosomeMenu> getMenuByCode(@PathVariable String menuCd) {
-        return twosomeMenuService.findByMenuCd(menuCd)
+    public ResponseEntity<TwosomeMenu> getMenuByCode(
+            @PathVariable String menuCd,
+            @RequestParam(required = false) String midCd) {
+        return (midCd != null && !midCd.isBlank()
+                ? twosomeMenuService.findByMenuCdAndMidCd(menuCd, midCd)
+                : twosomeMenuService.findByMenuCd(menuCd))
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }

@@ -8,5 +8,6 @@ import java.util.Optional;
 
 public interface ReleaseNoteRepository extends JpaRepository<ReleaseNote, Long> {
     Optional<ReleaseNote> findTopByPublishedTrueOrderByPublishedAtDescIdDesc();
+    List<ReleaseNote> findByPublishedTrueOrderByPublishedAtDescIdDesc();
     List<ReleaseNote> findAllByOrderByPublishedAtDescIdDesc();
 }

@@ -13,6 +13,11 @@ public class ReleaseNoteController {
 
     private final ReleaseNoteRepository releaseNoteRepository;
 
+    @GetMapping
+    public java.util.List<ReleaseNote> listPublished() {
+        return releaseNoteRepository.findByPublishedTrueOrderByPublishedAtDescIdDesc();
+    }
+
     @GetMapping("/latest")
     public ResponseEntity<ReleaseNote> latest() {
         return releaseNoteRepository.findTopByPublishedTrueOrderByPublishedAtDescIdDesc()

@@ -331,37 +331,38 @@ public class TwosomeStoreIntegrationService {
             // upsert는 삭제 행까지 조회해 재판매 메뉴를 복구하고, 정리 대상은 현재 활성 행만 비교한다.
             Map<String, TwosomeMenu> beforeByMenuCd = new HashMap<>();
             for (TwosomeMenu menu : twosomeMenuRepository.findAll()) {
-                beforeByMenuCd.put(menu.getMenuCd(), menu);
+                beforeByMenuCd.put(menuKey(menu.getMenuCd(), menu.getMidCd()), menu);
             }
             Map<String, TwosomeMenu> activeBeforeByMenuCd = new HashMap<>();
             for (TwosomeMenu menu : twosomeMenuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")) {
-                activeBeforeByMenuCd.put(menu.getMenuCd(), menu);
+                activeBeforeByMenuCd.put(menuKey(menu.getMenuCd(), menu.getMidCd()), menu);
             }
 
             int savedCount = upsertStoreMenus(items, beforeByMenuCd);
             touchAndPersist(session);
 
-            // 사라짐 분기: 주문 이력 없음 → 소프트삭제(정리), 이력 있음 → 시즌종료(보존)
+            // 현재 매장 목록에 없는 메뉴는 주문 화면에서 제외한다.
+            // 이력이 있으면 시즌종료로만 구분하고 DB 레코드는 남겨 과거 주문을 보존한다.
             List<TwosomeMenu> toClean = new ArrayList<>();
             List<String> cleaned = new ArrayList<>();
             List<String> seasonEnded = new ArrayList<>();
             Set<String> fetchedCds = new HashSet<>();
             for (TwosomeMenuItem item : items) {
                 if (item.getMenuCd() != null && !item.getMenuCd().isBlank()) {
-                    fetchedCds.add(item.getMenuCd());
+                    fetchedCds.add(menuKey(item.getMenuCd(), item.getMidCd()));
                 }
             }
             for (TwosomeMenu prev : activeBeforeByMenuCd.values()) {
-                if (fetchedCds.contains(prev.getMenuCd())) {
+                if (fetchedCds.contains(menuKey(prev.getMenuCd(), prev.getMidCd()))) {
                     continue;
                 }
                 if (orderRepository.existsByTwosomeMenuId(prev.getId())) {
                     seasonEnded.add(prev.getMenuCd() + " " + prev.getMenuNm());
                 } else {
-                    prev.setDelYn("Y");
-                    toClean.add(prev);
                     cleaned.add(prev.getMenuCd() + " " + prev.getMenuNm());
                 }
+                prev.setDelYn("Y");
+                toClean.add(prev);
             }
             if (!toClean.isEmpty()) {
                 twosomeMenuRepository.saveAll(toClean);
@@ -420,11 +421,12 @@ public class TwosomeStoreIntegrationService {
         int soldOutCount = 0;
 
         for (TwosomeMenuItem item : items) {
-            if (item.getMenuCd() == null || item.getMenuCd().isBlank() || !fetched.add(item.getMenuCd())) {
+            if (item.getMenuCd() == null || item.getMenuCd().isBlank()
+                    || !fetched.add(menuKey(item.getMenuCd(), item.getMidCd()))) {
                 continue;
             }
             Integer newPrice = parseSaleAmt(item.getSaleAmt());
-            TwosomeMenu prev = before.get(item.getMenuCd());
+            TwosomeMenu prev = before.get(menuKey(item.getMenuCd(), item.getMidCd()));
             if (prev == null) {
                 added.add(item.getMenuCd() + " " + item.getMenuNm());
             } else if (!java.util.Objects.equals(prev.getSaleAmt(), newPrice)) {
@@ -515,9 +517,7 @@ public class TwosomeStoreIntegrationService {
         List<TwosomeCartItemRequest> items = request.getItems();
         for (int i = 0; i < items.size(); i++) {
             TwosomeCartItemRequest item = items.get(i);
-            TwosomeMenu menu = (item.getMenuCd() != null)
-                    ? twosomeMenuRepository.findByMenuCd(item.getMenuCd()).orElse(null)
-                    : null;
+            TwosomeMenu menu = findMenu(item.getMenuCd(), item.getMidCd());
             String menuNm = (menu != null) ? menu.getMenuNm() : null;
 
             try {
@@ -718,9 +718,8 @@ public class TwosomeStoreIntegrationService {
         }
 
         // 재담기에 필요한 코드 준비 (로컬 메뉴 테이블에서 보완)
-        String midCd = twosomeMenuRepository.findByMenuCd(request.getMenuCd())
-                .map(TwosomeMenu::getMidCd)
-                .orElse(null);
+        TwosomeMenu menu = findMenu(request.getMenuCd(), null);
+        String midCd = menu != null ? menu.getMidCd() : null;
 
         // 삭제 후 재담기 (삭제 실패 시 재담기하지 않음)
         removeCartItem(sessionKey, cartNo, request.getCartDtlNo());
@@ -793,7 +792,9 @@ public class TwosomeStoreIntegrationService {
         response.setMidCd(firstText(item, "MID_CD", "midCd"));
         response.setMenuNm(firstText(item, "MENU_NM", "MENU_NM1", "menuNm", "MENU_NM2"));
         response.setQty(firstInt(item, 0, "ORD_CNT", "CART_CNT", "ORD_QTY", "qty"));
-        response.setPrice(firstInt(item, null, "SALE_AMT", "SALE_PRC", "FINAL_PRC", "MENU_PRC", "PRC", "price"));
+        Integer price = firstPositiveInt(item, "FINAL_PRC", "SALE_PRC", "MENU_PRC", "PRC", "SALE_AMT", "price");
+        response.setPrice(price != null ? price
+                : firstInt(item, null, "FINAL_PRC", "SALE_PRC", "MENU_PRC", "PRC", "SALE_AMT", "price"));
         // 재담기용 옵션 조합 (예: "010H,020R,040A,051E")
         response.setMenuOptVal(firstText(item, "MENU_OPT_VAL", "menuOptVal"));
         // 표시용 옵션 문자열 (예: "아이스 | 라지 | 블랙그라운드 | 일회용컵")
@@ -842,6 +843,16 @@ public class TwosomeStoreIntegrationService {
             }
         }
         return defaultValue;
+    }
+
+    private static Integer firstPositiveInt(JsonNode node, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            Integer value = firstInt(node, null, fieldName);
+            if (value != null && value > 0) {
+                return value;
+            }
+        }
+        return null;
     }
 
     // ==================== 메뉴 상세 옵션 / 변형 코드 ====================
@@ -1083,12 +1094,22 @@ public class TwosomeStoreIntegrationService {
                 entry.getValue().isPending() && entry.getValue().isPendingExpired());
     }
 
+    private TwosomeMenu findMenu(String menuCd, String midCd) {
+        if (menuCd == null || menuCd.isBlank()) {
+            return null;
+        }
+        return (midCd != null && !midCd.isBlank()
+                ? twosomeMenuRepository.findByMenuCdAndMidCd(menuCd, midCd)
+                : twosomeMenuRepository.findFirstByMenuCdOrderByIdAsc(menuCd))
+                .orElse(null);
+    }
+
     private void validateCartItem(String sessionKey, TwosomeCartItemRequest item, TwosomeMenu menu) {
         if (menu == null) {
             throw new TwosomeStoreException("메뉴 정보를 찾을 수 없습니다. 메뉴를 새로고침한 뒤 다시 선택해주세요.");
         }
         TwosomeMenuOptionService optionService = twosomeMenuOptionServiceProvider.getObject();
-        TwosomeMenuOptionsResponse options = optionService.getMenuOptions(sessionKey, item.getMenuCd());
+        TwosomeMenuOptionsResponse options = optionService.getMenuOptions(sessionKey, item.getMenuCd(), menu.getMidCd());
         if (!options.isParsed()) {
             throw new TwosomeStoreException(options.getMessage() != null
                     ? options.getMessage()
@@ -1145,9 +1166,11 @@ public class TwosomeStoreIntegrationService {
 
     private String buildCartInfoJson(TwosomeCartItemRequest item, TwosomeMenu menu) {
         // 변형 코드(옵션 조합 결과)가 있으면 MENU_CD=변형, UP_MENU_CD=기본 코드
+        // 옵션 조합이 없는 메뉴는 매장이 제공한 기본 변형 코드를 사용해 기본 코드의 0원 응답을 방지한다.
         String menuCd = (item.getVariantMenuCd() != null && !item.getVariantMenuCd().isBlank())
                 ? item.getVariantMenuCd()
-                : item.getMenuCd();
+                : (menu != null && menu.getDefaultMenuCd() != null && !menu.getDefaultMenuCd().isBlank()
+                        ? menu.getDefaultMenuCd() : item.getMenuCd());
         String upMenuCd = (item.getUpMenuCd() != null && !item.getUpMenuCd().isBlank())
                 ? item.getUpMenuCd()
                 : item.getMenuCd();
@@ -1186,9 +1209,13 @@ public class TwosomeStoreIntegrationService {
         }
     }
 
+    private static String menuKey(String menuCd, String midCd) {
+        return menuCd + "|" + (midCd != null ? midCd : "");
+    }
+
     /**
-     * 매장 메뉴 upsert: menuCd 기준으로 없으면 신규, 있으면 매장 정보로 갱신.
-     * 매장 목록에서 사라진 기존 항목은 이번에 del_yn 처리하지 않고 diff 리포트의 '사라짐'으로만 기록한다.
+     * 매장 메뉴 upsert: (menuCd, midCd) 기준으로 없으면 신규, 있으면 매장 정보로 갱신.
+     * 목록에서 제외된 항목은 refreshStoreMenus에서 주문 화면 비활성화하고, 재판매 시 del_yn=N으로 복구한다.
      */
     private int upsertStoreMenus(List<TwosomeMenuItem> items, Map<String, TwosomeMenu> existingByMenuCd) {
         Set<String> fetchedMenuCds = new HashSet<>();
@@ -1199,12 +1226,11 @@ public class TwosomeStoreIntegrationService {
             if (item.getMenuCd() == null || item.getMenuCd().isBlank()) {
                 continue;
             }
-            // 매장 응답에는 같은 메뉴가 중분류별로 중복 수록되므로 첫 번째 것만 처리
-            if (!fetchedMenuCds.add(item.getMenuCd())) {
+            if (!fetchedMenuCds.add(menuKey(item.getMenuCd(), item.getMidCd()))) {
                 continue;
             }
 
-            TwosomeMenu menu = existingByMenuCd.get(item.getMenuCd());
+            TwosomeMenu menu = existingByMenuCd.get(menuKey(item.getMenuCd(), item.getMidCd()));
             if (menu == null) {
                 menu = new TwosomeMenu();
                 menu.setMenuCd(item.getMenuCd());

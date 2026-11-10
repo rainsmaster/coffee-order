@@ -123,6 +123,7 @@ test('옵션 코드가 없는 과거 주문은 바로 저장하지 않고 복원
   await openLegacyReorder();
 
   expect(await screen.findByText(/이전 주문에 저장되지 않은 옵션이 있어/)).toBeInTheDocument();
+  expect(twosomeStoreAPI.getMenuOptions).toHaveBeenCalledWith('10191489', '10');
   expect(orderAPI.create).not.toHaveBeenCalled();
   expect(repAPI.repAddToCart).not.toHaveBeenCalled();
   expect(screen.getByRole('button', { name: '아이스' })).toHaveClass('selected');
@@ -146,6 +147,7 @@ test('옵션 코드가 없는 과거 주문은 바로 저장하지 않고 복원
   }));
   expect(repAPI.repAddToCart).toHaveBeenCalledWith(3, [expect.objectContaining({
     menuCd: '10191489',
+    midCd: '10',
     variantMenuCd: '10191496',
     opts: ['011I', '020L', '042D', '051T'],
   })]);
@@ -286,4 +288,36 @@ test('퍼스널 옵션 조회 실패 후 재시도하면 정상 옵션으로 전
 
   expect(await screen.findByRole('button', { name: /퍼스널 옵션 \(선택\)/ })).toBeInTheDocument();
   expect(twosomeStoreAPI.getMenuCustomOptions).toHaveBeenCalledTimes(2);
+});
+
+const openNoOptionMenu = async (item) => {
+  twosomeMenuAPI.getAll.mockResolvedValue({ 음료: [item] });
+  twosomeStoreAPI.getMenuOptions.mockResolvedValue({ menuCd: item.menuCd, parsed: true, groups: [] });
+  render(<OrderPage />);
+  fireEvent.click(await screen.findByRole('button', { name: '음료 (1)' }));
+  fireEvent.click(await screen.findByRole('button', { name: new RegExp(item.menuNm) }));
+};
+
+test.each([
+  { saleAmt: 4000, defaultMenuCd: null, expectedPrice: '4,000원', expectedCode: 'BASE-MENU' },
+  { saleAmt: 5800, defaultMenuCd: 'DEFAULT-VARIANT', expectedPrice: '5,800원', expectedCode: 'DEFAULT-VARIANT' },
+])('옵션이 없는 메뉴는 매장 가격과 기본 코드를 즉시 사용한다', async ({ saleAmt, defaultMenuCd, expectedPrice, expectedCode }) => {
+  await openNoOptionMenu({
+    id: 90, menuCd: 'BASE-MENU', menuNm: '기본 음료', midCd: '02', saleAmt, defaultMenuCd, salesPsblQty: -1,
+  });
+
+  await waitFor(() => expect(screen.getByLabelText('주문 요약')).toHaveTextContent(expectedPrice));
+  expect(twosomeStoreAPI.resolveVariant).not.toHaveBeenCalled();
+  expect(twosomeStoreAPI.getMenuCustomOptions).toHaveBeenCalledWith(expectedCode);
+});
+
+test('가격을 확인할 수 없는 메뉴는 대기 대신 가격 정보 없음으로 표시한다', async () => {
+  twosomeStoreAPI.resolveVariant.mockRejectedValue(new Error('가격 조회 실패'));
+  await openNoOptionMenu({
+    id: 91, menuCd: 'UNKNOWN-PRICE', menuNm: '가격 미확인 음료', midCd: '02', saleAmt: null,
+    defaultMenuCd: 'DEFAULT-VARIANT', salesPsblQty: -1,
+  });
+
+  await waitFor(() => expect(screen.getByLabelText('주문 요약')).toHaveTextContent('가격 정보 없음'));
+  expect(screen.queryByText('가격 확인 중…')).not.toBeInTheDocument();
 });

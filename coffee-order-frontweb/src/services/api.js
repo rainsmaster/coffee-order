@@ -203,7 +203,7 @@ export const twosomeStoreAPI = {
   }),
 
   // 메뉴 옵션 그룹 조회 (상세 페이지 파싱 + 캐시, 관리자/대표 세션 필요)
-  getMenuOptions: (menuCd) => fetchAPI(`/twosome/menus/${menuCd}/options`, {
+  getMenuOptions: (menuCd, midCd) => fetchAPI(`/twosome/menus/${menuCd}/options${midCd ? `?midCd=${encodeURIComponent(midCd)}` : ''}`, {
     headers: repTokenHeaderIfAny(),
   }),
 
@@ -367,6 +367,7 @@ export const repAPI = {
 
 export const releaseNoteAPI = {
   latest: () => fetchAPI('/release-notes/latest'),
+  getPublished: () => fetchAPI('/release-notes'),
   getById: (id) => fetchAPI(`/release-notes/${id}`),
 };
 

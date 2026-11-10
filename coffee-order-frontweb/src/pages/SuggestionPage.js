@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { suggestionAPI, releaseNoteAPI } from '../services/api';
+import { suggestionAPI, releaseNoteAPI, adminAPI } from '../services/api';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
 import ConfirmModal from '../components/ConfirmModal';
 import PageHeader from '../components/PageHeader';
+import ReleaseNoteEditorModal from '../components/ReleaseNoteEditorModal';
 import './SuggestionPage.css';
 import './SuggestionLayout.css';
 
@@ -48,8 +49,13 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
   const [pendingAction, setPendingAction] = useState(null);
 
   const [loading, setLoading] = useState(false);
-  const [releaseNote, setReleaseNote] = useState(null);
-  const [releaseLoading, setReleaseLoading] = useState(false);
+  const [releaseNotes, setReleaseNotes] = useState([]);
+  const [releaseListLoading, setReleaseListLoading] = useState(false);
+  const [selectedReleaseNote, setSelectedReleaseNote] = useState(null);
+  const [showReleaseDetailModal, setShowReleaseDetailModal] = useState(false);
+  const [showReleaseEditor, setShowReleaseEditor] = useState(false);
+  const [releaseEditorNote, setReleaseEditorNote] = useState(null);
+  const [adminToken, setAdminToken] = useState(localStorage.getItem('adminToken'));
 
   const fetchSuggestions = useCallback(async (page = 0) => {
     try {
@@ -67,26 +73,60 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
     }
   }, []);
 
+  const fetchReleaseNotes = useCallback(async () => {
+    setReleaseListLoading(true);
+    try {
+      const publicNotes = await releaseNoteAPI.getPublished() || [];
+      if (!adminToken) {
+        setReleaseNotes(publicNotes);
+        return;
+      }
+      try {
+        setReleaseNotes(await adminAPI.getReleaseNotes() || []);
+      } catch (error) {
+        setReleaseNotes(publicNotes);
+        if (error.message?.startsWith('ADMIN')) {
+          localStorage.removeItem('adminToken');
+          setAdminToken(null);
+        } else {
+          setAlertModal({ show: true, message: '비공개 업데이트는 확인하지 못했습니다. 공개 목록만 표시합니다.' });
+        }
+      }
+    } catch (error) {
+      setReleaseNotes([]);
+      setAlertModal({ show: true, message: '업데이트 목록을 불러오지 못했습니다.' });
+    } finally {
+      setReleaseListLoading(false);
+    }
+  }, [adminToken]);
+
   useEffect(() => {
     fetchSuggestions();
   }, [fetchSuggestions]);
 
   useEffect(() => {
+    fetchReleaseNotes();
+  }, [fetchReleaseNotes]);
+
+  useEffect(() => {
     let cancelled = false;
-    if (!releaseNoteId) {
-      setReleaseNote(null);
+    if (!releaseNoteId) return undefined;
+    const listedNote = releaseNotes.find((note) => String(note.id) === String(releaseNoteId));
+    if (listedNote) {
+      setSelectedReleaseNote(listedNote);
+      setShowReleaseDetailModal(true);
       return undefined;
     }
-    setReleaseLoading(true);
     releaseNoteAPI.getById(releaseNoteId).then((note) => {
-      if (!cancelled) setReleaseNote(note);
+      if (!cancelled) {
+        setSelectedReleaseNote(note);
+        setShowReleaseDetailModal(true);
+      }
     }).catch(() => {
-      if (!cancelled) setAlertModal({ show: true, message: '릴리즈 노트를 찾을 수 없거나 아직 공개되지 않았습니다.' });
-    }).finally(() => {
-      if (!cancelled) setReleaseLoading(false);
+      if (!cancelled) setAlertModal({ show: true, message: '업데이트를 찾을 수 없거나 아직 공개되지 않았습니다.' });
     });
     return () => { cancelled = true; };
-  }, [releaseNoteId]);
+  }, [releaseNoteId, releaseNotes]);
 
   // 상세 조회
   const handleViewDetail = async (suggestion) => {
@@ -99,6 +139,45 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
     } catch (error) {
       setAlertModal({ show: true, message: '상세 정보를 불러오는데 실패했습니다.' });
     }
+  };
+
+  const handleViewRelease = (note) => {
+    setSelectedReleaseNote(note);
+    setShowReleaseDetailModal(true);
+  };
+
+  const closeReleaseDetail = () => {
+    setShowReleaseDetailModal(false);
+    setSelectedReleaseNote(null);
+    if (releaseNoteId) {
+      onReleaseNoteClosed?.();
+      window.history.replaceState(null, '', '/');
+    }
+  };
+
+  const openReleaseEditor = (note = null) => {
+    if (showReleaseDetailModal) closeReleaseDetail();
+    setReleaseEditorNote(note);
+    setShowReleaseEditor(true);
+  };
+
+  const handleReleaseSaved = (saved, token) => {
+    setAdminToken(token);
+    setReleaseNotes((current) => current.some((note) => note.id === saved.id)
+      ? current.map((note) => note.id === saved.id ? saved : note)
+      : [saved, ...current]);
+    setShowReleaseEditor(false);
+    setReleaseEditorNote(null);
+    fetchReleaseNotes();
+    setAlertModal({ show: true, message: '업데이트를 저장하고 게시판에 반영했습니다.' });
+  };
+
+  const handleReleaseOpinion = () => {
+    const version = selectedReleaseNote?.version;
+    closeReleaseDetail();
+    resetForm();
+    setFormData((previous) => ({ ...previous, title: `[${version}] ` }));
+    setShowWriteModal(true);
   };
 
   // 글 작성
@@ -376,35 +455,47 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
     <div className="suggestion-page">
       <div className="page-header">
         <PageHeader title="건의와 업데이트" description="팀의 의견과 허다방 개선 소식을 확인하세요." />
-        <button
-          className="write-btn"
-          onClick={() => {
-            resetForm();
-            setShowWriteModal(true);
-          }}
-        >
-          글쓰기
-        </button>
+        <div className="page-header-actions">
+          <button className="release-write-btn" onClick={() => openReleaseEditor()}>업데이트 작성</button>
+          <button
+            className="write-btn"
+            onClick={() => {
+              resetForm();
+              setShowWriteModal(true);
+            }}
+          >
+            글쓰기
+          </button>
+        </div>
       </div>
 
-      {releaseLoading && <div className="release-note-detail-card"><h2>릴리즈 노트를 불러오는 중...</h2></div>}
-      {releaseNote && (
-        <article className="release-note-detail-card" aria-labelledby="release-note-detail-title">
-          <div className="release-note-detail-meta"><span>버전 {releaseNote.version}</span><span>{releaseNote.publishedAt ? new Date(releaseNote.publishedAt).toLocaleString('ko-KR') : ''}</span></div>
-          <h2 id="release-note-detail-title">{releaseNote.title}</h2>
-          <p className="release-note-detail-summary">{releaseNote.summary}</p>
-          <div className="release-note-detail-content">{releaseNote.content}</div>
-          <div className="release-note-detail-actions">
-            <button className="submit-btn" onClick={() => { resetForm(); setFormData((previous) => ({ ...previous, title: `[${releaseNote.version}] ` })); setShowWriteModal(true); }}>이 버전의 의견 남기기</button>
-            <button className="cancel-btn" onClick={() => { setReleaseNote(null); onReleaseNoteClosed?.(); window.history.replaceState(null, '', '/'); }}>상세 닫기</button>
-          </div>
-        </article>
-      )}
       {loading ? (
         <div className="loading">로딩 중...</div>
       ) : (
         <>
           <div className="suggestion-list">
+            {releaseListLoading && releaseNotes.length === 0 && (
+              <div className="release-list-status" role="status">업데이트를 불러오는 중...</div>
+            )}
+            {releaseNotes.map(note => (
+              <button
+                type="button"
+                key={`release-${note.id}`}
+                className={`suggestion-item release-item ${note.published ? 'pinned' : 'draft'}`}
+                onClick={() => handleViewRelease(note)}
+              >
+                <span className="suggestion-header">
+                  <span className="pin-badge">{note.published ? '[고정]' : '[비공개]'}</span>
+                  <span className="update-badge">업데이트</span>
+                  <span className="suggestion-title">{note.title}</span>
+                </span>
+                <span className="suggestion-meta">
+                  <span className="author">버전 {note.version}</span>
+                  <span className="date">{note.publishedAt ? formatDate(note.publishedAt) : '작성 중'}</span>
+                </span>
+              </button>
+            ))}
+
             {/* 고정글 */}
             {pinnedSuggestions.map(suggestion => (
               <button
@@ -446,17 +537,55 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
               </button>
             ))}
 
-            {pinnedSuggestions.length === 0 && suggestions.length === 0 && (
-              <div className="empty-message">등록된 건의사항이 없습니다.</div>
+            {!releaseListLoading && releaseNotes.length === 0 && pinnedSuggestions.length === 0 && suggestions.length === 0 && (
+              <div className="empty-message">등록된 건의사항과 업데이트가 없습니다.</div>
             )}
           </div>
 
           <div className="list-footer">
-            <span className="total-count">전체 {totalElements}개</span>
+            <span className="total-count">건의 {totalElements}개</span>
             {renderPagination()}
           </div>
         </>
       )}
+
+      <Modal isOpen={showReleaseDetailModal} onClose={closeReleaseDetail} title="업데이트">
+        {selectedReleaseNote && (
+          <div className="detail-view release-detail-view">
+            <div className="detail-header">
+              <div className="release-detail-badges">
+                <span className="pin-badge">{selectedReleaseNote.published ? '[고정]' : '[비공개]'}</span>
+                <span className="update-badge">업데이트</span>
+              </div>
+              <h2>{selectedReleaseNote.title}</h2>
+              <div className="detail-meta">
+                <span>버전 {selectedReleaseNote.version}</span>
+                <span>{selectedReleaseNote.publishedAt ? new Date(selectedReleaseNote.publishedAt).toLocaleString('ko-KR') : '아직 공개되지 않음'}</span>
+              </div>
+            </div>
+            <p className="release-detail-summary">{selectedReleaseNote.summary}</p>
+            <div className="detail-content">
+              {selectedReleaseNote.content.split('\n').map((line, index) => (
+                <p key={index}>{line || '\u00A0'}</p>
+              ))}
+            </div>
+            <div className="detail-actions release-detail-actions">
+              {selectedReleaseNote.published && (
+                <button className="submit-btn" onClick={handleReleaseOpinion}>이 버전의 의견 남기기</button>
+              )}
+              <button className="action-btn admin" onClick={() => openReleaseEditor(selectedReleaseNote)}>관리자 수정</button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <ReleaseNoteEditorModal
+        isOpen={showReleaseEditor}
+        note={releaseEditorNote}
+        onClose={() => { setShowReleaseEditor(false); setReleaseEditorNote(null); }}
+        onSaved={handleReleaseSaved}
+        onAdminToken={setAdminToken}
+      />
 
       {/* 글쓰기 모달 */}
       <Modal

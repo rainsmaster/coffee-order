@@ -136,10 +136,11 @@ public class TwosomeStoreController {
     @GetMapping("/menus/{menuCd}/options")
     public ResponseEntity<TwosomeMenuOptionsResponse> getMenuOptions(
             @RequestHeader(value = "X-Rep-Token", required = false) String repToken,
-            @PathVariable String menuCd) {
+            @PathVariable String menuCd,
+            @RequestParam(required = false) String midCd) {
         Long repMemberId = repAuthService.resolveMemberIdIfValid(repToken).orElse(null);
         String sessionKey = twosomeStoreIntegrationService.resolveOptionSessionKey(repMemberId);
-        return ResponseEntity.ok(twosomeMenuOptionService.getMenuOptions(sessionKey, menuCd));
+        return ResponseEntity.ok(twosomeMenuOptionService.getMenuOptions(sessionKey, menuCd, midCd));
     }
 
     /**

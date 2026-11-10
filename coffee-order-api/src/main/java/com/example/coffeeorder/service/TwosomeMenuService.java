@@ -27,9 +27,13 @@ public class TwosomeMenuService {
         return twosomeMenuRepository.findById(id);
     }
 
-    // 메뉴코드로 조회
+    // 메뉴코드로 조회 (중분류를 알 수 없는 기존 호출과의 하위 호환)
     public Optional<TwosomeMenu> findByMenuCd(String menuCd) {
-        return twosomeMenuRepository.findByMenuCd(menuCd);
+        return twosomeMenuRepository.findFirstByMenuCdOrderByIdAsc(menuCd);
+    }
+
+    public Optional<TwosomeMenu> findByMenuCdAndMidCd(String menuCd, String midCd) {
+        return twosomeMenuRepository.findByMenuCdAndMidCd(menuCd, midCd);
     }
 
     // 중분류명으로 조회

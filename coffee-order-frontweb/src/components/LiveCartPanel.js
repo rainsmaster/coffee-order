@@ -195,7 +195,7 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
   };
 
   const buildItems = (targets) => targets.map((order) => ({
-    menuCd: order.twosomeMenuCode, upMenuCd: order.twosomeMenuCode, midCd: null, qty: 1,
+    menuCd: order.twosomeMenuCode, upMenuCd: order.twosomeMenuCode, midCd: order.twosomeMenuMidCd || null, qty: 1,
     variantMenuCd: order.variantMenuCd || null,
     opts: order.variantOpts ? order.variantOpts.split(',').map((value) => value.trim()).filter(Boolean) : null,
     cstmInfo: parseCustom(order),

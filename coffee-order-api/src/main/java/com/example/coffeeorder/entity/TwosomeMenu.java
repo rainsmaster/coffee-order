@@ -10,7 +10,8 @@ import lombok.AllArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "twosome_menu")
+@Table(name = "twosome_menu", uniqueConstraints =
+        @UniqueConstraint(name = "uk_twosome_menu_cd_mid_cd", columnNames = {"menu_cd", "mid_cd"}))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,7 +23,7 @@ public class TwosomeMenu {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "menu_cd", unique = true, nullable = false, length = 20)
+    @Column(name = "menu_cd", nullable = false, length = 20)
     private String menuCd;
 
     @Column(name = "menu_nm", nullable = false, length = 200)

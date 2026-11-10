@@ -192,7 +192,7 @@ const OrderPage = ({ onAddTeamMember }) => {
     setMenuSearchQuery('');
     try {
       const options = await handleTwosomeMenuSelect(
-        menu.id.toString(), menu.menuCd, order.personalOption);
+        menu.id.toString(), menu.menuCd, menu.midCd, order.personalOption);
       if (!options?.parsed) {
         showAlert('이전 주문의 옵션을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
         return;
@@ -244,16 +244,17 @@ const OrderPage = ({ onAddTeamMember }) => {
     setIsReorderModalOpen(true);
   };
 
-  // 현재 선택된 메뉴 이름 가져오기 (투썸 메뉴 기준)
-  const getSelectedMenuName = () => {
-    if (selectedTwosomeMenu) {
-      for (const category of Object.values(twosomeMenus)) {
-        const menu = category.find(m => m.id.toString() === selectedTwosomeMenu);
-        if (menu) return menu.menuNm;
-      }
+  const getSelectedMenuInfo = () => {
+    if (!selectedTwosomeMenu) return null;
+    for (const category of Object.values(twosomeMenus)) {
+      const menu = category.find(m => m.id.toString() === selectedTwosomeMenu);
+      if (menu) return menu;
     }
-    return '';
+    return null;
   };
+
+  // 현재 선택된 메뉴 이름 가져오기 (투썸 메뉴 기준)
+  const getSelectedMenuName = () => getSelectedMenuInfo()?.menuNm || '';
 
   // 현재 선택된 팀원 이름 가져오기
   const getSelectedTeamName = () => {
@@ -309,7 +310,7 @@ const OrderPage = ({ onAddTeamMember }) => {
           personalOption: finalOption || null,
           variantMenuCd: variantInfo?.variantMenuCd ?? null,
           variantOpts: getSelectedOptsList().join(',') || null,
-          cstmInfo: variantInfo?.variantMenuCd
+          cstmInfo: customOptions?.hasCustom && variantInfo?.variantMenuCd
             ? (JSON.stringify(buildCartCstmInfo(variantInfo.variantMenuCd)) || null)
             : null,
         }
@@ -326,7 +327,7 @@ const OrderPage = ({ onAddTeamMember }) => {
       orderDate: new Date().toLocaleDateString('sv-SE'),
       variantMenuCd: variantInfo?.variantMenuCd ?? null,
       variantOpts: getSelectedOptsList().join(',') || null,
-      cstmInfo: variantInfo?.variantMenuCd
+      cstmInfo: customOptions?.hasCustom && variantInfo?.variantMenuCd
         ? (JSON.stringify(buildCartCstmInfo(variantInfo.variantMenuCd)) || null)
         : null,
     });
@@ -563,11 +564,11 @@ const OrderPage = ({ onAddTeamMember }) => {
       showAlert('해당 메뉴는 품절입니다. 다른 메뉴를 선택해주세요.');
       return;
     }
-    handleTwosomeMenuSelect(menu.id.toString(), menu.menuCd);
+    handleTwosomeMenuSelect(menu.id.toString(), menu.menuCd, menu.midCd);
   };
 
   // 투썸 메뉴 선택 시 서버 기반 옵션 그룹 로드 (기본값 미리 선택)
-  const handleTwosomeMenuSelect = async (menuId, menuCd, savedOptionText = '') => {
+  const handleTwosomeMenuSelect = async (menuId, menuCd, midCd = null, savedOptionText = '') => {
     setSelectedTwosomeMenu(menuId);
     setMenuOptions(null);
     setOptionsLoading(true);
@@ -585,7 +586,7 @@ const OrderPage = ({ onAddTeamMember }) => {
       return null;
     }
     try {
-      const options = await twosomeStoreAPI.getMenuOptions(menuCd);
+      const options = await twosomeStoreAPI.getMenuOptions(menuCd, midCd);
       if (!options) return null;
       if (!options.parsed) {
         setMenuOptions(options);
@@ -611,7 +612,7 @@ const OrderPage = ({ onAddTeamMember }) => {
 
   // 모든 그룹 선택 완료 여부
   const isAllGroupsSelected = () => {
-    if (!menuOptions || !menuOptions.groups || menuOptions.groups.length === 0) return false;
+    if (!menuOptions?.parsed || !menuOptions.groups) return false;
     return menuOptions.groups.every((group) => selectedOpts[group.grpCd]);
   };
 
@@ -728,34 +729,28 @@ const OrderPage = ({ onAddTeamMember }) => {
     let cancelled = false;
     setCustomOptions(null);
     setCustomOptionsStatus('loading');
+    const hasGroups = (menuOptions.groups || []).length > 0;
     const fetchVariant = async () => {
+      let result;
       try {
-        const result = await twosomeStoreAPI.resolveVariant(menuOptions.menuCd, getSelectedOptsList());
-        if (cancelled) return;
-        // 방어: 변형 코드 없거나 가격이 비정상(0 이하)이면 비정상 조합으로 간주해 차단
-        if (!result || !result.variantMenuCd || result.price == null || result.price <= 0) {
-          setVariantInfo(null);
-          setVariantFailed(true);
-          setCustomOptions(null);
-          setCustomOptionsStatus('idle');
-          return;
-        }
-        setVariantFailed(false);
-        setVariantInfo(result);
-        // 변형 확정 → 퍼스널 옵션 재조회 및 선택/펼침 초기화 (온도 변경 등으로 변형이 바뀌면 리셋)
-        setSelectedCustom({ qty: {}, choices: {} });
-        setCustomOptionsOpen(false);
-        setCustomOptions(null);
-        if (result?.variantMenuCd) {
-          try {
-            const custom = await twosomeStoreAPI.getMenuCustomOptions(result.variantMenuCd);
-            if (cancelled) return;
-            setCustomOptions(custom || null);
-            setCustomOptionsStatus(custom?.hasCustom ? 'success' : 'empty');
-          } catch (err) {
-            if (cancelled) return;
-            setCustomOptions(null);
-            setCustomOptionsStatus('error');
+        if (hasGroups) {
+          result = await twosomeStoreAPI.resolveVariant(menuOptions.menuCd, getSelectedOptsList());
+        } else {
+          const selectedMenu = getSelectedMenuInfo();
+          result = {
+            variantMenuCd: selectedMenu?.defaultMenuCd || menuOptions.menuCd,
+            variantMenuNm: selectedMenu?.menuNm || '',
+            price: selectedMenu?.saleAmt ?? null,
+          };
+          if (result.price == null) {
+            try {
+              const fallback = await twosomeStoreAPI.resolveVariant(menuOptions.menuCd, []);
+              if (fallback?.variantMenuCd && fallback.price > 0) {
+                result = { ...result, ...fallback };
+              }
+            } catch (ignored) {
+              // 매장 가격이 없는 경우에도 가격 대기 상태로 남기지 않는다.
+            }
           }
         }
       } catch (err) {
@@ -766,12 +761,36 @@ const OrderPage = ({ onAddTeamMember }) => {
           setCustomOptionsStatus('idle');
           setCustomOptionsOpen(false);
         }
+        return;
+      }
+      if (cancelled) return;
+      if (!result || !result.variantMenuCd || (hasGroups && (result.price == null || result.price <= 0))) {
+        setVariantInfo(null);
+        setVariantFailed(true);
+        setCustomOptions(null);
+        setCustomOptionsStatus('idle');
+        return;
+      }
+      setVariantFailed(false);
+      setVariantInfo(result);
+      setSelectedCustom({ qty: {}, choices: {} });
+      setCustomOptionsOpen(false);
+      setCustomOptions(null);
+      try {
+        const custom = await twosomeStoreAPI.getMenuCustomOptions(result.variantMenuCd);
+        if (cancelled) return;
+        setCustomOptions(custom || null);
+        setCustomOptionsStatus(custom?.hasCustom ? 'success' : 'empty');
+      } catch (err) {
+        if (cancelled) return;
+        setCustomOptions(null);
+        setCustomOptionsStatus('error');
       }
     };
     fetchVariant();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedOpts, menuOptions, customOptionsRetry]);
+  }, [selectedOpts, menuOptions, customOptionsRetry, selectedTwosomeMenu]);
 
   // 선택한 퍼스널 옵션을 cartCstmInfo 배열로 변환 (투썸 원문 필드명)
   const buildCartCstmInfo = (variantMenuCd) => {
@@ -858,10 +877,12 @@ const OrderPage = ({ onAddTeamMember }) => {
     return parts.join(', ');
   };
 
-  // 메뉴 코드로 중분류 코드 조회 (장바구니 담기용)
-  const findMidCdByMenuCd = (menuCd) => {
+  const findMidCdByOrder = (order) => {
+    if (order.twosomeMenuMidCd) return order.twosomeMenuMidCd;
     for (const menuList of Object.values(twosomeMenus)) {
-      const menu = menuList.find(m => m.menuCd === menuCd);
+      const menu = menuList.find(m => order.twosomeMenuId
+        ? m.id === order.twosomeMenuId
+        : m.menuCd === order.twosomeMenuCode);
       if (menu) return menu.midCd;
     }
     return null;
@@ -873,7 +894,7 @@ const OrderPage = ({ onAddTeamMember }) => {
       .map((order) => ({
         menuCd: order.twosomeMenuCode,
         upMenuCd: order.twosomeMenuCode,
-        midCd: findMidCdByMenuCd(order.twosomeMenuCode),
+        midCd: findMidCdByOrder(order),
         qty: 1,
         opts: order.variantOpts ? order.variantOpts.split(',').map((option) => option.trim()).filter(Boolean) : null,
         variantMenuCd: order.variantMenuCd || null,
@@ -1378,10 +1399,12 @@ const OrderPage = ({ onAddTeamMember }) => {
                     선택: {getTwosomeOptionString()}
                     {getCustomOptionString() && ` | ${getCustomOptionString()}`}
                     {variantInfo.variantMenuNm && ` (${variantInfo.variantMenuNm})`}
-                    {variantInfo.price != null && (
+                    {variantInfo.price != null ? (
                       <span className="variant-price">
                         {' '}예상 가격: {(variantInfo.price + getCustomTotalPrice()).toLocaleString()}원
                       </span>
+                    ) : (
+                      <span className="variant-price">가격 정보 없음</span>
                     )}
                   </>
                 ) : '옵션 가격 확인 중...'
@@ -1482,8 +1505,10 @@ const OrderPage = ({ onAddTeamMember }) => {
                   {[getTwosomeOptionString(), getCustomOptionString()].filter(Boolean).join(' | ') || '기본 옵션을 선택해주세요.'}
                 </p>
                 <div className="order-summary-price">
-                  {variantInfo?.price != null
-                    ? `${(variantInfo.price + getCustomTotalPrice()).toLocaleString()}원`
+                  {variantInfo
+                    ? (variantInfo.price != null
+                      ? `${(variantInfo.price + getCustomTotalPrice()).toLocaleString()}원`
+                      : '가격 정보 없음')
                     : '가격 확인 중…'}
                 </div>
               </>

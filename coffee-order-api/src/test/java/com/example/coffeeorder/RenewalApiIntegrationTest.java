@@ -189,13 +189,32 @@ class RenewalApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.publishedAt").isNotEmpty())
                 .andReturn().getResponse().getContentAsString());
+        String draftVersion = "draft-" + UUID.randomUUID();
+        mockMvc.perform(post("/api/admin/release-notes")
+                        .header("X-Admin-Token", adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "version", draftVersion,
+                                "title", "비공개 안내",
+                                "summary", "비공개 요약",
+                                "content", "비공개 내용",
+                                "published", false))))
+                .andExpect(status().isCreated());
 
+        mockMvc.perform(get("/api/release-notes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].version", org.hamcrest.Matchers.hasItem(version)))
+                .andExpect(jsonPath("$[*].version", org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem(draftVersion))));
         mockMvc.perform(get("/api/release-notes/latest"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.version").value(version));
         mockMvc.perform(get("/api/release-notes/{id}", created.get("id").asLong()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").value(note.get("content")));
+        mockMvc.perform(get("/api/admin/release-notes")
+                        .header("X-Admin-Token", "expired-admin-token"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.error").value("ADMIN_AUTH_FAILED"));
         mockMvc.perform(get("/admin"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(header().string("Location", "/?manageTab=reps"));
