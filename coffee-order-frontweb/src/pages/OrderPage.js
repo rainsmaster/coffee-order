@@ -504,15 +504,19 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
+  const normalizeMenuSearchText = (value) => value.toLowerCase()
+    .replaceAll('\uCE78\uB178', '\uCE74\uB178')
+    .replaceAll('\uCE78\uD638', '\uCE74\uB178');
+
   // 검색된 메뉴 목록 (투썸 모드 전용)
   const getSearchedMenus = () => {
     if (!menuSearchQuery.trim()) return [];
-    const query = menuSearchQuery.toLowerCase().trim();
+    const query = normalizeMenuSearchText(menuSearchQuery.trim());
     const results = [];
 
     Object.entries(twosomeMenus).forEach(([category, menuList]) => {
       menuList.forEach((menu) => {
-        if (menu.menuNm.toLowerCase().includes(query)) {
+        if (normalizeMenuSearchText(menu.menuNm).includes(query)) {
           results.push({ ...menu, category });
         }
       });

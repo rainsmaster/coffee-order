@@ -321,3 +321,17 @@ test('가격을 확인할 수 없는 메뉴는 대기 대신 가격 정보 없�
   await waitFor(() => expect(screen.getByLabelText('주문 요약')).toHaveTextContent('가격 정보 없음'));
   expect(screen.queryByText('가격 확인 중…')).not.toBeInTheDocument();
 });
+
+test.each(['아메리칸노', '아메리칸호'])('공식 메뉴 이름과 다른 표기로 아메리칸노를 검색할 수 있다', async (query) => {
+  twosomeMenuAPI.getAll.mockResolvedValue({
+    커피: [{ id: 100, menuCd: '10100001', menuNm: '아메리칸노', midCd: '01', saleAmt: 4700, salesPsblQty: -1 }],
+    '디카페인 커피': [{ id: 101, menuCd: '10100001', menuNm: '디카페인 아메리칸노', midCd: '17', saleAmt: 5200, salesPsblQty: -1 }],
+  });
+  render(<OrderPage />);
+
+  fireEvent.change(await screen.findByPlaceholderText(/메뉴 검색/), { target: { value: query } });
+
+  expect(await screen.findByText('검색 결과 (2건)')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /아메리칸노 이미지 없음 아메리칸노 커피/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /디카페인 아메리칸노 이미지 없음 디카페인 아메리칸노 디카페인 커피/ })).toBeInTheDocument();
+});
