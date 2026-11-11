@@ -40,6 +40,7 @@ services:
       - TWOSOME_CRYPTO_KEY=${TWOSOME_CRYPTO_KEY:?TWOSOME_CRYPTO_KEY is required}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
       - TWOSOME_MENU_PREWARM_LIMIT=${TWOSOME_MENU_PREWARM_LIMIT:-10}
+      - TWOSOME_IMAGE_DIR=/app/data/images/twosome
       - TZ=Asia/Seoul
     depends_on:
       redis:

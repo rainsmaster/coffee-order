@@ -274,6 +274,8 @@ Cloudflare가 외부 HTTPS를 처리하고, tunnel은 NAS의 Jenkins HTTP 포트
 
 생성된 WebP만 `/volume1/docker/mywebsite/data/images/twosome`에 업로드하고 기존 이미지는 같은 경로에 유지한다. 화면은 원본 URL에 `.webp`를 붙인 이미지를 먼저 요청하고, 실패하면 기존 원본을 사용한다. 원본 이미지 버전 쿼리는 두 URL에 같게 유지하므로 이미지가 바뀌면 Cloudflare와 서비스 워커 캐시도 함께 갱신된다.
 
+앱은 수동·예약 매장 메뉴 갱신 후 활성 메뉴의 이미지도 자동 동기화한다. 메뉴 코드를 파일명으로 사용하며, 같은 메뉴 코드의 일반·디카페인 레코드는 같은 로컬 경로를 공유한다. 원본 URL이 바뀐 이미지와 누락된 원본·WebP를 보충하고 `local_img_path`도 저장한다. 변환에 성공하기 전에는 기존 파일을 덮어쓰지 않으며, 개별 이미지 실패는 메뉴 갱신 자체를 중단하지 않는다. `.source` 파일은 다음 갱신 때 동일 이미지를 다시 받지 않기 위한 원본 URL 기록이다. 운영 이미지에는 `cwebp`가 포함되며 `TWOSOME_IMAGE_DIR`이 기존 볼륨의 `/app/data/images/twosome`으로 설정된다. 위 수동 스크립트는 초기 복구나 일괄 재변환이 필요할 때만 사용한다.
+
 Jenkins 관리자와 Pipeline 설정 권한은 관리자에게만 허용한다. 익명 사용자의 읽기·빌드 권한과 가입 기능은 허용하지 않는다. Jenkins가 Docker 소켓을 사용하므로 외부 관리자 계정에는 강한 고유 비밀번호를 사용한다.
 
 운영 앱은 이제 Container Manager에서 다시 빌드하지 않고 Jenkins로만 배포한다. Container Manager에서는 상태와 로그를 확인한다.

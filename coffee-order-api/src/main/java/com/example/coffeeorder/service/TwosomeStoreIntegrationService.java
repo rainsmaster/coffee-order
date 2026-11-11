@@ -73,6 +73,7 @@ public class TwosomeStoreIntegrationService {
     private final TwosomeAutoReloginGuard autoReloginGuard;
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
     private final org.springframework.beans.factory.ObjectProvider<TwosomeMenuOptionService> twosomeMenuOptionServiceProvider;
+    private final TwosomeMenuImageService twosomeMenuImageService;
 
     // 매장 정보 상수 (CJENM커머스부문점)
     private static final String STORE_CD = "1102115";
@@ -343,7 +344,9 @@ public class TwosomeStoreIntegrationService {
                 activeBeforeByMenuCd.put(menuKey(menu.getMenuCd(), menu.getMidCd()), menu);
             }
 
-            int savedCount = upsertStoreMenus(items, beforeByMenuCd);
+            List<TwosomeMenu> savedMenus = upsertStoreMenus(items, beforeByMenuCd);
+            int savedCount = savedMenus.size();
+            int synchronizedImageCount = twosomeMenuImageService.synchronizeMenus(savedMenus);
             twosomeMenuOptionServiceProvider.getObject().clearCustomOptionsCache();
             touchAndPersist(session);
 
@@ -378,7 +381,8 @@ public class TwosomeStoreIntegrationService {
             saveMenuRefreshDiff(diff);
 
             healthService.record(TwosomeHealthEventType.MENU_SYNC_SUCCESS, true, diffSummary(diff));
-            log.info("Refreshed twosome store menus: {} items | {}", savedCount, diffSummary(diff));
+            log.info("Refreshed twosome store menus: {} items, images={} | {}",
+                    savedCount, synchronizedImageCount, diffSummary(diff));
             return savedCount;
         } catch (TwosomeStoreException e) {
             healthService.record(TwosomeHealthEventType.MENU_SYNC_FAIL, false, e.getMessage());
@@ -1282,7 +1286,7 @@ public class TwosomeStoreIntegrationService {
      * 매장 메뉴 upsert: (menuCd, midCd) 기준으로 없으면 신규, 있으면 매장 정보로 갱신.
      * 목록에서 제외된 항목은 refreshStoreMenus에서 주문 화면 비활성화하고, 재판매 시 del_yn=N으로 복구한다.
      */
-    private int upsertStoreMenus(List<TwosomeMenuItem> items, Map<String, TwosomeMenu> existingByMenuCd) {
+    private List<TwosomeMenu> upsertStoreMenus(List<TwosomeMenuItem> items, Map<String, TwosomeMenu> existingByMenuCd) {
         Set<String> fetchedMenuCds = new HashSet<>();
         List<TwosomeMenu> toSave = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
@@ -1331,7 +1335,7 @@ public class TwosomeStoreIntegrationService {
         }
 
         twosomeMenuRepository.saveAll(toSave);
-        return fetchedMenuCds.size();
+        return toSave;
     }
 
     // ==================== 세션 레코드 ====================

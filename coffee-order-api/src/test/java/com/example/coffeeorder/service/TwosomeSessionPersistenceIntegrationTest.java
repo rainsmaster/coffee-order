@@ -73,7 +73,8 @@ class TwosomeSessionPersistenceIntegrationTest {
                 mock(TwosomeHealthService.class),
                 guard,
                 redisTemplate,
-                mock(ObjectProvider.class));
+                mock(ObjectProvider.class),
+                mock(TwosomeMenuImageService.class));
     }
 
     @AfterEach
@@ -105,7 +106,8 @@ class TwosomeSessionPersistenceIntegrationTest {
                 mock(TwosomeHealthService.class),
                 new TwosomeAutoReloginGuard(redisTemplate),
                 redisTemplate,
-                mock(ObjectProvider.class));
+                mock(ObjectProvider.class),
+                mock(TwosomeMenuImageService.class));
         secondService.restoreSessionFromRedis();
 
         assertThat(secondService.getSessionStatus(SESSION_KEY).getStatus()).isEqualTo("ACTIVE");

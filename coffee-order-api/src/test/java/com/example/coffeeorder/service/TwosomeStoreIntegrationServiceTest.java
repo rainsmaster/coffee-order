@@ -56,6 +56,8 @@ class TwosomeStoreIntegrationServiceTest {
     @Mock
     private TwosomeMenuOptionService optionService;
     @Mock
+    private TwosomeMenuImageService imageService;
+    @Mock
     private ValueOperations<String, String> valueOperations;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -66,7 +68,8 @@ class TwosomeStoreIntegrationServiceTest {
         org.mockito.Mockito.lenient().when(optionServiceProvider.getObject()).thenReturn(optionService);
         service = new TwosomeStoreIntegrationService(
                 apiClient, menuRepository, orderRepository, objectMapper,
-                sessionRedisStore, healthService, autoReloginGuard, stringRedisTemplate, optionServiceProvider);
+                sessionRedisStore, healthService, autoReloginGuard, stringRedisTemplate, optionServiceProvider,
+                imageService);
     }
 
     @Test
@@ -177,6 +180,7 @@ class TwosomeStoreIntegrationServiceTest {
         assertThat(savedMenus).hasSize(2).contains(decaf);
         assertThat(savedMenus).anyMatch(item -> "01".equals(item.getMidCd())
                 && "아메리칸노".equals(item.getMenuNm()));
+        verify(imageService).synchronizeMenus(savedMenus);
     }
 
     @Test

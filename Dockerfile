@@ -23,10 +23,11 @@ WORKDIR /app
 # 타임존 설정 (한국 시간)
 ENV TZ=Asia/Seoul
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl webp \
     && rm -rf /var/lib/apt/lists/* \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
-    && echo $TZ > /etc/timezone
+    && echo $TZ > /etc/timezone \
+    && cwebp -version
 
 # 빌드된 JAR 파일 복사 (React 빌드 결과 포함)
 COPY --from=build /app/coffee-order-api/target/coffee-order-api-1.0.0.jar app.jar
