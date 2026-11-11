@@ -266,7 +266,7 @@ Cloudflare가 외부 HTTPS를 처리하고, tunnel은 NAS의 Jenkins HTTP 포트
 - `heodabang-public-read-apis-60s`: GET `/api/twosome-menus`, `/api/departments`, `/api/twosome/store-info`만 Edge TTL 60초로 캐시한다.
 - `heodabang-versioned-static-1y`: GET `/static/*`, `/images/twosome/*`를 Edge TTL 1년으로 캐시한다. CRA 파일 해시와 이미지 버전 쿼리를 유지해야 한다.
 
-주문, 대표, 관리자, 장바구니, 로그인 API는 캐시하지 않는다. 서버의 `ApiCacheControlFilter`도 공개 조회 외 API에 `no-store`를 적용한다. 배포 후 `cf-cache-status`가 공개 조회에서는 `HIT`, 주문 조회에서는 `DYNAMIC`인지 확인한다.
+주문, 대표, 관리자, 장바구니, 로그인 API는 캐시하지 않는다. 서버의 `ApiCacheControlFilter`도 공개 조회 외 API에 `no-store`를 적용한다. 배포 후 `cf-cache-status`가 공개 조회에서는 `HIT`, 주문 조회에서는 `DYNAMIC`인지 확인한다. 정적 파일이 없거나 오류인 응답도 `no-store`로 반환해, 파일 생성 전의 404가 장기 캐시되지 않게 한다.
 
 ### 메뉴 이미지 WebP
 

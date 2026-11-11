@@ -24,6 +24,17 @@ class StaticContentCacheFilterTest {
     }
 
     @Test
+    void doesNotCacheMissingImages() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/images/twosome/missing.png.webp");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, (servletRequest, servletResponse) ->
+                ((MockHttpServletResponse) servletResponse).setStatus(404));
+
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+    }
+
+    @Test
     void keepsHtmlAndServiceWorkerUncached() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/service-worker.js");
         MockHttpServletResponse response = new MockHttpServletResponse();

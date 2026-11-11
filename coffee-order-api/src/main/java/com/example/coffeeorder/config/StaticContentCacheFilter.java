@@ -30,5 +30,8 @@ public class StaticContentCacheFilter extends OncePerRequestFilter {
                     CacheControl.maxAge(java.time.Duration.ofDays(365)).cachePublic().immutable().getHeaderValue());
         }
         filterChain.doFilter(request, response);
+        if (response.getStatus() >= 400) {
+            response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
+        }
     }
 }
