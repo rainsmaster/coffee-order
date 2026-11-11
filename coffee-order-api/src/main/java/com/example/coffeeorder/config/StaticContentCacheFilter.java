@@ -6,11 +6,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Set;
 
 @Component
@@ -20,31 +22,38 @@ public class StaticContentCacheFilter extends OncePerRequestFilter {
             "/", "/index.html", "/service-worker.js", "/offline.html", "/manifest.json"
     );
 
+    private final Path dataPath;
+
+    public StaticContentCacheFilter(@Value("${app.data.path:./data}") String dataPath) {
+        this.dataPath = Path.of(dataPath).toAbsolutePath().normalize();
+    }
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String path = request.getRequestURI();
-        boolean versionedStatic = path.startsWith("/static/") || path.startsWith("/images/twosome/");
-        ContentCachingResponseWrapper bufferedResponse = versionedStatic
-                ? new ContentCachingResponseWrapper(response) : null;
-        if (NO_CACHE_PATHS.contains(path)) {
+        if (NO_CACHE_PATHS.contains(path) || isMissingImage(path)) {
             response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
-        } else if (versionedStatic) {
+        } else if (path.startsWith("/static/") || path.startsWith("/images/twosome/")) {
             response.setHeader(HttpHeaders.CACHE_CONTROL,
                     CacheControl.maxAge(java.time.Duration.ofDays(365)).cachePublic().immutable().getHeaderValue());
         }
-        try {
-            filterChain.doFilter(request, bufferedResponse != null ? bufferedResponse : response);
-            if (response.getStatus() >= 400) {
-                response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
-            }
-        } catch (IOException | ServletException | RuntimeException e) {
+        filterChain.doFilter(request, response);
+        if (response.getStatus() >= 400) {
             response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
-            throw e;
-        } finally {
-            if (bufferedResponse != null) {
-                bufferedResponse.copyBodyToResponse();
-            }
+        }
+    }
+
+    private boolean isMissingImage(String requestPath) {
+        if (!requestPath.startsWith("/images/")) {
+            return false;
+        }
+        try {
+            Path imageRoot = dataPath.resolve("images").normalize();
+            Path image = imageRoot.resolve(requestPath.substring("/images/".length())).normalize();
+            return !image.startsWith(imageRoot) || !Files.isRegularFile(image) || !Files.isReadable(image);
+        } catch (RuntimeException e) {
+            return true;
         }
     }
 }

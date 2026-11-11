@@ -1,20 +1,46 @@
 package com.example.coffeeorder.config;
 
 import jakarta.servlet.FilterChain;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 class StaticContentCacheFilterTest {
 
-    private final StaticContentCacheFilter filter = new StaticContentCacheFilter();
+    @TempDir
+    private Path dataPath;
+    private StaticContentCacheFilter filter;
+
+    @BeforeEach
+    void setUp() {
+        filter = new StaticContentCacheFilter(dataPath.toString());
+    }
 
     @Test
     void cachesVersionedAssetsForOneYear() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/static/js/main.1234.js");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        assertThat(response.getHeader("Cache-Control"))
+                .contains("max-age=31536000", "public", "immutable");
+    }
+
+    @Test
+    void cachesExistingImagesForOneYear() throws Exception {
+        Path image = dataPath.resolve("images/twosome/existing.png.webp");
+        Files.createDirectories(image.getParent());
+        Files.write(image, new byte[]{1, 2});
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/images/twosome/existing.png.webp");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         filter.doFilter(request, response, mock(FilterChain.class));
