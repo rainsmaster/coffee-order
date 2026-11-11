@@ -1,33 +1,35 @@
 package com.example.coffeeorder.config;
 
+import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.Test;
-import org.springframework.http.CacheControl;
-import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 class StaticContentCacheFilterTest {
 
-    @Test
-    void disablesHttpCacheForHtmlAndServiceWorker() throws Exception {
-        assertThat(filter("/")).isEqualTo(CacheControl.noStore().getHeaderValue());
-        assertThat(filter("/index.html")).isEqualTo(CacheControl.noStore().getHeaderValue());
-        assertThat(filter("/service-worker.js")).isEqualTo(CacheControl.noStore().getHeaderValue());
-    }
+    private final StaticContentCacheFilter filter = new StaticContentCacheFilter();
 
     @Test
-    void preservesCachingForHashedAssetsAndApi() throws Exception {
-        assertThat(filter("/static/js/main.9a943929.js")).isNull();
-        assertThat(filter("/api/departments")).isNull();
-    }
-
-    private String filter(String path) throws Exception {
-        StaticContentCacheFilter filter = new StaticContentCacheFilter();
-        MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+    void cachesVersionedAssetsForOneYear() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/static/js/main.1234.js");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        filter.doFilter(request, response, (servletRequest, servletResponse) -> { });
-        return response.getHeader(HttpHeaders.CACHE_CONTROL);
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        assertThat(response.getHeader("Cache-Control"))
+                .contains("max-age=31536000", "public", "immutable");
+    }
+
+    @Test
+    void keepsHtmlAndServiceWorkerUncached() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/service-worker.js");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
     }
 }

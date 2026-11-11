@@ -22,8 +22,12 @@ public class StaticContentCacheFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        if (NO_CACHE_PATHS.contains(request.getRequestURI())) {
+        String path = request.getRequestURI();
+        if (NO_CACHE_PATHS.contains(path)) {
             response.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
+        } else if (path.startsWith("/static/") || path.startsWith("/images/twosome/")) {
+            response.setHeader(HttpHeaders.CACHE_CONTROL,
+                    CacheControl.maxAge(java.time.Duration.ofDays(365)).cachePublic().immutable().getHeaderValue());
         }
         filterChain.doFilter(request, response);
     }

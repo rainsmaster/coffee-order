@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import Modal from './Modal';
 import { repAPI } from '../services/api';
 import './RepLoginModal.css';
@@ -28,30 +28,6 @@ const RepLoginModal = ({ rep, onClose, onSuccess }) => {
       setCaptchaLoading(false);
     }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    const initialize = async () => {
-      if (!localStorage.getItem('repToken')) return;
-      try {
-        const me = await repAPI.me();
-        if (cancelled) return;
-        if (me.id === rep.id) {
-          setAccount(me);
-          setLoginId(me.twosomeId || '');
-          setStep('twosome');
-          await requestCaptcha();
-        } else {
-          localStorage.removeItem('repToken');
-        }
-      } catch (err) {
-        localStorage.removeItem('repToken');
-      }
-    };
-    initialize();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rep.id]);
 
   const handlePinSubmit = async (event) => {
     event.preventDefault();

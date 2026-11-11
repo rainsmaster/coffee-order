@@ -28,7 +28,10 @@ const DepartmentContext = createContext();
 // Provider 컴포넌트
 export const DepartmentProvider = ({ children }) => {
   const [departments, setDepartments] = useState([]);
-  const [selectedDepartment, setSelectedDepartmentState] = useState(null);
+  const [selectedDepartment, setSelectedDepartmentState] = useState(() => {
+    const savedId = Number.parseInt(getCookie(COOKIE_NAME), 10);
+    return Number.isInteger(savedId) && savedId > 0 ? { id: savedId, name: '' } : null;
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 

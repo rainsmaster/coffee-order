@@ -458,7 +458,7 @@ const ManagePage = ({ initialTab }) => {
           <div className="admin-login-card">
             <h2>관리자 로그인</h2>
             <p className="admin-login-desc">투썸 연동은 관리자만 설정할 수 있습니다. 업데이트 작성과 수정은 건의 게시판에서 할 수 있습니다.</p>
-            <input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && handleAdminLogin()} placeholder="관리자 비밀번호" autoFocus />
+            <input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && handleAdminLogin()} placeholder="관리자 비밀번호 : admin1234" autoFocus />
             <button className="admin-btn primary" onClick={handleAdminLogin} disabled={adminLoginLoading}>{adminLoginLoading ? '로그인 중...' : '로그인'}</button>
           </div>
         )}

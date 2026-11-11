@@ -396,6 +396,7 @@ public class TwosomeStoreApiClient {
         }
 
         HttpResponse<T> response;
+        long startedAt = System.nanoTime();
         try {
             response = context.getHttpClient().send(requestBuilder.build(), handler);
         } catch (IOException e) {
@@ -403,6 +404,8 @@ public class TwosomeStoreApiClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new TwosomeStoreException("투썸 서버 호출이 중단되었습니다. (" + action + ")", e);
+        } finally {
+            com.example.coffeeorder.config.RequestTimingSupport.recordTwosome(System.nanoTime() - startedAt);
         }
 
         context.storeCookies(response);

@@ -39,6 +39,7 @@ services:
       - TWOSOME_ADMIN_PW=${TWOSOME_ADMIN_PW:?TWOSOME_ADMIN_PW is required}
       - TWOSOME_CRYPTO_KEY=${TWOSOME_CRYPTO_KEY:?TWOSOME_CRYPTO_KEY is required}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?ADMIN_PASSWORD is required}
+      - TWOSOME_MENU_PREWARM_LIMIT=${TWOSOME_MENU_PREWARM_LIMIT:-10}
       - TZ=Asia/Seoul
     depends_on:
       redis:

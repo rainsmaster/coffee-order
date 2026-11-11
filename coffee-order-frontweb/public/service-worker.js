@@ -1,5 +1,5 @@
-const STATIC_CACHE_NAME = 'coffee-order-static-v2';
-const DYNAMIC_CACHE_NAME = 'coffee-order-dynamic-v2';
+const STATIC_CACHE_NAME = 'coffee-order-static-v3';
+const DYNAMIC_CACHE_NAME = 'coffee-order-dynamic-v3';
 
 const STATIC_ASSETS = [
   '/',
@@ -46,32 +46,32 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (url.pathname.startsWith('/api/')) {
-    event.respondWith(networkFirstApi(request, url.pathname));
+    if (API_CACHE_PATTERNS.some((pattern) => pattern.test(url.pathname))) {
+      event.respondWith(staleWhileRevalidateApi(request, event));
+    } else {
+      event.respondWith(networkFirstApi(request));
+    }
     return;
   }
 
   if (request.mode === 'navigate' || request.destination === 'document') {
-    event.respondWith(networkFirstDocument(request));
+    event.respondWith(networkFirstDocument(request, event));
     return;
   }
 
   if (url.pathname.startsWith('/static/') || url.pathname.startsWith('/images/')
     || request.destination === 'image') {
     const cacheName = url.pathname.startsWith('/static/') ? STATIC_CACHE_NAME : DYNAMIC_CACHE_NAME;
-    event.respondWith(cacheFirst(request, cacheName));
+    event.respondWith(cacheFirst(request, cacheName, event));
     return;
   }
 
-  event.respondWith(networkFirstStatic(request));
+  event.respondWith(networkFirstStatic(request, event));
 });
 
-async function networkFirstApi(request, pathname) {
+async function networkFirstApi(request) {
   try {
-    const networkResponse = await fetch(request);
-    if (networkResponse.ok && API_CACHE_PATTERNS.some((pattern) => pattern.test(pathname))) {
-      await cacheResponse(DYNAMIC_CACHE_NAME, request, networkResponse);
-    }
-    return networkResponse;
+    return await fetch(request);
   } catch (error) {
     const cachedResponse = await caches.match(request);
     if (cachedResponse) {
@@ -84,47 +84,72 @@ async function networkFirstApi(request, pathname) {
   }
 }
 
-async function networkFirstDocument(request) {
-  try {
-    const networkResponse = await fetch(request, { cache: 'no-store' });
-    if (networkResponse.ok) {
-      await cacheResponse(STATIC_CACHE_NAME, '/index.html', networkResponse);
-    }
-    return networkResponse;
-  } catch (error) {
+function staleWhileRevalidateApi(request, event) {
+  const networkResponsePromise = fetch(request);
+  event.waitUntil(
+    networkResponsePromise
+      .then((networkResponse) => {
+        if (networkResponse.ok) {
+          return cacheResponse(DYNAMIC_CACHE_NAME, request, networkResponse);
+        }
+        return undefined;
+      })
+      .catch(() => undefined)
+  );
+
+  return caches.match(request)
+    .then((cachedResponse) => cachedResponse || networkResponsePromise)
+    .catch(() => new Response(
+      JSON.stringify({ error: '오프라인 상태입니다. 네트워크 연결을 확인해주세요.' }),
+      { status: 503, headers: { 'Content-Type': 'application/json' } }
+    ));
+}
+
+function networkFirstDocument(request, event) {
+  const networkResponsePromise = fetch(request, { cache: 'no-store' });
+  event.waitUntil(cacheNetworkResponse(networkResponsePromise, STATIC_CACHE_NAME, '/index.html'));
+
+  return networkResponsePromise.catch(async () => {
     const cachedResponse = await caches.match('/index.html') || await caches.match('/offline.html');
     return cachedResponse || new Response('오프라인 상태입니다.', { status: 503 });
-  }
+  });
 }
 
-async function networkFirstStatic(request) {
-  try {
-    const networkResponse = await fetch(request, { cache: 'no-store' });
-    if (networkResponse.ok) {
-      await cacheResponse(STATIC_CACHE_NAME, request, networkResponse);
-    }
-    return networkResponse;
-  } catch (error) {
+function networkFirstStatic(request, event) {
+  const networkResponsePromise = fetch(request, { cache: 'no-store' });
+  event.waitUntil(cacheNetworkResponse(networkResponsePromise, STATIC_CACHE_NAME, request));
+
+  return networkResponsePromise.catch(async () => {
     const cachedResponse = await caches.match(request);
     return cachedResponse || new Response('', { status: 503 });
-  }
+  });
 }
 
-async function cacheFirst(request, cacheName) {
+async function cacheFirst(request, cacheName, event) {
   const cachedResponse = await caches.match(request);
   if (cachedResponse) {
     return cachedResponse;
   }
 
+  const networkResponsePromise = fetch(request);
+  event.waitUntil(cacheNetworkResponse(networkResponsePromise, cacheName, request));
+
   try {
-    const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
-      await cacheResponse(cacheName, request, networkResponse);
-    }
-    return networkResponse;
+    return await networkResponsePromise;
   } catch (error) {
     return new Response('', { status: request.destination === 'image' ? 404 : 503 });
   }
+}
+
+function cacheNetworkResponse(networkResponsePromise, cacheName, key) {
+  return networkResponsePromise
+    .then((networkResponse) => {
+      if (networkResponse.ok) {
+        return cacheResponse(cacheName, key, networkResponse);
+      }
+      return undefined;
+    })
+    .catch(() => undefined);
 }
 
 async function cacheResponse(cacheName, key, response) {

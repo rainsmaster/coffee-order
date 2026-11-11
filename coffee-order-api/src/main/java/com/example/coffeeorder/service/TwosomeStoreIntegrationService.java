@@ -45,6 +45,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * 투썸 연동 세션 관리 및 오케스트레이션 서비스.
@@ -339,6 +344,7 @@ public class TwosomeStoreIntegrationService {
             }
 
             int savedCount = upsertStoreMenus(items, beforeByMenuCd);
+            twosomeMenuOptionServiceProvider.getObject().clearCustomOptionsCache();
             touchAndPersist(session);
 
             // 현재 매장 목록에 없는 메뉴는 주문 화면에서 제외한다.
@@ -378,6 +384,30 @@ public class TwosomeStoreIntegrationService {
             healthService.record(TwosomeHealthEventType.MENU_SYNC_FAIL, false, e.getMessage());
             throw e;
         }
+    }
+
+    public int prewarmMenuOptions(int limit) {
+        if (limit <= 0) {
+            return 0;
+        }
+        requireActiveSession();
+        List<TwosomeMenu> candidates = twosomeMenuRepository.findStoreMenus().stream()
+                .filter(menu -> menu.getOptionData() == null || menu.getOptionData().isBlank())
+                .sorted(java.util.Comparator.comparing(menu -> menu.getMenuNm() == null || !menu.getMenuNm().contains("아메리카")))
+                .limit(limit)
+                .toList();
+        int prewarmed = 0;
+        for (TwosomeMenu menu : candidates) {
+            try {
+                if (twosomeMenuOptionServiceProvider.getObject()
+                        .getMenuOptions(ACTIVE_KEY, menu.getMenuCd(), menu.getMidCd()).isParsed()) {
+                    prewarmed++;
+                }
+            } catch (Exception e) {
+                log.warn("Failed to prewarm menu options (menuCd={}): {}", menu.getMenuCd(), e.getMessage());
+            }
+        }
+        return prewarmed;
     }
 
     /** 최근 메뉴 리프레시 diff 리포트 조회 (없으면 null) */
@@ -926,24 +956,59 @@ public class TwosomeStoreIntegrationService {
         return ACTIVE_KEY;
     }
 
-    // ==================== 매장 상세 (1시간 인메모리 캐시, 세션 불필요) ====================
+    // ==================== 매장 상세 (5분 인메모리 캐시, 세션 불필요) ====================
 
     private static final Duration STORE_DETAIL_CACHE_TTL = Duration.ofMinutes(5);
 
     private volatile TwosomeStoreInfoResponse cachedStoreInfo;
     private volatile LocalDateTime cachedStoreInfoAt;
+    private final AtomicReference<FutureTask<TwosomeStoreInfoResponse>> storeInfoFetch = new AtomicReference<>();
 
     /**
-     * 매장 상세 정보 조회. 1시간 인메모리 캐시.
+     * 매장 상세 정보 조회. 한 요청만 갱신하고 다른 요청은 기존 캐시를 사용한다.
      * ACTIVE 관리자 세션이 있으면 그 컨텍스트로, 없으면 익명 컨텍스트로 호출한다.
      * 예외 발생 시 캐시가 있으면 캐시를 반환하고, 없으면 예외를 전파한다.
      */
-    public synchronized TwosomeStoreInfoResponse getStoreInfo() {
+    public TwosomeStoreInfoResponse getStoreInfo() {
         if (cachedStoreInfo != null && cachedStoreInfoAt != null
                 && Duration.between(cachedStoreInfoAt, LocalDateTime.now())
                         .compareTo(STORE_DETAIL_CACHE_TTL) < 0) {
             return cachedStoreInfo;
         }
+
+        FutureTask<TwosomeStoreInfoResponse> newTask = new FutureTask<>(this::fetchStoreInfo);
+        FutureTask<TwosomeStoreInfoResponse> task = storeInfoFetch.updateAndGet(
+                current -> current != null ? current : newTask);
+        boolean owner = task == newTask;
+        if (owner) {
+            task.run();
+        } else if (cachedStoreInfo != null) {
+            return cachedStoreInfo;
+        }
+
+        try {
+            return task.get(20, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new TwosomeStoreException("매장 정보 조회가 중단되었습니다.", e);
+        } catch (ExecutionException e) {
+            if (e.getCause() instanceof TwosomeStoreException storeException) {
+                throw storeException;
+            }
+            throw new TwosomeStoreException("매장 정보 조회에 실패했습니다.", e.getCause());
+        } catch (TimeoutException e) {
+            if (cachedStoreInfo != null) {
+                return cachedStoreInfo;
+            }
+            throw new TwosomeStoreException("매장 정보 조회 시간이 초과되었습니다.", e);
+        } finally {
+            if (owner) {
+                storeInfoFetch.compareAndSet(task, null);
+            }
+        }
+    }
+
+    private TwosomeStoreInfoResponse fetchStoreInfo() {
         try {
             JsonNode storeList = twosomeStoreApiClient.fetchStoreDetailInfo(
                     obtainStoreInfoContext(), STORE_CD, STORE_LAT, STORE_LONGI);
@@ -1237,6 +1302,9 @@ public class TwosomeStoreIntegrationService {
                 menu.setDelYn("N");
                 menu.setCreatedDate(now);
             }
+            boolean optionStructureChanged = menu.getId() == null
+                    || !java.util.Objects.equals(menu.getMidCd(), item.getMidCd())
+                    || !java.util.Objects.equals(menu.getDefaultMenuCd(), item.getDefaultMenuCd());
             menu.setMenuNm(item.getMenuNm());
             menu.setEnMenuNm(item.getEnMenuNm());
             menu.setGrtCd(item.getGrtCd());
@@ -1256,7 +1324,9 @@ public class TwosomeStoreIntegrationService {
             menu.setSortOrd(item.getSortOrd());
             menu.setDmDisplayNo(item.getDmDisplayNo());
             menu.setDelYn("N");
-            menu.setOptionData(null); // 메뉴 갱신 시 상세 옵션 캐시 무효화
+            if (optionStructureChanged) {
+                menu.setOptionData(null);
+            }
             toSave.add(menu);
         }
 

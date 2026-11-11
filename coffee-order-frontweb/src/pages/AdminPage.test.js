@@ -46,6 +46,8 @@ test('대표 관리는 관리자 로그인 없이 열리고 소속을 실제 부
   expect(screen.getByText('MSA TF')).toBeInTheDocument();
   expect(screen.queryByText('관리자 로그인')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '관리자 로그아웃' })).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '대표 PIN·투썸 계정 보안 안내' })).toBeInTheDocument();
+  expect(screen.getByText('대표 PIN과 투썸 비밀번호는 평문으로 저장하지 않습니다.')).toBeInTheDocument();
   expect(adminAPI.getReps).toHaveBeenCalled();
 });
 

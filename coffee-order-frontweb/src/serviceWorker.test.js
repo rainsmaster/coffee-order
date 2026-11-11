@@ -46,32 +46,63 @@ function response() {
 }
 
 describe('service worker 캐시 갱신', () => {
-  test('HTML은 HTTP 캐시를 우회하고 캐시 저장 후 응답을 반환한다', async () => {
+  test('HTML 캐시 저장이 네트워크 응답 반환을 막지 않는다', async () => {
     const { context, cache } = createWorker();
     const networkResponse = response();
     let completeCacheWrite;
     cache.put.mockReturnValue(new Promise((resolve) => { completeCacheWrite = resolve; }));
     context.fetch.mockResolvedValue(networkResponse);
     const request = { url: 'https://heodabang.me/', method: 'GET' };
+    const event = { waitUntil: jest.fn() };
     const networkFirstDocument = vm.runInContext('networkFirstDocument', context);
 
-    let completed = false;
-    const resultPromise = networkFirstDocument(request).then((result) => {
-      completed = true;
-      return result;
-    });
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    const result = await networkFirstDocument(request, event);
 
     expect(context.fetch).toHaveBeenCalledWith(request, { cache: 'no-store' });
+    expect(result).toBe(networkResponse);
+    expect(event.waitUntil).toHaveBeenCalledTimes(1);
     expect(networkResponse.clone).toHaveBeenCalledTimes(1);
-    expect(completed).toBe(false);
 
     completeCacheWrite();
-    const result = await resultPromise;
+    await event.waitUntil.mock.calls[0][0];
     result.bodyUsed = true;
-
-    expect(result).toBe(networkResponse);
     expect(cache.put).toHaveBeenCalledWith('/index.html', { cached: true });
+  });
+
+  test('공개 API는 캐시를 즉시 반환하고 백그라운드에서 갱신한다', async () => {
+    const { context, cache } = createWorker();
+    const cachedResponse = { cached: true };
+    const networkResponse = response();
+    let finishNetwork;
+    context.caches.match.mockResolvedValue(cachedResponse);
+    context.fetch.mockReturnValue(new Promise((resolve) => { finishNetwork = resolve; }));
+    const request = { url: 'https://heodabang.me/api/twosome-menus', method: 'GET' };
+    const event = { waitUntil: jest.fn() };
+    const staleWhileRevalidateApi = vm.runInContext('staleWhileRevalidateApi', context);
+
+    const result = await staleWhileRevalidateApi(request, event);
+
+    expect(result).toBe(cachedResponse);
+    expect(context.fetch).toHaveBeenCalledTimes(1);
+    expect(event.waitUntil).toHaveBeenCalledTimes(1);
+    expect(cache.put).not.toHaveBeenCalled();
+
+    finishNetwork(networkResponse);
+    await event.waitUntil.mock.calls[0][0];
+    expect(cache.put).toHaveBeenCalledWith(request, { cached: true });
+  });
+
+  test('캐시가 없는 공개 API는 네트워크를 한 번만 호출한다', async () => {
+    const { context } = createWorker();
+    const networkResponse = response();
+    context.fetch.mockResolvedValue(networkResponse);
+    const request = { url: 'https://heodabang.me/api/departments', method: 'GET' };
+    const event = { waitUntil: jest.fn() };
+    const staleWhileRevalidateApi = vm.runInContext('staleWhileRevalidateApi', context);
+
+    await expect(staleWhileRevalidateApi(request, event)).resolves.toBe(networkResponse);
+    await event.waitUntil.mock.calls[0][0];
+    expect(context.fetch).toHaveBeenCalledTimes(1);
   });
 
   test('해시가 포함된 정적 자산은 캐시를 사용하고 POST API는 가로채지 않는다', async () => {
@@ -85,7 +116,8 @@ describe('service worker 캐시 갱신', () => {
         destination: 'script',
         mode: 'same-origin'
       },
-      respondWith: jest.fn()
+      respondWith: jest.fn(),
+      waitUntil: jest.fn()
     };
 
     listeners.fetch(assetEvent);
@@ -108,6 +140,8 @@ describe('service worker 캐시 갱신', () => {
       'coffee-order-dynamic-v1',
       'coffee-order-static-v2',
       'coffee-order-dynamic-v2',
+      'coffee-order-static-v3',
+      'coffee-order-dynamic-v3',
       'another-application-cache'
     ]);
     const event = { waitUntil: jest.fn() };
@@ -115,8 +149,9 @@ describe('service worker 캐시 갱신', () => {
     listeners.activate(event);
     await event.waitUntil.mock.calls[0][0];
 
-    expect(context.caches.delete).toHaveBeenCalledTimes(3);
-    expect(context.caches.delete).not.toHaveBeenCalledWith('coffee-order-static-v2');
+    expect(context.caches.delete).toHaveBeenCalledTimes(5);
+    expect(context.caches.delete).not.toHaveBeenCalledWith('coffee-order-static-v3');
+    expect(context.caches.delete).not.toHaveBeenCalledWith('coffee-order-dynamic-v3');
     expect(context.caches.delete).not.toHaveBeenCalledWith('another-application-cache');
   });
 });

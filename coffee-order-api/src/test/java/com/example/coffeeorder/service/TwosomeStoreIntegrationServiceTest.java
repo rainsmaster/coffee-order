@@ -364,6 +364,74 @@ class TwosomeStoreIntegrationServiceTest {
         assertThat(service.getSessionStatus("rep:2").getStatus()).isEqualTo("ACTIVE");
     }
 
+    @Test
+    void preservesCachedOptionsWhenMenuStructureIsUnchanged() {
+        TwosomeMenu existing = menu("10100001");
+        existing.setId(1L);
+        existing.setDefaultMenuCd("variant-1");
+        existing.setOptionData("cached-options");
+        when(menuRepository.findAll()).thenReturn(List.of(existing));
+        when(menuRepository.findByDelYnOrderByMidNmAscSortOrdAsc("N")).thenReturn(List.of(existing));
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        TwosomeMenuResponse.TwosomeMenuItem item = new TwosomeMenuResponse.TwosomeMenuItem();
+        item.setMenuCd("10100001");
+        item.setMenuNm("아메리칸노");
+        item.setMidCd("17");
+        item.setMidNm("커피");
+        item.setDefaultMenuCd("variant-1");
+        item.setSaleAmt("5,200");
+        item.setSalesPsblQty(-1);
+        TwosomeMenuResponse response = new TwosomeMenuResponse();
+        response.setFetchResultListSet(List.of(item));
+        when(apiClient.fetchStoreMenus(any(), eq("1102115"))).thenReturn(response);
+
+        activateAdminSession();
+        service.refreshStoreMenus();
+
+        assertThat(existing.getOptionData()).isEqualTo("cached-options");
+        verify(optionService).clearCustomOptionsCache();
+    }
+
+    @Test
+    void prewarmsOnlyMenusWithoutCachedOptions() {
+        TwosomeMenu menu = menu("10100001");
+        menu.setMenuNm("아메리칸노");
+        when(menuRepository.findStoreMenus()).thenReturn(List.of(menu));
+        when(optionService.getMenuOptions("active", "10100001", "17")).thenReturn(cupOptions());
+        activateAdminSession();
+
+        assertThat(service.prewarmMenuOptions(10)).isEqualTo(1);
+        verify(optionService).getMenuOptions("active", "10100001", "17");
+    }
+
+    @Test
+    void sharesOneStoreInfoRequestBetweenConcurrentCallers() throws Exception {
+        com.fasterxml.jackson.databind.node.ArrayNode storeList = objectMapper.createArrayNode();
+        storeList.addObject().put("STORE_NM", "CJENM커머스부문점").put("ORD_TIME", "07:30~20:50");
+        java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
+        when(apiClient.fetchStoreDetailInfo(any(), eq("1102115"), anyDouble(), anyDouble())).thenAnswer(invocation -> {
+            started.countDown();
+            release.await(2, java.util.concurrent.TimeUnit.SECONDS);
+            return storeList;
+        });
+        java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newFixedThreadPool(2);
+        try {
+            java.util.concurrent.Future<String> first = executor.submit(() -> service.getStoreInfo().getStoreNm());
+            assertThat(started.await(1, java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            java.util.concurrent.Future<String> second = executor.submit(() -> service.getStoreInfo().getStoreNm());
+            release.countDown();
+
+            assertThat(first.get(2, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("CJENM커머스부문점");
+            assertThat(second.get(2, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo("CJENM커머스부문점");
+            verify(apiClient).fetchStoreDetailInfo(any(), eq("1102115"), anyDouble(), anyDouble());
+        } finally {
+            release.countDown();
+            executor.shutdownNow();
+        }
+    }
+
     private TwosomeMenu menu(String menuCd) {
         TwosomeMenu menu = new TwosomeMenu();
         menu.setMenuCd(menuCd);

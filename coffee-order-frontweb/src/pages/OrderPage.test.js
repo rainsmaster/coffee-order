@@ -335,3 +335,21 @@ test.each(['아메리칸노', '아메리칸호'])('공식 메뉴 이름과 다�
   expect(screen.getByRole('button', { name: /아메리칸노 이미지 없음 아메리칸노 커피/ })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /디카페인 아메리칸노 이미지 없음 디카페인 아메리칸노 디카페인 커피/ })).toBeInTheDocument();
 });
+
+test('카테고리 메뉴는 처음 12개만 표시하고 더보기로 나머지를 연다', async () => {
+  const menus = Array.from({ length: 15 }, (_, index) => ({
+    ...menu,
+    id: 200 + index,
+    menuCd: `TEST-${index}`,
+    menuNm: `테스트 메뉴 ${index + 1}`,
+  }));
+  twosomeMenuAPI.getAll.mockResolvedValue({ 커피: menus });
+  const { container } = render(<OrderPage />);
+
+  fireEvent.click(await screen.findByRole('button', { name: '커피 (15)' }));
+  await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(12));
+  fireEvent.click(screen.getByRole('button', { name: '메뉴 더보기 (12/15)' }));
+
+  await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(15));
+  expect(screen.queryByRole('button', { name: /메뉴 더보기/ })).not.toBeInTheDocument();
+});

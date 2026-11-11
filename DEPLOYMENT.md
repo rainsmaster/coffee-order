@@ -259,6 +259,21 @@ Jenkins가 Git에서 `Jenkinsfile`을 읽으므로 파이프라인 변경은 해
 
 Cloudflare가 외부 HTTPS를 처리하고, tunnel은 NAS의 Jenkins HTTP 포트에 outbound 연결로 전달한다. DSM 리버스 프록시나 추가 인증서·포트 전달은 필요하지 않다.
 
+### Cloudflare 캐시 규칙
+
+`heodabang.me`의 `Caching > Cache Rules`에 다음 두 규칙을 사용한다.
+
+- `heodabang-public-read-apis-60s`: GET `/api/twosome-menus`, `/api/departments`, `/api/twosome/store-info`만 Edge TTL 60초로 캐시한다.
+- `heodabang-versioned-static-1y`: GET `/static/*`, `/images/twosome/*`를 Edge TTL 1년으로 캐시한다. CRA 파일 해시와 이미지 버전 쿼리를 유지해야 한다.
+
+주문, 대표, 관리자, 장바구니, 로그인 API는 캐시하지 않는다. 서버의 `ApiCacheControlFilter`도 공개 조회 외 API에 `no-store`를 적용한다. 배포 후 `cf-cache-status`가 공개 조회에서는 `HIT`, 주문 조회에서는 `DYNAMIC`인지 확인한다.
+
+### 메뉴 이미지 WebP
+
+원본 JPG·PNG는 삭제하지 않는다. `cwebp`가 설치된 환경에서 `scripts/convert-twosome-webp.sh ORIGINAL_IMAGE_DIR WEBP_OUTPUT_DIR`을 실행하면 원본 파일명 뒤에 `.webp`를 붙인 파일이 생성된다. 예를 들어 `10100010.png`의 최적화 파일은 `10100010.png.webp`다.
+
+생성된 WebP만 `/volume1/docker/mywebsite/data/images/twosome`에 업로드하고 기존 이미지는 같은 경로에 유지한다. 화면은 원본 URL에 `.webp`를 붙인 이미지를 먼저 요청하고, 실패하면 기존 원본을 사용한다. 원본 이미지 버전 쿼리는 두 URL에 같게 유지하므로 이미지가 바뀌면 Cloudflare와 서비스 워커 캐시도 함께 갱신된다.
+
 Jenkins 관리자와 Pipeline 설정 권한은 관리자에게만 허용한다. 익명 사용자의 읽기·빌드 권한과 가입 기능은 허용하지 않는다. Jenkins가 Docker 소켓을 사용하므로 외부 관리자 계정에는 강한 고유 비밀번호를 사용한다.
 
 운영 앱은 이제 Container Manager에서 다시 빌드하지 않고 Jenkins로만 배포한다. Container Manager에서는 상태와 로그를 확인한다.

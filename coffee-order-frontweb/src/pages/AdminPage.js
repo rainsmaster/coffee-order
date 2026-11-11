@@ -235,6 +235,28 @@ const AdminPage = ({ embedded = false }) => {
           </table></div>
         )}
       </div>
+      <section className="rep-security-guide" aria-labelledby="rep-security-title">
+        <h3 id="rep-security-title">대표 PIN·투썸 계정 보안 안내</h3>
+        <p className="rep-security-lead"><strong>대표 PIN과 투썸 비밀번호는 평문으로 저장하지 않습니다.</strong></p>
+        <div className="rep-security-grid">
+          <section className="rep-security-item">
+            <h4>대표 PIN 저장</h4>
+            <p>PIN을 설정하면 대표마다 새로 생성한 16바이트 랜덤 salt와 함께 SHA-256 해시로 변환해 MySQL에 저장합니다. 저장되는 것은 salt와 해시이며, 관리자도 원래 PIN을 조회할 수 없습니다. PIN을 입력하면 같은 방식으로 계산한 값이 일치하는지만 확인합니다.</p>
+          </section>
+          <section className="rep-security-item">
+            <h4>투썸 비밀번호 저장</h4>
+            <p>투썸 비밀번호는 AES-256-GCM 방식으로 암호화한 뒤 MySQL에 저장합니다. 암호화 키는 암호문과 분리해 운영 환경의 비밀 설정으로 관리합니다. 세션 갱신처럼 인증이 필요한 작업을 수행할 때만 서버에서 복호화해 사용하며, 브라우저나 API 응답으로 비밀번호를 반환하지 않습니다.</p>
+          </section>
+          <section className="rep-security-item">
+            <h4>로그인·세션 관리</h4>
+            <p>PIN 입력에 5회 연속 실패하면 10분간 잠금 처리합니다. 본인 확인에 성공하면 임의의 대표 토큰을 발급해 Redis에 최대 12시간 동안 보관합니다. 실제 투썸 세션은 서비스 재시작 후에도 장바구니 연동을 유지하기 위해 Redis에 저장하고 10분마다 유효성을 확인합니다. 대표 로그인 창을 열 때는 저장된 토큰과 관계없이 항상 PIN을 다시 입력해야 합니다.</p>
+          </section>
+          <section className="rep-security-item">
+            <h4>브라우저·로그 보호</h4>
+            <p>브라우저 로컬 저장소에는 PIN과 투썸 비밀번호 대신 임의의 대표 토큰만 보관합니다. 대표 목록에는 PIN 설정 여부와 최종 로그인 시각, 투썸 상태만 표시하며 PIN·비밀번호·세션 쿠키는 화면과 로그에 노출하지 않습니다. 세션이 만료되거나 로그아웃하면 다시 본인 인증이 필요합니다.</p>
+          </section>
+        </div>
+      </section>
       {loginRep && (
         <RepLoginModal
           rep={loginRep}

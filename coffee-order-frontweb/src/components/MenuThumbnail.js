@@ -1,27 +1,37 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
 import './MenuThumbnail.css';
 
-const getImageUrl = (menu) => {
+const getImageUrls = (menu) => {
   const remotePath = menu.menuImg02 || menu.menuImg;
-  const imageUrl = menu.localImgPath || (remotePath ? `https://mcdn.twosome.co.kr${remotePath}` : '');
-  if (!imageUrl || !menu.localImgPath || !remotePath) return imageUrl;
+  const remoteUrl = remotePath
+    ? `https://mcdn.twosome.co.kr${remotePath}`.replace(/([?&]q=)100\b/, (match, prefix) => `${prefix}80`)
+    : '';
+  if (!menu.localImgPath) return remoteUrl ? [remoteUrl] : [];
 
-  const version = remotePath.split('/').pop();
-  return `${imageUrl}?v=${encodeURIComponent(version)}`;
+  const withVersion = (path) => {
+    if (!remotePath) return path;
+    const version = remotePath.split('/').pop();
+    return `${path}?v=${encodeURIComponent(version)}`;
+  };
+  const webpPath = menu.localImgPath.toLowerCase().endsWith('.webp')
+    ? menu.localImgPath
+    : `${menu.localImgPath}.webp`;
+  return [...new Set([withVersion(webpPath), withVersion(menu.localImgPath)])];
 };
 
 const loadedImageUrls = new Set();
 
 const MenuThumbnail = ({ menu }) => {
-  const imageUrl = getImageUrl(menu);
+  const imageUrls = getImageUrls(menu);
   const imageRef = useRef(null);
+  const [failedImageUrls, setFailedImageUrls] = useState(() => new Set());
+  const imageUrl = imageUrls.find((url) => !failedImageUrls.has(url)) || '';
+  const failed = !imageUrl;
   const [loaded, setLoaded] = useState(() => loadedImageUrls.has(imageUrl));
-  const [failed, setFailed] = useState(!imageUrl);
 
   useLayoutEffect(() => {
     setLoaded(loadedImageUrls.has(imageUrl));
-    setFailed(!imageUrl);
-    if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
+    if (imageUrl && imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
       loadedImageUrls.add(imageUrl);
       setLoaded(true);
     }
@@ -47,13 +57,15 @@ const MenuThumbnail = ({ menu }) => {
           height="276"
           loading="lazy"
           decoding="async"
+          fetchPriority="low"
+          sizes="(max-width: 480px) 30vw, 100px"
           onLoad={() => {
             loadedImageUrls.add(imageUrl);
             setLoaded(true);
           }}
           onError={() => {
-            setFailed(true);
-            setLoaded(true);
+            setLoaded(false);
+            setFailedImageUrls((current) => new Set(current).add(imageUrl));
           }}
         />
       )}

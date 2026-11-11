@@ -559,6 +559,22 @@
 }
 
 /* 모달 내부 카드 그리드 (작게) */
+.menu-load-more {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.75rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-brand);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.menu-load-more:hover {
+  background: var(--color-brand-soft);
+}
+
 .twosome-card-grid.modal-grid {
   grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
   gap: 0.5rem;
@@ -1044,10 +1060,22 @@
 }
 
 .rep-twosome-guide {
-  margin: 0 0 0.5rem;
-  color: #777;
-  font-size: 0.82rem;
-  line-height: 1.5;
+  margin: 0 0 1rem;
+  padding: 0.75rem;
+  border-radius: var(--radius-control);
+  background: var(--color-brand-soft);
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.rep-twosome-guide strong {
+  color: var(--color-brand);
+}
+
+.rep-twosome-guide p {
+  margin: 0.35rem 0 0;
 }
 
 /* 투썸 퍼스널 옵션(커스텀) */

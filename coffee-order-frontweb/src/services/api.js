@@ -88,7 +88,7 @@ export const teamAPI = {
 // ==================== Order API ====================
 export const orderAPI = {
   // 오늘 주문 조회 (부서별 필터링)
-  getToday: (departmentId) => fetchAPI(departmentId ? `/orders/today?departmentId=${departmentId}` : '/orders/today'),
+  getToday: (departmentId, options = {}) => fetchAPI(departmentId ? `/orders/today?departmentId=${departmentId}` : '/orders/today', options),
 
   // 특정 날짜 주문 조회 (부서별 필터링)
   getByDate: (date, departmentId) => {
@@ -346,7 +346,10 @@ export const repAPI = {
     body: JSON.stringify({ targetRepMemberId, items }),
   }),
 
-  repGetCart: (targetRepMemberId) => fetchAPI(`/rep/twosome/cart?${repTargetQuery(targetRepMemberId)}`, { headers: repTokenHeader() }),
+  repGetCart: (targetRepMemberId, options = {}) => fetchAPI(`/rep/twosome/cart?${repTargetQuery(targetRepMemberId)}`, {
+    ...options,
+    headers: { ...repTokenHeader(), ...options.headers },
+  }),
 
   repRemoveCartItem: (cartNo, cartDtlNo, targetRepMemberId) => fetchAPI(`/rep/twosome/cart/items/${cartNo}?cartDtlNo=${encodeURIComponent(cartDtlNo)}&${repTargetQuery(targetRepMemberId)}`, {
     method: 'DELETE',

@@ -26,6 +26,9 @@ public class TwosomeMenuRefreshScheduler {
     private final TwosomeStoreIntegrationService integrationService;
     private final DistributedLockService lockService;
 
+    @org.springframework.beans.factory.annotation.Value("${twosome.menu-refresh.prewarm-limit:10}")
+    private int prewarmLimit;
+
     @Scheduled(cron = "${twosome.menu-refresh.cron:0 30 8 * * *}", zone = "Asia/Seoul")
     public void refreshStoreMenus() {
         log.info("=== Twosome Store Menu Refresh Job Started ===");
@@ -35,7 +38,8 @@ public class TwosomeMenuRefreshScheduler {
         }
         try {
             int savedCount = integrationService.refreshStoreMenus();
-            log.info("=== Twosome Store Menu Refresh Completed. saved={} ===", savedCount);
+            int prewarmedCount = integrationService.prewarmMenuOptions(prewarmLimit);
+            log.info("=== Twosome Store Menu Refresh Completed. saved={}, prewarmed={} ===", savedCount, prewarmedCount);
         } catch (Exception e) {
             log.error("=== Twosome Store Menu Refresh Failed ===", e);
         } finally {

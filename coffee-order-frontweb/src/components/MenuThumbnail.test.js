@@ -28,7 +28,9 @@ test('로딩 중에는 크기가 고정된 스켈레톤을 보이고 로드 후 
   expect(image).toHaveAttribute('height', '276');
   expect(image).toHaveAttribute('loading', 'lazy');
   expect(image).toHaveAttribute('decoding', 'async');
-  expect(image.src).toContain('/images/twosome/10100002.jpg?v=10100002_20260608055115.jpg');
+  expect(image).toHaveAttribute('fetchpriority', 'low');
+  expect(image).toHaveAttribute('sizes', '(max-width: 480px) 30vw, 100px');
+  expect(image.src).toContain('/images/twosome/10100002.jpg.webp?v=10100002_20260608055115.jpg');
 
   fireEvent.load(image);
 
@@ -57,11 +59,17 @@ test('캐시되어 이미 완료된 이미지는 첫 화멶부터 스켈레톤 �
   expect(container.querySelector('.menu-thumbnail')).toHaveClass('is-loaded');
 });
 
-test('이미지 실패 시 외부 요청 없이 로컬 대체 아이콘을 표시한다', () => {
+test('WebP 실패 시 원본을 사용하고 원본도 실패하면 외부 요청 없이 대체 아이콘을 표시한다', () => {
   const { container } = render(<MenuThumbnail menu={menu} />);
-  const image = screen.getByRole('img', { name: '카페 라떼' });
 
-  fireEvent.error(image);
+  fireEvent.error(screen.getByRole('img', { name: '카페 라떼' }));
+
+  const original = screen.getByRole('img', { name: '카페 라떼' });
+  expect(original.src).toContain('/images/twosome/10100002.jpg?v=');
+  expect(original.src).not.toContain('.webp');
+  expect(original.src).not.toContain('mcdn.twosome.co.kr');
+
+  fireEvent.error(original);
 
   expect(screen.getByRole('img', { name: '카페 라떼 이미지 없음' })).toBeInTheDocument();
   expect(container.querySelector('.menu-thumbnail-skeleton')).not.toBeInTheDocument();
@@ -73,4 +81,15 @@ test('원본 이미지 버전이 바뀌면 캐시 키도 바뀐다', () => {
   render(<MenuThumbnail menu={changed} />);
 
   expect(screen.getByRole('img', { name: '카페 라떼' }).src).toContain('?v=10100002_20261110090000.jpg');
+});
+
+test('외부 썸네일은 다운로드 크기를 줄이는 품질로 요청한다', () => {
+  const remoteMenu = {
+    menuNm: '원격 메뉴',
+    menuImg02: '/menu_image/remote.jpg?width=276&height=276&q=100',
+  };
+  render(<MenuThumbnail menu={remoteMenu} />);
+
+  expect(screen.getByRole('img', { name: '원격 메뉴' }).src)
+    .toContain('width=276&height=276&q=80');
 });

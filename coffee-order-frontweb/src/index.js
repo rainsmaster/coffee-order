@@ -6,6 +6,7 @@ import './styles/tokens.css';
 import App from './App';
 import './styles/responsive-controls.css';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
+import reportWebVitals from './reportWebVitals';
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
@@ -13,6 +14,8 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+reportWebVitals();
 
 // PWA Service Worker 등록
 serviceWorkerRegistration.register({

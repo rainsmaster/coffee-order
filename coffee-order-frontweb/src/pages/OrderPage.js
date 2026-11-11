@@ -12,8 +12,11 @@ import Modal from '../components/Modal';
 import useModal from '../hooks/useModal';
 import { isWithinStoreHours } from '../utils/storeHours';
 import { needsOptionConfirmation, restoreOptionSelections } from '../utils/reorderOptions';
+import createVisiblePolling from '../utils/polling';
 import './OrderPage.css';
 import './OrderLayout.css';
+
+const MENU_BATCH_SIZE = 12;
 
 const OrderPage = ({ onAddTeamMember }) => {
   const { selectedDepartmentId } = useDepartment();
@@ -28,6 +31,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [selectedOpts, setSelectedOpts] = useState({}); // {grpCd: opts}
   const [variantInfo, setVariantInfo] = useState(null); // {variantMenuCd, variantMenuNm, price}
+  const [variantLoading, setVariantLoading] = useState(false);
   const [customOptions, setCustomOptions] = useState(null); // 퍼스널 옵션 (수량형+선택형)
   const [customOptionsStatus, setCustomOptionsStatus] = useState('idle');
   const [customOptionsRetry, setCustomOptionsRetry] = useState(0);
@@ -38,6 +42,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   const [optionsError, setOptionsError] = useState('');
   const orderAvailable = true; // 마감 개념 제거 — 항상 주문 가능
   const [menuSearchQuery, setMenuSearchQuery] = useState(''); // 메뉴 검색어
+  const [visibleMenuCount, setVisibleMenuCount] = useState(MENU_BATCH_SIZE);
 
   // 주문 변경 모달 상태
   const [isOrderChangeModalOpen, setIsOrderChangeModalOpen] = useState(false);
@@ -88,50 +93,54 @@ const OrderPage = ({ onAddTeamMember }) => {
     closeConfirm,
   } = useModal();
 
+  useEffect(() => {
+    setVisibleMenuCount(MENU_BATCH_SIZE);
+  }, [selectedCategory, menuSearchQuery, twosomeMenus]);
+
   // 데이터 로드 (부서 변경 시 재로드)
   useEffect(() => {
-    if (selectedDepartmentId) {
-      loadData();
-      loadRepList();
-      resetOrderForm();
-    }
+    if (!selectedDepartmentId) return undefined;
+    loadData();
+    loadRepList();
+    resetOrderForm();
 
-    // 5초마다 주문 목록 자동 새로고침 (폴링)
-    const interval = setInterval(() => {
-      if (selectedDepartmentId) {
-        loadOrders();
-      }
-    }, 5000);
-
-    return () => clearInterval(interval);
+    // 15초마다 주문 목록 자동 새로고침 (폴링)
+    return createVisiblePolling((signal) => loadOrders(signal), 15000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDepartmentId]);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      const [teamsData, twosomeMenusData, ordersData] = await Promise.all([
-        teamAPI.getAll(selectedDepartmentId),
-        twosomeMenuAPI.getAll(),
-        orderAPI.getToday(selectedDepartmentId),
-      ]);
-      setTeams(teamsData);
-      setTwosomeMenus(twosomeMenusData);
-      setOrders(ordersData);
-    } catch (err) {
-      setError('데이터를 불러오는데 실패했습니다.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+  const loadData = () => {
+    setError('');
+    setLoading(true);
+    setTeams([]);
+    setOrders([]);
+
+    teamAPI.getAll(selectedDepartmentId)
+      .then((data) => setTeams(data || []))
+      .catch((err) => {
+        setError('팀원 정보를 불러오지 못했습니다.');
+        console.error(err);
+      });
+
+    twosomeMenuAPI.getAll()
+      .then((data) => setTwosomeMenus(data || {}))
+      .catch((err) => {
+        setError('메뉴 정보를 불러오지 못했습니다.');
+        console.error(err);
+      })
+      .finally(() => setLoading(false));
+
+    orderAPI.getToday(selectedDepartmentId)
+      .then((data) => setOrders(data || []))
+      .catch((err) => console.error('주문 목록 초기 조회 실패:', err));
   };
 
-  const loadOrders = async () => {
+  const loadOrders = async (signal) => {
     try {
-      const ordersData = await orderAPI.getToday(selectedDepartmentId);
-      setOrders(ordersData);
+      const ordersData = await orderAPI.getToday(selectedDepartmentId, { signal });
+      setOrders(ordersData || []);
     } catch (err) {
-      console.error('주문 목록 새로고침 실패:', err);
+      if (err.name !== 'AbortError') console.error('주문 목록 새로고침 실패:', err);
     }
   };
 
@@ -531,6 +540,9 @@ const OrderPage = ({ onAddTeamMember }) => {
     return twosomeMenus[selectedCategory] || [];
   };
 
+  const visibleMenus = menuSearchQuery.trim() ? getSearchedMenus() : getCurrentMenus();
+  const hasMoreMenus = visibleMenus.length > visibleMenuCount;
+
   // 카테고리 목록 (투썸 메뉴만 사용) - 순서 정렬
   const getCategories = () => {
     const categoryOrder = [
@@ -723,6 +735,7 @@ const OrderPage = ({ onAddTeamMember }) => {
   useEffect(() => {
     if (!menuOptions || !menuOptions.parsed || !isAllGroupsSelected()) {
       setVariantInfo(null);
+      setVariantLoading(false);
       setVariantFailed(false);
       setCustomOptions(null);
       setCustomOptionsStatus('idle');
@@ -731,6 +744,8 @@ const OrderPage = ({ onAddTeamMember }) => {
       return undefined;
     }
     let cancelled = false;
+    setVariantLoading(true);
+    setVariantFailed(false);
     setCustomOptions(null);
     setCustomOptionsStatus('loading');
     const hasGroups = (menuOptions.groups || []).length > 0;
@@ -760,6 +775,7 @@ const OrderPage = ({ onAddTeamMember }) => {
       } catch (err) {
         if (!cancelled) {
           setVariantInfo(null);
+          setVariantLoading(false);
           setVariantFailed(true);
           setCustomOptions(null);
           setCustomOptionsStatus('idle');
@@ -770,11 +786,13 @@ const OrderPage = ({ onAddTeamMember }) => {
       if (cancelled) return;
       if (!result || !result.variantMenuCd || (hasGroups && (result.price == null || result.price <= 0))) {
         setVariantInfo(null);
+        setVariantLoading(false);
         setVariantFailed(true);
         setCustomOptions(null);
         setCustomOptionsStatus('idle');
         return;
       }
+      setVariantLoading(false);
       setVariantFailed(false);
       setVariantInfo(result);
       setSelectedCustom({ qty: {}, choices: {} });
@@ -911,25 +929,6 @@ const OrderPage = ({ onAddTeamMember }) => {
 
   // ==================== 팀 대표 로그인 (1단계) ====================
 
-  // 페이지 로드 시 저장된 rep 토큰이 있으면 내 정보 + 투썸 세션 상태 복원
-  useEffect(() => {
-    const restoreRepSession = async () => {
-      if (!localStorage.getItem('repToken')) return;
-      try {
-        const me = await repAPI.me();
-        setRepMe(me);
-        setRepInfo({ id: me.id, name: me.name, teamName: me.teamName });
-        if (me.twosomeAccount) {
-          refreshRepTwosomeSession();
-        }
-      } catch (err) {
-        localStorage.removeItem('repToken');
-      }
-    };
-    restoreRepSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const detectOrderCartMode = async () => {
     if (localStorage.getItem('repToken')) {
       try {
@@ -964,25 +963,28 @@ const OrderPage = ({ onAddTeamMember }) => {
 
   const isWithinOrdTime = (info) => isWithinStoreHours(info);
 
-  // 페이지 로드 시 로그인 모드 + 개점 여부 조회
   useEffect(() => {
-    const initOrderModeAndStore = async () => {
-      const mode = await detectOrderCartMode();
-      await loadStoreOpen(mode);
+    const initializeOrderModeAndStore = async () => {
+      const storeRequest = loadStoreOpen();
+      if (!localStorage.getItem('repToken')) {
+        setRepTwosomeStatus('NONE');
+        await storeRequest;
+        return;
+      }
+      try {
+        const [me, session] = await Promise.all([repAPI.me(), repAPI.twosomeSession()]);
+        setRepMe(me);
+        setRepInfo({ id: me.id, name: me.name, teamName: me.teamName });
+        setRepTwosomeStatus(session?.status || 'NONE');
+      } catch (err) {
+        localStorage.removeItem('repToken');
+        setRepTwosomeStatus('NONE');
+      }
+      await storeRequest;
     };
-    initOrderModeAndStore();
+    initializeOrderModeAndStore();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 대표 투썸 세션 상태 새로고침
-  const refreshRepTwosomeSession = async () => {
-    try {
-      const session = await repAPI.twosomeSession();
-      setRepTwosomeStatus(session?.status || 'NONE');
-    } catch (err) {
-      setRepTwosomeStatus('NONE');
-    }
-  };
 
   // ==================== 대표 투썸 계정 / 로그인 ====================
 
@@ -1166,10 +1168,6 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
-  if (loading) {
-    return <div className="loading">로딩 중...</div>;
-  }
-
   return (
     <div className="order-page">
       {error && <div className="error-message">{error}</div>}
@@ -1252,7 +1250,9 @@ const OrderPage = ({ onAddTeamMember }) => {
         })()}
 
         {/* 투썸 메뉴 선택 - 검색 및 카테고리 선택 */}
-        {(
+        {loading ? (
+          <div className="loading" role="status">메뉴를 불러오는 중...</div>
+        ) : (
           <div className="form-group">
             <label>메뉴 선택 <span className="mode-badge">투썸 메뉴</span></label>
 
@@ -1312,7 +1312,7 @@ const OrderPage = ({ onAddTeamMember }) => {
               </div>
             ) : (
               <div className="twosome-card-grid">
-                {getSearchedMenus().map((menu) => (
+                {visibleMenus.slice(0, visibleMenuCount).map((menu) => (
                   <button
                     key={menu.id}
                     className={`twosome-card ${
@@ -1337,7 +1337,7 @@ const OrderPage = ({ onAddTeamMember }) => {
           <div className="form-group">
             <label>{selectedCategory} 메뉴</label>
             <div className="twosome-card-grid">
-              {getCurrentMenus().map((menu) => (
+              {visibleMenus.slice(0, visibleMenuCount).map((menu) => (
                 <button
                   key={menu.id}
                   className={`twosome-card ${
@@ -1353,6 +1353,11 @@ const OrderPage = ({ onAddTeamMember }) => {
               ))}
             </div>
           </div>
+        )}
+        {hasMoreMenus && !loading && (
+          <button type="button" className="menu-load-more" onClick={() => setVisibleMenuCount((count) => count + MENU_BATCH_SIZE)}>
+            메뉴 더보기 ({Math.min(visibleMenuCount, visibleMenus.length)}/{visibleMenus.length})
+          </button>
         )}
 
         {/* 투썸 메뉴 옵션 그룹 선택 (서버 기반, 그룹 순서대로) */}
@@ -1509,11 +1514,19 @@ const OrderPage = ({ onAddTeamMember }) => {
                   {[getTwosomeOptionString(), getCustomOptionString()].filter(Boolean).join(' | ') || '기본 옵션을 선택해주세요.'}
                 </p>
                 <div className="order-summary-price">
-                  {variantInfo
-                    ? (variantInfo.price != null
-                      ? `${(variantInfo.price + getCustomTotalPrice()).toLocaleString()}원`
-                      : '가격 정보 없음')
-                    : '가격 확인 중…'}
+                  {optionsLoading
+                    ? '옵션 정보 로딩 중'
+                    : variantLoading
+                      ? '옵션 선택 완료'
+                      : variantInfo
+                        ? (variantInfo.price != null
+                          ? `${(variantInfo.price + getCustomTotalPrice()).toLocaleString()}원`
+                          : '가격 정보 없음')
+                        : variantFailed
+                          ? '가격 정보 없음'
+                          : (menuOptions?.groups || []).length > 0 && !isAllGroupsSelected()
+                            ? '옵션 선택 후 가격 확인'
+                            : '가격 정보 없음'}
                 </div>
               </>
             )}
@@ -1592,7 +1605,11 @@ const OrderPage = ({ onAddTeamMember }) => {
 
       <Modal isOpen={repModalMode === 'setup'} onClose={closeRepModal} title="대표 등록 및 PIN 생성">
         <div className="rep-modal-form">
-          <p className="rep-twosome-guide">본인 팀원을 선택하고 본인만 아는 PIN을 만드세요. 기존 대표는 입력한 기존 PIN으로 로그인하며 PIN이 바뀌지는 않습니다.</p>
+          <div className="rep-twosome-guide">
+            <strong>팀 대표로 등록하시겠어요?</strong>
+            <p>본인 팀원을 선택하고 PIN을 설정해 대표로 등록한 뒤, 투썸 로그인을 한 번만 완료하면 주문한 메뉴가 해당 대표의 실제 투썸 장바구니에 담겨요!</p>
+            <p>기존 대표는 새 PIN을 만들 필요 없이 기존 PIN으로 로그인하면 됩니다.</p>
+          </div>
           <label className="form-label">본인 팀원 선택</label>
           <select value={repForm.teamMemberId} onChange={(e) => setRepForm({ ...repForm, teamMemberId: e.target.value })}>
             <option value="">선택해주세요</option>

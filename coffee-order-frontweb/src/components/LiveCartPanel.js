@@ -5,6 +5,7 @@ import Modal from './Modal';
 import ConfirmModal from './ConfirmModal';
 import useModal from '../hooks/useModal';
 import { isWithinStoreHours as storeIsOpen } from '../utils/storeHours';
+import createVisiblePolling from '../utils/polling';
 
 const parseCustom = (order) => {
   try {
@@ -14,11 +15,11 @@ const parseCustom = (order) => {
   }
 };
 
-const LiveCartPanel = ({ departmentId, onOrderClick }) => {
-  const [reps, setReps] = useState([]);
+const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, reps: externalReps, onOrdersChange, onRepsChange, onSummaryChange }) => {
+  const [internalReps, setInternalReps] = useState([]);
   const [selectedRepId, setSelectedRepId] = useState(null);
   const [cartItems, setCartItems] = useState([]);
-  const [orders, setOrders] = useState([]);
+  const [internalOrders, setInternalOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [lastCheckedAt, setLastCheckedAt] = useState(null);
   const [cartError, setCartError] = useState('');
@@ -31,31 +32,50 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
     isAlertOpen, alertConfig, showAlert, closeAlert,
     isConfirmOpen, confirmConfig, showConfirm, closeConfirm,
   } = useModal();
+  const reps = externalReps ?? internalReps;
+  const hasExternalReps = externalReps !== undefined;
+  const hasExternalOrders = externalOrders !== undefined;
   const selectedRep = reps.find((rep) => rep.id === Number(selectedRepId));
   const isActive = selectedRep?.twosomeStatus === 'ACTIVE';
+  const orders = externalOrders ?? internalOrders;
   const pendingOrders = orders.filter((order) => order.twosomeMenuCode && !order.cartReflectedAt);
   const reflectedForRep = orders.filter((order) => order.twosomeMenuCode && order.cartReflectedBy === selectedRep?.id);
 
   const loadReps = useCallback(async () => {
     try {
       const list = await repAPI.list(departmentId) || [];
-      setReps(list);
-      setSelectedRepId((current) => list.find((rep) => rep.id === current)?.id
-        || list.find((rep) => rep.twosomeStatus === 'ACTIVE')?.id || list[0]?.id || null);
+      setInternalReps(list);
+      onRepsChange?.(list);
     } catch (err) {
-      setReps([]);
-      setSelectedRepId(null);
+      setInternalReps([]);
+      onRepsChange?.([]);
       setCartError('대표 목록을 불러오지 못했습니다.');
     }
-  }, [departmentId]);
+  }, [departmentId, onRepsChange]);
 
-  const loadOrders = useCallback(async () => {
+  useEffect(() => {
+    setSelectedRepId((current) => reps.find((rep) => rep.id === current)?.id
+      || reps.find((rep) => rep.twosomeStatus === 'ACTIVE')?.id || reps[0]?.id || null);
+  }, [reps]);
+
+  const loadOrders = useCallback(async (signal) => {
     try {
-      setOrders(await orderAPI.getToday(departmentId) || []);
+      const nextOrders = await orderAPI.getToday(departmentId, { signal }) || [];
+      setInternalOrders(nextOrders);
+      onOrdersChange?.(nextOrders);
     } catch (err) {
-      setCartError('오늘의 팀 주문서를 불러오지 못했습니다.');
+      if (err.name !== 'AbortError') setCartError('오늘의 팀 주문서를 불러오지 못했습니다.');
     }
-  }, [departmentId]);
+  }, [departmentId, onOrdersChange]);
+
+  useEffect(() => {
+    onSummaryChange?.({
+      itemCount: cartItems.reduce((sum, item) => sum + (item.qty || 0), 0),
+      totalPrice: cartItems.some((item) => item.price > 0)
+        ? cartItems.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 0), 0)
+        : 0,
+    });
+  }, [cartItems, onSummaryChange]);
 
   const loadStoreOpen = useCallback(async () => {
     try {
@@ -69,7 +89,7 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
     }
   }, []);
 
-  const loadCart = useCallback(async (rep, silent = false) => {
+  const loadCart = useCallback(async (rep, silent = false, signal) => {
     if (!rep || rep.twosomeStatus !== 'ACTIVE') {
       requestSequence.current += 1;
       setCartItems([]);
@@ -81,12 +101,12 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
     if (!silent) setLoading(true);
     setCartError('');
     try {
-      const items = await repAPI.repGetCart(rep.id) || [];
+      const items = await repAPI.repGetCart(rep.id, { signal }) || [];
       if (sequence !== requestSequence.current) return;
       setCartItems(items);
       setLastCheckedAt(new Date());
     } catch (err) {
-      if (sequence !== requestSequence.current) return;
+      if (err.name === 'AbortError' || sequence !== requestSequence.current) return;
       setCartItems([]);
       setCartError(err.message === 'TARGET_REP_SESSION_REQUIRED' || err.message === 'TWOSOME_SESSION_EXPIRED'
         ? '대표 투썸 세션이 만료되었습니다. 주문 화면에서 다시 로그인해주세요.'
@@ -102,10 +122,10 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
     setLastCheckedAt(null);
     setCartError('');
     setExpandedCustom({});
-    loadReps();
-    loadOrders();
+    if (!hasExternalReps) loadReps();
+    if (!hasExternalOrders) loadOrders();
     loadStoreOpen();
-  }, [loadReps, loadOrders, loadStoreOpen]);
+  }, [hasExternalReps, hasExternalOrders, loadReps, loadOrders, loadStoreOpen]);
 
   useEffect(() => {
     setCartItems([]);
@@ -113,13 +133,12 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
     setExpandedCustom({});
     if (!selectedRep) return undefined;
     loadCart(selectedRep);
-    const interval = setInterval(() => {
-      loadCart(selectedRep, true);
-      loadOrders();
+    const stopPolling = createVisiblePolling(async (signal) => {
+      await Promise.all([loadCart(selectedRep, true, signal), loadOrders(signal)]);
     }, 15000);
     return () => {
       requestSequence.current += 1;
-      clearInterval(interval);
+      stopPolling();
     };
   }, [selectedRep, loadCart, loadOrders]);
 
@@ -243,63 +262,76 @@ const LiveCartPanel = ({ departmentId, onOrderClick }) => {
   };
 
   return (
-    <section className="live-cart-panel" aria-busy={loading}>
-      <div className="live-cart-toolbar">
-        <label>장바구니 대표
-          <select value={selectedRepId || ''} onChange={(event) => setSelectedRepId(Number(event.target.value) || null)}>
-            {reps.length === 0 && <option value="">등록된 대표 없음</option>}
-            {reps.map((rep) => <option key={rep.id} value={rep.id} disabled={rep.twosomeStatus !== 'ACTIVE'}>{rep.name} · {rep.statusReason}</option>)}
-          </select>
-        </label>
-        <button className="today-button" onClick={() => { loadReps(); loadCart(selectedRep); loadOrders(); }} disabled={loading}>지금 새로고침</button>
-      </div>
-      {reps.length === 0 && <div className="no-data">등록된 대표가 없습니다. 주문 화면에서 본인 팀원을 선택하고 대표로 등록할 수 있습니다.</div>}
-      {selectedRep && !isActive && <div className="cart-status-message"><strong>{selectedRep.name}</strong> · {selectedRep.statusReason}<p>주문 화면에서 해당 대표로 로그인하면 실시간 장바구니를 조회할 수 있습니다.</p></div>}
-      {!isActive && <button className="btn-bulk-add" onClick={onOrderClick}>주문 화면에서 대표 로그인</button>}
-      {isActive && (
-        <>
-          <div className="cart-live-status">
-            <span>15초마다 자동 확인 · 마지막 확인: {lastCheckedAt ? lastCheckedAt.toLocaleString('ko-KR') : '확인 중'}</span>
-            {!storeOpen && <strong>매장 닫힘 · 로컬 주문서만 저장 가능</strong>}
+    <section id="live-cart-section" className="live-cart-panel" aria-busy={loading} aria-labelledby="live-cart-title">
+      <div className="live-cart-card">
+        <div className="live-cart-heading">
+          <div>
+            <h2 id="live-cart-title">실시간 장바구니</h2>
+            <p>선택한 대표의 실제 투썸 장바구니입니다.</p>
           </div>
-          {cartError && <div className="cart-error-notice">{cartError}</div>}
-          {!cartError && (
-            <div className="summary-section">
-              <h3>{selectedRep.name}의 실제 투썸 장바구니</h3>
-              {cartItems.length > 0 && <div className="cart-toolbar"><button className="btn-clear-cart" onClick={clearCart} disabled={loading}>실제 장바구니 전체 비우기</button></div>}
-              <div className="total-summary">총 <strong>{cartItems.reduce((sum, item) => sum + (item.qty || 0), 0)}</strong>건
-                {cartItems.some((item) => item.price > 0) && <> · 확인된 금액 <strong>{cartItems.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 0), 0).toLocaleString()}</strong>원</>}
-              </div>
-              {loading && cartItems.length === 0 ? <div className="loading">장바구니 확인 중...</div> : cartItems.length === 0 ? (
-                <div className="no-data">현재는 {selectedRep.name}의 장바구니가 비어 있습니다.</div>
-              ) : (
-                <ul className="cart-item-list">
-                  {cartItems.map((item, index) => {
-                    const id = `${item.cartNo}-${item.cartDtlNo}`;
-                    const stopped = item.ordStopYn === 'Y' || item.ordAbleYn === 'N' || Boolean(item.notSaleMsg?.trim());
-                    return <li className="cart-item" key={`${id}-${index}`}>
-                      <div className="cart-item-main">
-                        <span className="cart-item-name">{item.menuNm || item.menuCd}</span>
-                        {item.optNm && <div className="cart-item-opt">{item.optNm}</div>}
-                        {item.cstmAmt > 0 && <div className="cart-custom-wrap"><button className="cart-custom-toggle" onClick={() => toggleCustom(item)}>퍼스널 옵션 {expandedCustom[id] ? '닫기' : '보기'} ({item.cstmAmt.toLocaleString()}원)</button>{expandedCustom[id] && <ul className="cart-custom-list">{expandedCustom[id].map((detail, detailIndex) => <li key={detailIndex}><span>{detail.name}</span><span>{(detail.price || 0).toLocaleString()}원</span></li>)}</ul>}</div>}
-                        <div className="cart-item-badges">{stopped && <span className="cart-badge stopped">판매불가{item.notSaleMsg ? ` · ${item.notSaleMsg}` : ''}</span>}{!stopped && !item.price && <span className="cart-badge unpriced">가격 확인 불가</span>}</div>
-                      </div>
-                      {item.price > 0 && <span className="cart-item-price">{item.price.toLocaleString()}원</span>}
-                      <div className="cart-qty-controls"><button className="cart-qty-btn" onClick={() => changeQuantity(item, item.qty - 1)} disabled={loading || item.qty <= 1} aria-label={`${item.menuNm} 수량 줄이기`}>-</button><span className="cart-qty">{item.qty}</span><button className="cart-qty-btn" onClick={() => changeQuantity(item, item.qty + 1)} disabled={loading} aria-label={`${item.menuNm} 수량 늘리기`}>+</button></div>
-                      <button className="btn-remove-cart-item" onClick={() => removeItem(item)} disabled={loading}>제거</button>
-                    </li>;
-                  })}
-                </ul>
-              )}
+          {isActive && (
+            <div className="live-cart-heading-total">
+              총 <strong>{cartItems.reduce((sum, item) => sum + (item.qty || 0), 0)}</strong>건
+              {cartItems.some((item) => item.price > 0) && <span> · {cartItems.reduce((sum, item) => sum + (item.price || 0) * (item.qty || 0), 0).toLocaleString()}원</span>}
             </div>
           )}
-          <div className="local-cart-section">
-            <h3>오늘의 팀 주문서 (로컬)</h3>
-            <p>외부 장바구니와 별도로 저장된 기록입니다. 미반영 {pendingOrders.length}건 · {selectedRep.name}에게 반영됨 {reflectedForRep.length}건</p>
-            <button className="btn-bulk-add" onClick={handleBulkAdd} disabled={bulkLoading || !storeOpen || pendingOrders.length === 0} title={!storeOpen ? '매장 개장 후 이용할 수 있습니다' : ''}>{bulkLoading ? '담는 중...' : `미반영 주문을 ${selectedRep.name} 장바구니에 일괄 담기`}</button>
-          </div>
-        </>
-      )}
+        </div>
+        <div className="live-cart-toolbar">
+          <label>장바구니 대표
+            <select value={selectedRepId || ''} onChange={(event) => setSelectedRepId(Number(event.target.value) || null)}>
+              {reps.length === 0 && <option value="">등록된 대표 없음</option>}
+              {reps.map((rep) => <option key={rep.id} value={rep.id} disabled={rep.twosomeStatus !== 'ACTIVE'}>{rep.name} · {rep.statusReason}</option>)}
+            </select>
+          </label>
+          <button className="today-button" onClick={() => { loadReps(); loadCart(selectedRep); loadOrders(); }} disabled={loading}>지금 새로고침</button>
+        </div>
+        {reps.length === 0 && <div className="no-data">등록된 대표가 없습니다. 주문 화면에서 본인 팀원을 선택하고 대표로 등록할 수 있습니다.</div>}
+        {selectedRep && !isActive && <div className="cart-status-message"><strong>{selectedRep.name}</strong> · {selectedRep.statusReason}<p>주문 화면에서 해당 대표로 로그인하면 실시간 장바구니를 조회할 수 있습니다.</p></div>}
+        {!isActive && <button className="btn-bulk-add" onClick={onOrderClick}>주문 화면에서 대표 로그인</button>}
+        {isActive && (
+          <>
+            <div className="cart-live-status">
+              <span>15초마다 자동 확인 · 마지막 확인: {lastCheckedAt ? lastCheckedAt.toLocaleString('ko-KR') : '확인 중'}</span>
+              {!storeOpen && <strong>매장 닫힘 · 로컬 주문서만 저장 가능</strong>}
+            </div>
+            {cartError && <div className="cart-error-notice">{cartError}</div>}
+            {!cartError && (
+              <div className="summary-section">
+                <div className="live-cart-content-heading">
+                  <h3>{selectedRep.name}의 실제 투썸 장바구니</h3>
+                  {cartItems.length > 0 && <button className="btn-clear-cart" onClick={clearCart} disabled={loading}>전체 비우기</button>}
+                </div>
+                {loading && cartItems.length === 0 ? <div className="loading">장바구니 확인 중...</div> : cartItems.length === 0 ? (
+                  <div className="no-data">현재는 {selectedRep.name}의 장바구니가 비어 있습니다.</div>
+                ) : (
+                  <ul className="cart-item-list">
+                    {cartItems.map((item, index) => {
+                      const id = `${item.cartNo}-${item.cartDtlNo}`;
+                      const stopped = item.ordStopYn === 'Y' || item.ordAbleYn === 'N' || Boolean(item.notSaleMsg?.trim());
+                      return <li className="cart-item" key={`${id}-${index}`}>
+                        <div className="cart-item-main">
+                          <span className="cart-item-name">{item.menuNm || item.menuCd}</span>
+                          {item.optNm && <div className="cart-item-opt">{item.optNm}</div>}
+                          {item.cstmAmt > 0 && <div className="cart-custom-wrap"><button className="cart-custom-toggle" onClick={() => toggleCustom(item)}>퍼스널 옵션 {expandedCustom[id] ? '닫기' : '보기'} ({item.cstmAmt.toLocaleString()}원)</button>{expandedCustom[id] && <ul className="cart-custom-list">{expandedCustom[id].map((detail, detailIndex) => <li key={detailIndex}><span>{detail.name}</span><span>{(detail.price || 0).toLocaleString()}원</span></li>)}</ul>}</div>}
+                          <div className="cart-item-badges">{stopped && <span className="cart-badge stopped">판매불가{item.notSaleMsg ? ` · ${item.notSaleMsg}` : ''}</span>}{!stopped && !item.price && <span className="cart-badge unpriced">가격 확인 불가</span>}</div>
+                        </div>
+                        {item.price > 0 && <span className="cart-item-price">{item.price.toLocaleString()}원</span>}
+                        <div className="cart-qty-controls"><button className="cart-qty-btn" onClick={() => changeQuantity(item, item.qty - 1)} disabled={loading || item.qty <= 1} aria-label={`${item.menuNm} 수량 줄이기`}>-</button><span className="cart-qty">{item.qty}</span><button className="cart-qty-btn" onClick={() => changeQuantity(item, item.qty + 1)} disabled={loading} aria-label={`${item.menuNm} 수량 늘리기`}>+</button></div>
+                        <button className="btn-remove-cart-item" onClick={() => removeItem(item)} disabled={loading}>제거</button>
+                      </li>;
+                    })}
+                  </ul>
+                )}
+              </div>
+            )}
+            <div className="local-cart-section">
+              <h3>오늘의 팀 주문서 (로컬)</h3>
+              <p>외부 장바구니와 별도로 저장된 기록입니다. 미반영 {pendingOrders.length}건 · {selectedRep.name}에게 반영됨 {reflectedForRep.length}건</p>
+              <button className="btn-bulk-add" onClick={handleBulkAdd} disabled={bulkLoading || !storeOpen || pendingOrders.length === 0} title={!storeOpen ? '매장 개장 후 이용할 수 있습니다' : ''}>{bulkLoading ? '담는 중...' : `미반영 주문을 ${selectedRep.name} 장바구니에 일괄 담기`}</button>
+            </div>
+          </>
+        )}
+      </div>
       <Modal isOpen={Boolean(bulkDialog)} onClose={() => setBulkDialog(null)} title="이미 담은 항목이 있습니다">
         {bulkDialog && <div className="bulk-add-dialog">
           <p>다음 항목은 이미 {selectedRep.name} 장바구니 담기로 기록되어 있습니다.</p>

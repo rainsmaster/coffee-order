@@ -17,18 +17,20 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * 투썸 메뉴 상세 옵션 관리.
  *
  * - 메뉴 상세 페이지(tsTsoMenuDetail.do)를 jsoup으로 파싱해 옵션 그룹을 추출하고
- *   twosome_menu.option_data(JSON)에 캐시한다 (메뉴 새로고침 시 무효화).
+ *   twosome_menu.option_data(JSON)에 캐시한다 (옵션 구성이 변경된 메뉴는 새로고침 시 무효화).
  * - 상세 페이지 조회에는 투썸 세션이 필요하므로 관리자 또는 대표 세션을 사용한다.
  * - 옵션 조합으로 변형 메뉴 코드를 조회한다 (getNewMenuInfoAjax).
  */
@@ -39,22 +41,22 @@ public class TwosomeMenuOptionService {
 
     /** 투썸 세션에 매장이 바인딩되지 않았을 때 상세 페이지가 돌려주는 스크립트 알림 문구 */
     private static final String NO_STORE_ALERT = "주문가능한 매장이 없습니다";
+    private static final Duration CUSTOM_OPTIONS_CACHE_TTL = Duration.ofHours(1);
 
     private final TwosomeMenuRepository twosomeMenuRepository;
     private final TwosomeStoreIntegrationService integrationService;
     private final ObjectMapper objectMapper;
+    private final Map<String, CachedCustomOptions> customOptionsCache = new ConcurrentHashMap<>();
 
     /**
      * 메뉴 옵션 그룹 조회 (캐시 우선). 상세 페이지 파싱 결과가 없으면 조회 후 캐시한다.
      *
      * @param sessionKey 옵션 조회에 사용할 세션 (관리자 "active" 또는 대표 "rep:{memberId}")
      */
-    @Transactional
     public TwosomeMenuOptionsResponse getMenuOptions(String sessionKey, String menuCd) {
         return getMenuOptions(sessionKey, menuCd, null);
     }
 
-    @Transactional
     public TwosomeMenuOptionsResponse getMenuOptions(String sessionKey, String menuCd, String midCd) {
         TwosomeMenu menu = (midCd != null && !midCd.isBlank()
                 ? twosomeMenuRepository.findByMenuCdAndMidCd(menuCd, midCd)
@@ -99,8 +101,22 @@ public class TwosomeMenuOptionService {
      * - article.collapse의 이름과 data-id를 카테고리로 유지하고, 우유 그룹(3004)은 하나만 선택
      */
     public JsonNode getMenuCustomOptions(String sessionKey, String variantMenuCd) {
+        CachedCustomOptions cached = customOptionsCache.get(variantMenuCd);
+        if (cached != null && cached.expiresAt().isAfter(Instant.now())) {
+            return cached.value();
+        }
         String html = integrationService.getMenuCustomOptionsHtml(sessionKey, variantMenuCd);
-        return parseCustomPanelHtml(variantMenuCd, html);
+        JsonNode parsed = parseCustomPanelHtml(variantMenuCd, html);
+        customOptionsCache.put(variantMenuCd,
+                new CachedCustomOptions(Instant.now().plus(CUSTOM_OPTIONS_CACHE_TTL), parsed));
+        return parsed;
+    }
+
+    public void clearCustomOptionsCache() {
+        customOptionsCache.clear();
+    }
+
+    private record CachedCustomOptions(Instant expiresAt, JsonNode value) {
     }
 
     JsonNode parseCustomPanelHtml(String variantMenuCd, String html) {
