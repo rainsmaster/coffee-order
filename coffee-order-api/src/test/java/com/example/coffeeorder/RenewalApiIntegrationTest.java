@@ -220,6 +220,13 @@ class RenewalApiIntegrationTest {
                 .andExpect(header().string("Location", "/?manageTab=reps"));
     }
 
+    @Test
+    void missingImagesAreNotCached() throws Exception {
+        mockMvc.perform(get("/images/twosome/missing-image.png.webp"))
+                .andExpect(status().isNotFound())
+                .andExpect(header().string("Cache-Control", "no-store"));
+    }
+
     private String createOrder(Fixture fixture, LocalDate orderDate) throws Exception {
         Map<String, Object> request = new HashMap<>();
         request.put("departmentId", fixture.department().getId());

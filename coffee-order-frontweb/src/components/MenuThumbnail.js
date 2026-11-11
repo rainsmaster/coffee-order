@@ -11,7 +11,7 @@ const getImageUrls = (menu) => {
   const withVersion = (path) => {
     if (!remotePath) return path;
     const version = remotePath.split('/').pop();
-    return `${path}?v=${encodeURIComponent(version)}`;
+    return `${path}?imageVersion=${encodeURIComponent(version)}`;
   };
   const webpPath = menu.localImgPath.toLowerCase().endsWith('.webp')
     ? menu.localImgPath

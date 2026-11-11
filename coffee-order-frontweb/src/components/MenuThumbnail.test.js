@@ -30,7 +30,7 @@ test('로딩 중에는 크기가 고정된 스켈레톤을 보이고 로드 후 
   expect(image).toHaveAttribute('decoding', 'async');
   expect(image).toHaveAttribute('fetchpriority', 'low');
   expect(image).toHaveAttribute('sizes', '(max-width: 480px) 30vw, 100px');
-  expect(image.src).toContain('/images/twosome/10100002.jpg.webp?v=10100002_20260608055115.jpg');
+  expect(image.src).toContain('/images/twosome/10100002.jpg.webp?imageVersion=10100002_20260608055115.jpg');
 
   fireEvent.load(image);
 
@@ -65,7 +65,7 @@ test('WebP 실패 시 원본을 사용하고 원본도 실패하면 외부 요�
   fireEvent.error(screen.getByRole('img', { name: '카페 라떼' }));
 
   const original = screen.getByRole('img', { name: '카페 라떼' });
-  expect(original.src).toContain('/images/twosome/10100002.jpg?v=');
+  expect(original.src).toContain('/images/twosome/10100002.jpg?imageVersion=');
   expect(original.src).not.toContain('.webp');
   expect(original.src).not.toContain('mcdn.twosome.co.kr');
 
@@ -80,7 +80,7 @@ test('원본 이미지 버전이 바뀌면 캐시 키도 바뀐다', () => {
   const changed = { ...menu, menuImg: '/menu_image/10100002_20261110090000.jpg' };
   render(<MenuThumbnail menu={changed} />);
 
-  expect(screen.getByRole('img', { name: '카페 라떼' }).src).toContain('?v=10100002_20261110090000.jpg');
+  expect(screen.getByRole('img', { name: '카페 라떼' }).src).toContain('?imageVersion=10100002_20261110090000.jpg');
 });
 
 test('외부 썸네일은 다운로드 크기를 줄이는 품질로 요청한다', () => {

@@ -28,10 +28,14 @@ class StaticContentCacheFilterTest {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/images/twosome/missing.png.webp");
         MockHttpServletResponse response = new MockHttpServletResponse();
 
-        filter.doFilter(request, response, (servletRequest, servletResponse) ->
-                ((MockHttpServletResponse) servletResponse).setStatus(404));
+        filter.doFilter(request, response, (servletRequest, servletResponse) -> {
+            ((jakarta.servlet.http.HttpServletResponse) servletResponse).setStatus(404);
+            servletResponse.getOutputStream().write("missing".getBytes());
+            servletResponse.flushBuffer();
+        });
 
         assertThat(response.getHeader("Cache-Control")).isEqualTo("no-store");
+        assertThat(response.getContentAsString()).isEqualTo("missing");
     }
 
     @Test
