@@ -628,11 +628,12 @@ public class TwosomeStoreIntegrationService {
         touchAndPersist(session);
 
         JsonNode items = body.path("cartStoreMenuList");
+        if (!items.isArray()) {
+            throw new TwosomeStoreException("장바구니 목록 형식이 변경되어 현재 상태를 확인할 수 없습니다.");
+        }
         List<TwosomeCartItemResponse> result = new ArrayList<>();
-        if (items.isArray()) {
-            for (JsonNode item : items) {
-                result.add(parseCartItem(item));
-            }
+        for (JsonNode item : items) {
+            result.add(parseCartItem(item));
         }
         return result;
     }
@@ -663,8 +664,12 @@ public class TwosomeStoreIntegrationService {
         try {
             JsonNode body = twosomeStoreApiClient.fetchMenuCustomList(
                     session.getContext(), cartNo, cartDtlNo);
+            JsonNode list = body.isArray() ? body : body.path("fetchResultListSet");
+            if (!list.isArray()) {
+                throw new TwosomeStoreException("장바구니 퍼스널 옵션 형식이 변경되어 확인이 필요합니다.");
+            }
             touchAndPersist(session);
-            return body.path("fetchResultListSet");
+            return list;
         } catch (TwosomeStoreSessionExpiredException e) {
             expire(sessionKey, session);
             throw e;
@@ -960,6 +965,44 @@ public class TwosomeStoreIntegrationService {
         return ACTIVE_KEY;
     }
 
+    JsonNode getOrderHistory(String sessionKey, String startDate, String endDate, int pageNum) {
+        return executeReadOnly(sessionKey, context ->
+                twosomeStoreApiClient.fetchOrderHistory(context, startDate, endDate, pageNum));
+    }
+
+    String getOrderDetailHtml(String sessionKey, String ordNo) {
+        return executeReadOnly(sessionKey, context ->
+                twosomeStoreApiClient.fetchOrderDetailHtml(context, ordNo));
+    }
+
+    JsonNode getOrderCustomList(String sessionKey, String ordNo, String ordDtlNo) {
+        return executeReadOnly(sessionKey, context ->
+                twosomeStoreApiClient.fetchOrderCustomList(context, ordNo, ordDtlNo));
+    }
+
+    String getReceiptHtml(String sessionKey, String receiptNo) {
+        return executeReadOnly(sessionKey, context ->
+                twosomeStoreApiClient.fetchReceiptHtml(context, receiptNo));
+    }
+
+    JsonNode getReceiptData(String sessionKey, String receiptNo, String custNo) {
+        return executeReadOnly(sessionKey, context ->
+                twosomeStoreApiClient.fetchReceiptData(context, receiptNo, custNo));
+    }
+
+    private <T> T executeReadOnly(String sessionKey,
+                                  java.util.function.Function<TwosomeStoreSessionContext, T> action) {
+        StoreSession session = requireSessionByKey(sessionKey, "투썸 로그인이 필요합니다.");
+        try {
+            T result = action.apply(session.getContext());
+            touchAndPersist(session);
+            return result;
+        } catch (TwosomeStoreSessionExpiredException e) {
+            expire(sessionKey, session);
+            throw e;
+        }
+    }
+
     // ==================== 매장 상세 (5분 인메모리 캐시, 세션 불필요) ====================
 
     private static final Duration STORE_DETAIL_CACHE_TTL = Duration.ofMinutes(5);
@@ -1141,7 +1184,7 @@ public class TwosomeStoreIntegrationService {
             }
         }
         sessionRedisStore.save(sessionKey, new TwosomeSessionRedisStore.StoredSession(
-                new LinkedHashMap<>(session.getContext().getCookieJar()),
+                session.getContext().snapshotCookies(),
                 session.getStoreNm(),
                 session.getLoginId(),
                 session.getLoggedInAt() != null ? session.getLoggedInAt() : LocalDateTime.now()));

@@ -1,0 +1,25 @@
+{
+  "queryCode": 1000,
+  "fetchResultListSet": [
+    {
+      "CSTM_NM": "샷 추가",
+      "CSTM_GRP_CD": "10",
+      "TYPE_ADD_CD": "A",
+      "CSTM_ADD_CD": "SHOT",
+      "TYPE_CHG_CD": "",
+      "CSTM_CHG_CD": "",
+      "CSTM_ORD_CNT": 1,
+      "CSTM_NUM": 7
+    },
+    {
+      "CSTM_NM": "칼리아드 드리즐",
+      "CSTM_GRP_CD": "20",
+      "TYPE_ADD_CD": "",
+      "CSTM_ADD_CD": "",
+      "TYPE_CHG_CD": "C",
+      "CSTM_CHG_CD": "CARAMEL",
+      "CSTM_ORD_CNT": "2",
+      "CSTM_NUM": 3
+    }
+  ]
+}

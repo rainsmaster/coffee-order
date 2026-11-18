@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -30,12 +31,22 @@ class RepControllerTest {
     private MemberRepository memberRepository;
     @Mock
     private TwosomeStoreIntegrationService integrationService;
+    @Mock
+    private com.example.coffeeorder.service.TwosomePaymentObservationService paymentObservationService;
+    @Mock
+    private com.example.coffeeorder.service.DistributedLockService lockService;
 
     private RepController controller;
 
     @BeforeEach
     void setUp() {
-        controller = new RepController(repAuthService, memberRepository, integrationService);
+        org.mockito.Mockito.lenient().when(lockService.tryWithLock(
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> java.util.Optional.of(
+                        ((java.util.function.Supplier<?>) invocation.getArgument(3)).get()));
+        controller = new RepController(repAuthService, memberRepository, integrationService,
+                paymentObservationService, lockService);
     }
 
     @Test
@@ -73,5 +84,20 @@ class RepControllerTest {
                 .isInstanceOf(AuthException.class)
                 .extracting("errorCode").isEqualTo("TARGET_REP_SESSION_REQUIRED");
         verify(integrationService, never()).addItemsToCart(sessionKey, request);
+    }
+
+    @Test
+    void orderHistoryRefreshUsesOnlyPinAuthenticatedOwner() {
+        Member member = new Member();
+        member.setId(42L);
+        String sessionKey = TwosomeStoreIntegrationService.repSessionKey(42L);
+        when(repAuthService.resolveByToken("pin-token")).thenReturn(member);
+        when(integrationService.getSessionStatus(sessionKey))
+                .thenReturn(new TwosomeSessionResponse("ACTIVE", "테스트점", null, 20L, null));
+
+        controller.refreshOrders("pin-token");
+
+        verify(paymentObservationService).refresh(42L);
+        verify(repAuthService, never()).requireActiveMember(anyLong());
     }
 }

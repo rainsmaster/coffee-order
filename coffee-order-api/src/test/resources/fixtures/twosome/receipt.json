@@ -1,0 +1,14 @@
+{
+  "RESULT_CODE": "0000",
+  "RESULT_MSG": "[성공]정상 조회되었습니다.",
+  "receiptData": [
+    { "CONTENTS": "[투썸오더 : 907]", "TXT_ALIGN": "C", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[투썸오더 결제]", "TXT_ALIGN": "C", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[주문번호] 907", "TXT_ALIGN": "L", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[주문일시] 2026-11-06 09:40:44", "TXT_ALIGN": "L", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[결제금액] 15,900", "TXT_ALIGN": "L", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[신용카드] 15,900", "TXT_ALIGN": "L", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[승인번호] 12345678", "TXT_ALIGN": "L", "TXT_STYLE": "", "TXT_TYPE": "TEXT" },
+    { "CONTENTS": "[승인일시] 2026-11-06 09:40:43", "TXT_ALIGN": "L", "TXT_STYLE": "", "TXT_TYPE": "TEXT" }
+  ]
+}

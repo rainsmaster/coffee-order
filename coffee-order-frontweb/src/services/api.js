@@ -340,6 +340,23 @@ export const repAPI = {
 
   twosomeSession: () => fetchAPI('/rep/twosome/session', { headers: repTokenHeader() }),
 
+  getTwosomeOrders: (options = {}) => fetchAPI('/rep/twosome/orders', {
+    ...options,
+    headers: { ...repTokenHeader(), ...options.headers },
+  }),
+
+  refreshTwosomeOrders: (options = {}) => fetchAPI('/rep/twosome/orders/refresh', {
+    ...options,
+    method: 'POST',
+    headers: { ...repTokenHeader(), ...options.headers },
+  }),
+
+  resetTwosomeOrders: (options = {}) => fetchAPI('/rep/twosome/orders/reset', {
+    ...options,
+    method: 'POST',
+    headers: { ...repTokenHeader(), ...options.headers },
+  }),
+
   repAddToCart: (targetRepMemberId, items) => fetchAPI('/rep/twosome/cart/add', {
     method: 'POST',
     headers: repTokenHeader(),

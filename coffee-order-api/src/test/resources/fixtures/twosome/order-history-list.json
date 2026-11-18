@@ -1,0 +1,27 @@
+{
+  "queryCode": 1000,
+  "rowCount": 2,
+  "fetchResultListSet": [
+    {
+      "ORD_NO": "TPSO2026110600000001",
+      "STORE_NM": "CJENM커머스부문점",
+      "ORD_STAT_GBCD": "60",
+      "ORD_STAT_GBNM": "수령완료",
+      "ORD_DTIME": "2026-11-06(금) 09:40",
+      "MD_PICU_DTIME": "2026-11-06 09:49",
+      "ORD_GBCD": "10",
+      "UP_MENU_NM": "카페라떼 외 1개",
+      "MENU_IMG_03": "/menu_image/latte.jpg"
+    },
+    {
+      "ORD_NO": "TPSO2026110600000002",
+      "STORE_NM": "CJENM커머스부문점",
+      "ORD_STAT_GBCD": "80",
+      "ORD_STAT_GBNM": "취소완료",
+      "ORD_DTIME": "2026-11-06(금) 09:30",
+      "MD_PICU_DTIME": null,
+      "ORD_GBCD": "10",
+      "UP_MENU_NM": "아메리칸노"
+    }
+  ]
+}

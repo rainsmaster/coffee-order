@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +28,7 @@ public class OrderController {
     private final OrderService orderService;
     private final SettingsService settingsService;
     private final RepAuthService repAuthService;
+    private final com.example.coffeeorder.service.TwosomePaymentObservationService paymentObservationService;
 
     // 오늘 주문 전체 조회 (부서별 필터링 지원)
     @GetMapping("/today")
@@ -130,7 +132,21 @@ public class OrderController {
         repAuthService.requireActiveMember(request.getTargetRepMemberId());
         int updatedCount = orderService.markCartReflected(
                 request.getOrderIds(), request.getTargetRepMemberId());
-        return ResponseEntity.ok(Map.of("updatedCount", updatedCount));
+        Map<String, Object> result = new HashMap<>();
+        result.put("updatedCount", updatedCount);
+        if (updatedCount > 0) {
+            try {
+                var observation = paymentObservationService.startObservation(
+                        request.getTargetRepMemberId(), request.getOrderIds());
+                result.put("observationStatus", observation.status());
+            } catch (RuntimeException e) {
+                org.slf4j.LoggerFactory.getLogger(OrderController.class).warn(
+                        "장바구니 반영은 저장했지만 결제 관찰을 시작하지 못했습니다. repMemberId={}: {}",
+                        request.getTargetRepMemberId(), e.getMessage());
+                result.put("observationStatus", "CHECK_UNAVAILABLE");
+            }
+        }
+        return ResponseEntity.ok(result);
     }
 
     // 날짜별 메뉴 집계

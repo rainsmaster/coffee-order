@@ -31,6 +31,8 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // 특정 팀원의 최근 주문 조회 (날짜 내림차순, 생성시간 내림차순)
     Optional<Order> findTopByTeamAndDelYnOrderByOrderDateDescCreatedTimeDesc(Team team, String delYn);
 
+    List<Order> findByExternalOrderId(Long externalOrderId);
+
     // 부서별 오늘 주문 수 조회
     long countByDepartmentIdAndOrderDateAndDelYn(Long departmentId, LocalDate orderDate, String delYn);
 }

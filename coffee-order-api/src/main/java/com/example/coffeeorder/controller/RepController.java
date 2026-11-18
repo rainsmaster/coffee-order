@@ -46,6 +46,8 @@ public class RepController {
     private final RepAuthService repAuthService;
     private final MemberRepository memberRepository;
     private final TwosomeStoreIntegrationService twosomeStoreIntegrationService;
+    private final com.example.coffeeorder.service.TwosomePaymentObservationService paymentObservationService;
+    private final com.example.coffeeorder.service.DistributedLockService lockService;
 
     // 로그인 화면용 활성 대표 목록 (부서별 필터와 세션 상태)
     @GetMapping("/api/reps")
@@ -195,8 +197,8 @@ public class RepController {
             @RequestBody TwosomeCartAddRequest request) {
         Long memberId = resolveTargetMemberId(token, request.getTargetRepMemberId());
         requireActiveSession(memberId);
-        return ResponseEntity.ok(twosomeStoreIntegrationService.addItemsToCart(
-                TwosomeStoreIntegrationService.repSessionKey(memberId), request));
+        return ResponseEntity.ok(withCartLock(memberId, () -> twosomeStoreIntegrationService.addItemsToCart(
+                TwosomeStoreIntegrationService.repSessionKey(memberId), request)));
     }
 
     @PostMapping("/api/rep/twosome/cart/custom-list")
@@ -249,12 +251,14 @@ public class RepController {
             @RequestParam(required = false) Long targetRepMemberId) {
         Long memberId = resolveTargetMemberId(token, targetRepMemberId);
         requireActiveSession(memberId);
-        twosomeStoreIntegrationService.removeCartItem(
-                TwosomeStoreIntegrationService.repSessionKey(memberId), cartNo, cartDtlNo);
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "SUCCESS");
-        result.put("message", "장바구니 항목이 삭제되었습니다.");
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(withCartLock(memberId, () -> {
+            twosomeStoreIntegrationService.removeCartItem(
+                    TwosomeStoreIntegrationService.repSessionKey(memberId), cartNo, cartDtlNo);
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "SUCCESS");
+            result.put("message", "장바구니 항목이 삭제되었습니다.");
+            return result;
+        }));
     }
 
     @PutMapping("/api/rep/twosome/cart/items/{cartNo}/qty")
@@ -265,12 +269,14 @@ public class RepController {
             @RequestParam(required = false) Long targetRepMemberId) {
         Long memberId = resolveTargetMemberId(token, targetRepMemberId);
         requireActiveSession(memberId);
-        twosomeStoreIntegrationService.adjustCartItemQty(
-                TwosomeStoreIntegrationService.repSessionKey(memberId), cartNo, request);
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "SUCCESS");
-        result.put("message", "수량이 조정되었습니다.");
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(withCartLock(memberId, () -> {
+            twosomeStoreIntegrationService.adjustCartItemQty(
+                    TwosomeStoreIntegrationService.repSessionKey(memberId), cartNo, request);
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "SUCCESS");
+            result.put("message", "수량이 조정되었습니다.");
+            return result;
+        }));
     }
 
     @PostMapping("/api/rep/twosome/cart/clear")
@@ -279,13 +285,46 @@ public class RepController {
             @RequestParam(required = false) Long targetRepMemberId) {
         Long memberId = resolveTargetMemberId(token, targetRepMemberId);
         requireActiveSession(memberId);
-        int deletedCount = twosomeStoreIntegrationService.clearCart(
-                TwosomeStoreIntegrationService.repSessionKey(memberId));
-        Map<String, Object> result = new HashMap<>();
-        result.put("status", "SUCCESS");
-        result.put("deletedCount", deletedCount);
-        result.put("message", String.format("장바구니 %d건이 삭제되었습니다.", deletedCount));
-        return ResponseEntity.ok(result);
+        return ResponseEntity.ok(withCartLock(memberId, () -> {
+            int deletedCount = twosomeStoreIntegrationService.clearCart(
+                    TwosomeStoreIntegrationService.repSessionKey(memberId));
+            Map<String, Object> result = new HashMap<>();
+            result.put("status", "SUCCESS");
+            result.put("deletedCount", deletedCount);
+            result.put("message", String.format("장바구니 %d건이 삭제되었습니다.", deletedCount));
+            return result;
+        }));
+    }
+
+    @GetMapping("/api/rep/twosome/orders")
+    public ResponseEntity<com.example.coffeeorder.dto.RepTwosomeOrderView> getOrders(
+            @RequestHeader(value = "X-Rep-Token", required = false) String token) {
+        Member member = repAuthService.resolveByToken(token);
+        return ResponseEntity.ok(paymentObservationService.getView(member.getId()));
+    }
+
+    @PostMapping("/api/rep/twosome/orders/refresh")
+    public ResponseEntity<com.example.coffeeorder.dto.RepTwosomeOrderView> refreshOrders(
+            @RequestHeader(value = "X-Rep-Token", required = false) String token) {
+        Member member = repAuthService.resolveByToken(token);
+        requireActiveSession(member.getId());
+        return ResponseEntity.ok(paymentObservationService.refresh(member.getId()));
+    }
+
+    @PostMapping("/api/rep/twosome/orders/reset")
+    public ResponseEntity<com.example.coffeeorder.dto.RepTwosomeOrderView> resetOrders(
+            @RequestHeader(value = "X-Rep-Token", required = false) String token) {
+        Member member = repAuthService.resolveByToken(token);
+        requireActiveSession(member.getId());
+        return ResponseEntity.ok(paymentObservationService.resetObservation(member.getId()));
+    }
+
+    private <T> T withCartLock(Long memberId, java.util.function.Supplier<T> action) {
+        String key = "twosome:payment-observer:lock:"
+                + TwosomeStoreIntegrationService.repSessionKey(memberId);
+        return lockService.tryWithLock(key, java.time.Duration.ofSeconds(2), java.time.Duration.ZERO, action)
+                .orElseThrow(() -> new TwosomeStoreException(
+                        "같은 대표의 장바구니 확인 작업이 진행 중입니다. 잠시 후 다시 시도해주세요."));
     }
 
     private Long resolveTargetMemberId(String token, Long targetRepMemberId) {

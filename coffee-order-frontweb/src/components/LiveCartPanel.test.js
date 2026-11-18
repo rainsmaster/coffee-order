@@ -3,6 +3,10 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import LiveCartPanel from './LiveCartPanel';
 import { orderAPI, repAPI, twosomeStoreAPI } from '../services/api';
 
+jest.mock('./TwosomeOrderTracker', () => function MockTwosomeOrderTracker() {
+  return null;
+});
+
 jest.mock('../services/api', () => ({
   orderAPI: { getToday: jest.fn(), markCartReflected: jest.fn() },
   repAPI: {
@@ -142,5 +146,36 @@ describe('대표별 실시간 장바구니', () => {
     expect(await screen.findByText('확인 사이에 장바구니에 항목이 추가되어 다시 담기를 중단했습니다. 현재 항목을 먼저 확인해주세요.')).toBeInTheDocument();
     expect(repAPI.repAddToCart).not.toHaveBeenCalled();
     expect(orderAPI.markCartReflected).not.toHaveBeenCalled();
+  });
+
+  test('실제 주문과 연결된 미취소 항목은 다시 담기 대상에서 제외한다', async () => {
+    repAPI.repGetCart.mockResolvedValue([]);
+    const paidOrders = reflectedOrders.map((order) => ({
+      ...order, externalOrderId: 99, externalOrderNo: 'TPSO-ORDER', externalOrderStatus: '60',
+    }));
+    render(<LiveCartPanel
+      departmentId={1} onOrderClick={jest.fn()} orders={paidOrders} reps={activeReps}
+      onOrdersChange={jest.fn()} onSummaryChange={jest.fn()}
+    />);
+
+    expect(await screen.findByText(/실제 주문 연결 2건/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /반영 완료 .*다시 담기/ })).not.toBeInTheDocument();
+  });
+
+  test('같은 기본 메뉴가 섞여도 요청 순서의 성공 결과만 반영한다', async () => {
+    repAPI.repGetCart.mockResolvedValue([]);
+    repAPI.repAddToCart.mockResolvedValue({ results: [
+      { menuCd: 'A', success: false }, { menuCd: 'A', success: true },
+    ] });
+    const sameMenuOrders = reflectedOrders.map((order) => ({ ...order, twosomeMenuCode: 'A' }));
+    render(<LiveCartPanel
+      departmentId={1} onOrderClick={jest.fn()} orders={sameMenuOrders} reps={activeReps}
+      onOrdersChange={jest.fn()} onSummaryChange={jest.fn()}
+    />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '반영 완료 2건 다시 담기' }));
+    fireEvent.click(screen.getByRole('button', { name: '장바구니에 2건 다시 담기' }));
+
+    await waitFor(() => expect(orderAPI.markCartReflected).toHaveBeenCalledWith([2], 1));
   });
 });

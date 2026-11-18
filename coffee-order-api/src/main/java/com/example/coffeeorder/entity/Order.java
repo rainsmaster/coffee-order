@@ -54,6 +54,18 @@ public class Order {
     @Column(name = "cart_reflected_by")
     private Long cartReflectedBy;
 
+    @Column(name = "external_order_id")
+    private Long externalOrderId;
+
+    @Column(name = "external_order_no", length = 40)
+    private String externalOrderNo;
+
+    @Column(name = "external_order_status", length = 10)
+    private String externalOrderStatus;
+
+    @Column(name = "external_order_linked_at")
+    private LocalDateTime externalOrderLinkedAt;
+
     // 투썸 변형 메뉴 코드 (옵션 조합 결과, 장바구니 담기의 MENU_CD)
     @Column(name = "variant_menu_cd", length = 20)
     private String variantMenuCd;

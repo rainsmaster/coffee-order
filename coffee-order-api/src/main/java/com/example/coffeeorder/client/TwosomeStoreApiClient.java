@@ -333,6 +333,65 @@ public class TwosomeStoreApiClient {
         return readTree(response.body(), "resolve variant menu");
     }
 
+    private static final String ORDER_HISTORY_PAGE_URL = BASE_URL + "/ts/tsOrderHistoryList.do?menuGb=CD";
+    private static final String ORDER_HISTORY_URL = BASE_URL + "/my/orderHistoryListAjax.json";
+    private static final String ORDER_DETAIL_URL = BASE_URL + "/my/orderHistoryDetail.do";
+    private static final String ORDER_CUSTOM_LIST_URL = BASE_URL + "/od/getTwOrderMenuCstmListAjax.json";
+    private static final String RECEIPT_PAGE_URL = BASE_URL + "/my/elecReceiptDetail.do";
+    private static final String RECEIPT_DATA_URL = BASE_URL + "/my/elecReceiptDetailAjax.json";
+
+    public JsonNode fetchOrderHistory(TwosomeStoreSessionContext context, String startDate,
+                                      String endDate, int pageNum) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("startDate", startDate);
+        params.put("endDate", endDate);
+        params.put("menuGb", "CD");
+        params.put("mdGb", "");
+        params.put("ordStatGbcd", "");
+        params.put("pageNum", String.valueOf(pageNum));
+        HttpResponse<String> response = send(context,
+                buildPostForm(ORDER_HISTORY_URL, params), "order history");
+        JsonNode body = readTree(response.body(), "order history");
+        if (body.path("fetchResultListSet").isArray() && body.path("fetchResultListSet").isEmpty()) {
+            HttpResponse<String> page = send(context, buildGet(ORDER_HISTORY_PAGE_URL), "order history page");
+            if (!"/ts/tsOrderHistoryList.do".equals(page.uri().getPath())) {
+                throw new TwosomeStoreSessionExpiredException(
+                        "투썸 주문내역 접근 세션이 만료되었습니다. 다시 로그인해주세요.");
+            }
+        }
+        return body;
+    }
+
+    public String fetchOrderDetailHtml(TwosomeStoreSessionContext context, String ordNo) {
+        HttpResponse<String> response = send(context,
+                buildGet(ORDER_DETAIL_URL + "?ordNo=" + encode(ordNo)), "order detail");
+        return response.body();
+    }
+
+    public JsonNode fetchOrderCustomList(TwosomeStoreSessionContext context, String ordNo, String ordDtlNo) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("ordNo", ordNo);
+        params.put("ordDtlNo", ordDtlNo);
+        HttpResponse<String> response = send(context,
+                buildPostForm(ORDER_CUSTOM_LIST_URL, params), "order custom list");
+        return readTree(response.body(), "order custom list");
+    }
+
+    public String fetchReceiptHtml(TwosomeStoreSessionContext context, String receiptNo) {
+        HttpResponse<String> response = send(context,
+                buildGet(RECEIPT_PAGE_URL + "?receiptNo=" + encode(receiptNo)), "receipt page");
+        return response.body();
+    }
+
+    public JsonNode fetchReceiptData(TwosomeStoreSessionContext context, String receiptNo, String custNo) {
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("receiptNo", receiptNo);
+        params.put("custNo", custNo);
+        HttpResponse<String> response = send(context,
+                buildPostForm(RECEIPT_DATA_URL, params), "receipt data");
+        return readTree(response.body(), "receipt data");
+    }
+
     public record CartAddResult(boolean success, String resultCd, String resultMsg) {
     }
 

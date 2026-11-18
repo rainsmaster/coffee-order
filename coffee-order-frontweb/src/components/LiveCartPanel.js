@@ -6,6 +6,7 @@ import ConfirmModal from './ConfirmModal';
 import useModal from '../hooks/useModal';
 import { isWithinStoreHours as storeIsOpen } from '../utils/storeHours';
 import createVisiblePolling from '../utils/polling';
+import TwosomeOrderTracker from './TwosomeOrderTracker';
 
 const parseCustom = (order) => {
   try {
@@ -27,6 +28,7 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
   const [expandedCustom, setExpandedCustom] = useState({});
   const [bulkDialog, setBulkDialog] = useState(null);
   const [bulkLoading, setBulkLoading] = useState(false);
+  const [trackerRefreshNonce, setTrackerRefreshNonce] = useState(0);
   const requestSequence = useRef(0);
   const {
     isAlertOpen, alertConfig, showAlert, closeAlert,
@@ -40,6 +42,8 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
   const orders = externalOrders ?? internalOrders;
   const pendingOrders = orders.filter((order) => order.twosomeMenuCode && !order.cartReflectedAt);
   const reflectedForRep = orders.filter((order) => order.twosomeMenuCode && order.cartReflectedBy === selectedRep?.id);
+  const readdableReflectedForRep = reflectedForRep.filter((order) => !order.externalOrderId || order.externalOrderStatus === '80');
+  const paymentLinkedForRep = reflectedForRep.filter((order) => order.externalOrderId && order.externalOrderStatus !== '80');
 
   const loadReps = useCallback(async () => {
     try {
@@ -239,20 +243,25 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
         }
       }
       const result = await repAPI.repAddToCart(selectedRep.id, buildItems(targets));
-      const successful = (result?.results || []).filter((item) => item.success);
-      const remaining = [...successful];
+      const results = Array.isArray(result?.results) ? result.results : [];
       const ids = [];
-      targets.forEach((order) => {
-        const index = remaining.findIndex((item) => item.menuCd === order.twosomeMenuCode);
-        if (index >= 0) {
-          ids.push(order.id);
-          remaining.splice(index, 1);
-        }
+      targets.forEach((order, index) => {
+        if (results[index]?.success) ids.push(order.id);
       });
-      if (ids.length > 0) await orderAPI.markCartReflected(ids, selectedRep.id);
+      let reflectionWarning = '';
+      if (ids.length > 0) {
+        try {
+          await orderAPI.markCartReflected(ids, selectedRep.id);
+        } catch (markError) {
+          reflectionWarning = ' 장바구니에는 담겼지만 반영 기록을 확인하지 못했습니다. 다시 담지 말고 새로고침 후 확인해주세요.';
+        } finally {
+          setTrackerRefreshNonce((current) => current + 1);
+        }
+      }
       await Promise.all([loadCart(selectedRep), loadOrders()]);
-      const failed = (result?.results || []).filter((item) => !item.success).map((item) => item.menuNm || item.menuCd).join(', ');
-      showAlert(`담기 결과: 성공 ${ids.length}건, 실패 ${targets.length - ids.length}건${failed ? ` (${failed})` : ''}`);
+      const failed = targets.flatMap((order, index) => results[index]?.success
+        ? [] : [results[index]?.menuNm || order.menuName || order.twosomeMenuCode]).join(', ');
+      showAlert(`담기 결과: 성공 ${ids.length}건, 실패 ${targets.length - ids.length}건${failed ? ` (${failed})` : ''}.${reflectionWarning}`);
     } catch (err) {
       showAlert('일괄 담기에 실패했습니다. 대표 로그인 상태와 매장 영업시간을 확인해주세요.');
       await loadReps();
@@ -261,15 +270,15 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
     }
   };
 
-  const canReaddReflected = pendingOrders.length === 0 && reflectedForRep.length > 0
+  const canReaddReflected = pendingOrders.length === 0 && readdableReflectedForRep.length > 0
     && cartItems.length === 0 && lastCheckedAt !== null && !cartError;
 
   const handleBulkAdd = () => {
     if (!storeOpen) return;
     if (canReaddReflected) {
-      setBulkDialog({ targets: reflectedForRep, reflected: reflectedForRep, readd: true });
-    } else if (reflectedForRep.length > 0) {
-      setBulkDialog({ targets: pendingOrders, reflected: reflectedForRep });
+      setBulkDialog({ targets: readdableReflectedForRep, reflected: readdableReflectedForRep, readd: true });
+    } else if (readdableReflectedForRep.length > 0) {
+      setBulkDialog({ targets: pendingOrders, reflected: readdableReflectedForRep });
     } else {
       executeBulkAdd(pendingOrders);
     }
@@ -340,7 +349,7 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
             )}
             <div className="local-cart-section">
               <h3>오늘의 팀 주문서 (로컬)</h3>
-              <p>외부 장바구니와 별도로 저장된 기록입니다. 미반영 {pendingOrders.length}건 · {selectedRep.name}에게 반영됨 {reflectedForRep.length}건</p>
+              <p>외부 장바구니와 별도로 저장된 기록입니다. 미반영 {pendingOrders.length}건 · {selectedRep.name}에게 반영됨 {reflectedForRep.length}건{paymentLinkedForRep.length > 0 ? ` · 실제 주문 연결 ${paymentLinkedForRep.length}건` : ''}</p>
               <button
                 className="btn-bulk-add"
                 onClick={handleBulkAdd}
@@ -348,12 +357,13 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
                 title={!storeOpen ? '매장 개장 후 이용할 수 있습니다' : ''}
               >
                 {bulkLoading ? '담는 중...' : canReaddReflected
-                  ? `반영 완료 ${reflectedForRep.length}건 다시 담기`
+                  ? `반영 완료 ${readdableReflectedForRep.length}건 다시 담기`
                   : `미반영 주문을 ${selectedRep.name} 장바구니에 일괄 담기`}
               </button>
             </div>
           </>
         )}
+        <TwosomeOrderTracker selectedRep={selectedRep} onNeedLogin={onOrderClick} refreshNonce={trackerRefreshNonce} />
       </div>
       <Modal
         isOpen={Boolean(bulkDialog)}

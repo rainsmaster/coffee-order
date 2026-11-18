@@ -32,7 +32,7 @@ public class TwosomeStoreSessionContext {
                 .build();
     }
 
-    public String getCookieHeader() {
+    public synchronized String getCookieHeader() {
         if (cookieJar.isEmpty()) {
             return null;
         }
@@ -41,7 +41,7 @@ public class TwosomeStoreSessionContext {
                 .collect(Collectors.joining("; "));
     }
 
-    public void storeCookies(HttpResponse<?> response) {
+    public synchronized void storeCookies(HttpResponse<?> response) {
         List<String> setCookies = response.headers().allValues("set-cookie");
         for (String sc : setCookies) {
             String pair = sc.split(";", 2)[0];
@@ -50,5 +50,9 @@ public class TwosomeStoreSessionContext {
                 cookieJar.put(pair.substring(0, idx).trim(), pair.substring(idx + 1).trim());
             }
         }
+    }
+
+    public synchronized Map<String, String> snapshotCookies() {
+        return new LinkedHashMap<>(cookieJar);
     }
 }

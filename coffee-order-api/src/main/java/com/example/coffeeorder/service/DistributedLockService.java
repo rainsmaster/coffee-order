@@ -62,4 +62,31 @@ public class DistributedLockService {
         return lock.isLocked();
     }
 
+    public <T> java.util.Optional<T> tryWithLock(String key, java.time.Duration waitTime,
+                                                  java.time.Duration leaseTime,
+                                                  java.util.function.Supplier<T> action) {
+        RLock lock = redissonClient.getLock(key);
+        boolean acquired = false;
+        try {
+            acquired = leaseTime == null || leaseTime.isZero()
+                    ? lock.tryLock(waitTime.toMillis(), TimeUnit.MILLISECONDS)
+                    : lock.tryLock(waitTime.toMillis(), leaseTime.toMillis(), TimeUnit.MILLISECONDS);
+            if (!acquired) {
+                return java.util.Optional.empty();
+            }
+            return java.util.Optional.ofNullable(action.get());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return java.util.Optional.empty();
+        } finally {
+            try {
+                if (acquired && lock.isHeldByCurrentThread()) {
+                    lock.unlock();
+                }
+            } catch (RuntimeException e) {
+                log.warn("Failed to release distributed lock explicitly (key={}): {}", key, e.getMessage());
+            }
+        }
+    }
+
 }
