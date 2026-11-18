@@ -220,7 +220,7 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
     cstmInfo: parseCustom(order),
   }));
 
-  const executeBulkAdd = async (targets) => {
+  const executeBulkAdd = async (targets, options = {}) => {
     if (bulkLoading || targets.length === 0) return;
     setBulkLoading(true);
     try {
@@ -228,6 +228,15 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
       if (!open) {
         showAlert('매장이 닫혀 있어 팀 주문서만 유지합니다. 개장 후 다시 시도해주세요.');
         return;
+      }
+      if (options.requireEmptyCart) {
+        const currentItems = await repAPI.repGetCart(selectedRep.id);
+        setCartItems(currentItems || []);
+        setLastCheckedAt(new Date());
+        if (currentItems?.length > 0) {
+          showAlert('확인 사이에 장바구니에 항목이 추가되어 다시 담기를 중단했습니다. 현재 항목을 먼저 확인해주세요.');
+          return;
+        }
       }
       const result = await repAPI.repAddToCart(selectedRep.id, buildItems(targets));
       const successful = (result?.results || []).filter((item) => item.success);
@@ -252,9 +261,14 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
     }
   };
 
+  const canReaddReflected = pendingOrders.length === 0 && reflectedForRep.length > 0
+    && cartItems.length === 0 && lastCheckedAt !== null && !cartError;
+
   const handleBulkAdd = () => {
     if (!storeOpen) return;
-    if (reflectedForRep.length > 0) {
+    if (canReaddReflected) {
+      setBulkDialog({ targets: reflectedForRep, reflected: reflectedForRep, readd: true });
+    } else if (reflectedForRep.length > 0) {
       setBulkDialog({ targets: pendingOrders, reflected: reflectedForRep });
     } else {
       executeBulkAdd(pendingOrders);
@@ -327,22 +341,47 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
             <div className="local-cart-section">
               <h3>오늘의 팀 주문서 (로컬)</h3>
               <p>외부 장바구니와 별도로 저장된 기록입니다. 미반영 {pendingOrders.length}건 · {selectedRep.name}에게 반영됨 {reflectedForRep.length}건</p>
-              <button className="btn-bulk-add" onClick={handleBulkAdd} disabled={bulkLoading || !storeOpen || pendingOrders.length === 0} title={!storeOpen ? '매장 개장 후 이용할 수 있습니다' : ''}>{bulkLoading ? '담는 중...' : `미반영 주문을 ${selectedRep.name} 장바구니에 일괄 담기`}</button>
+              <button
+                className="btn-bulk-add"
+                onClick={handleBulkAdd}
+                disabled={bulkLoading || !storeOpen || (pendingOrders.length === 0 && !canReaddReflected)}
+                title={!storeOpen ? '매장 개장 후 이용할 수 있습니다' : ''}
+              >
+                {bulkLoading ? '담는 중...' : canReaddReflected
+                  ? `반영 완료 ${reflectedForRep.length}건 다시 담기`
+                  : `미반영 주문을 ${selectedRep.name} 장바구니에 일괄 담기`}
+              </button>
             </div>
           </>
         )}
       </div>
-      <Modal isOpen={Boolean(bulkDialog)} onClose={() => setBulkDialog(null)} title="이미 담은 항목이 있습니다">
-        {bulkDialog && <div className="bulk-add-dialog">
-          <p>다음 항목은 이미 {selectedRep.name} 장바구니 담기로 기록되어 있습니다.</p>
-          <ul className="bulk-add-reflected-list">{bulkDialog.reflected.map((order) => <li key={order.id}>{order.menuName} · {order.teamName}</li>)}</ul>
-          <p>미반영 {bulkDialog.targets.length}건을 담거나, 기존 항목도 한 번 더 담을 수 있습니다.</p>
-          <div className="bulk-add-buttons">
-            <button className="bulk-add-btn primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets); }} disabled={bulkDialog.targets.length === 0}>미반영 항목만 담기</button>
-            <button className="bulk-add-btn" onClick={() => { const targets = [...bulkDialog.targets, ...bulkDialog.reflected]; setBulkDialog(null); executeBulkAdd(targets); }}>기존 항목도 한 번 더 담기</button>
-            <button className="bulk-add-btn" onClick={() => setBulkDialog(null)}>취소</button>
+      <Modal
+        isOpen={Boolean(bulkDialog)}
+        onClose={() => setBulkDialog(null)}
+        title={bulkDialog?.readd ? '반영 완료 주문 다시 담기' : '이미 담은 항목이 있습니다'}
+      >
+        {bulkDialog && (bulkDialog.readd ? (
+          <div className="bulk-add-dialog">
+            <p>현재 {selectedRep.name}의 실제 투썸 장바구니가 비어 있습니다.</p>
+            <p><strong>결제가 완료된 주문이 아니라 장바구니를 비운 경우에만 다시 담아주세요.</strong></p>
+            <ul className="bulk-add-reflected-list">{bulkDialog.reflected.map((order) => <li key={order.id}>{order.menuName} · {order.teamName}</li>)}</ul>
+            <div className="bulk-add-buttons">
+              <button className="bulk-add-btn primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets, { requireEmptyCart: true }); }}>장바구니에 {bulkDialog.targets.length}건 다시 담기</button>
+              <button className="bulk-add-btn" onClick={() => setBulkDialog(null)}>취소</button>
+            </div>
           </div>
-        </div>}
+        ) : (
+          <div className="bulk-add-dialog">
+            <p>다음 항목은 이미 {selectedRep.name} 장바구니 담기로 기록되어 있습니다.</p>
+            <ul className="bulk-add-reflected-list">{bulkDialog.reflected.map((order) => <li key={order.id}>{order.menuName} · {order.teamName}</li>)}</ul>
+            <p>미반영 {bulkDialog.targets.length}건을 담거나, 기존 항목도 한 번 더 담을 수 있습니다.</p>
+            <div className="bulk-add-buttons">
+              <button className="bulk-add-btn primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets); }} disabled={bulkDialog.targets.length === 0}>미반영 항목만 담기</button>
+              <button className="bulk-add-btn" onClick={() => { const targets = [...bulkDialog.targets, ...bulkDialog.reflected]; setBulkDialog(null); executeBulkAdd(targets); }}>기존 항목도 한 번 더 담기</button>
+              <button className="bulk-add-btn" onClick={() => setBulkDialog(null)}>취소</button>
+            </div>
+          </div>
+        ))}
       </Modal>
       <ConfirmModal isOpen={isConfirmOpen} onClose={closeConfirm} onConfirm={confirmConfig.onConfirm} message={confirmConfig.message} title={confirmConfig.title} />
       <AlertModal isOpen={isAlertOpen} onClose={closeAlert} message={alertConfig.message} title={alertConfig.title} />

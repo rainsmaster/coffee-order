@@ -88,4 +88,59 @@ describe('대표별 실시간 장바구니', () => {
     expect(onOrdersChange).not.toHaveBeenCalled();
     expect(screen.getByText('미반영 1건', { exact: false })).toBeInTheDocument();
   });
+
+  const reflectedOrders = [
+    {
+      id: 1, teamName: '홍길동', menuName: '아메리칸노', twosomeMenuCode: 'A', twosomeMenuMidCd: '01',
+      variantMenuCd: 'VA', variantOpts: '010I', cstmInfo: null,
+      cartReflectedAt: '2026-11-18T09:00:00', cartReflectedBy: 1,
+    },
+    {
+      id: 2, teamName: '김대리', menuName: '카페라떼', twosomeMenuCode: 'B', twosomeMenuMidCd: '01',
+      variantMenuCd: 'VB', variantOpts: '010H', cstmInfo: null,
+      cartReflectedAt: '2026-11-18T09:00:00', cartReflectedBy: 1,
+    },
+  ];
+  const activeReps = [{ id: 1, name: '홍길동', twosomeStatus: 'ACTIVE', statusReason: '사용 가능' }];
+
+  test('실제 장바구니가 비어 있으면 반영 완료 주문을 다시 담을 수 있다', async () => {
+    repAPI.repGetCart.mockResolvedValue([]);
+    repAPI.repAddToCart.mockResolvedValue({ results: [
+      { menuCd: 'A', success: true }, { menuCd: 'B', success: true },
+    ] });
+    orderAPI.markCartReflected.mockResolvedValue({ updatedCount: 2 });
+    render(<LiveCartPanel
+      departmentId={1} onOrderClick={jest.fn()} orders={reflectedOrders} reps={activeReps}
+      onOrdersChange={jest.fn()} onSummaryChange={jest.fn()}
+    />);
+
+    const readdButton = await screen.findByRole('button', { name: '반영 완료 2건 다시 담기' });
+    expect(readdButton).toBeEnabled();
+    fireEvent.click(readdButton);
+    expect(screen.getByText('결제가 완료된 주문이 아니라 장바구니를 비운 경우에만 다시 담아주세요.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '장바구니에 2건 다시 담기' }));
+
+    await waitFor(() => expect(repAPI.repAddToCart).toHaveBeenCalledWith(1, [
+      expect.objectContaining({ menuCd: 'A', variantMenuCd: 'VA', qty: 1 }),
+      expect.objectContaining({ menuCd: 'B', variantMenuCd: 'VB', qty: 1 }),
+    ]));
+    expect(orderAPI.markCartReflected).toHaveBeenCalledWith([1, 2], 1);
+  });
+
+  test('재담기 확인 중 장바구니에 항목이 생기면 중복 담기를 중단한다', async () => {
+    repAPI.repGetCart.mockResolvedValue([]).mockResolvedValueOnce([]).mockResolvedValueOnce([{
+      cartNo: 'c1', cartDtlNo: '1', menuCd: 'A', menuNm: '아메리칸노', qty: 1, price: 4700,
+    }]);
+    render(<LiveCartPanel
+      departmentId={1} onOrderClick={jest.fn()} orders={reflectedOrders} reps={activeReps}
+      onOrdersChange={jest.fn()} onSummaryChange={jest.fn()}
+    />);
+
+    fireEvent.click(await screen.findByRole('button', { name: '반영 완료 2건 다시 담기' }));
+    fireEvent.click(screen.getByRole('button', { name: '장바구니에 2건 다시 담기' }));
+
+    expect(await screen.findByText('확인 사이에 장바구니에 항목이 추가되어 다시 담기를 중단했습니다. 현재 항목을 먼저 확인해주세요.')).toBeInTheDocument();
+    expect(repAPI.repAddToCart).not.toHaveBeenCalled();
+    expect(orderAPI.markCartReflected).not.toHaveBeenCalled();
+  });
 });
