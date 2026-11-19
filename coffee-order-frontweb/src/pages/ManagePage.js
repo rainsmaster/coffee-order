@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { Tab, TabList } from '@astryxdesign/core/TabList';
+import { TextInput } from '@astryxdesign/core/TextInput';
 import { teamAPI, departmentAPI, twosomeStoreAPI, adminAPI } from '../services/api';
 import { useDepartment } from '../context/DepartmentContext';
 import Modal from '../components/Modal';
@@ -357,21 +360,13 @@ const ManagePage = ({ initialTab }) => {
     <div className="manage-page">
       <PageHeader title="설정" description="부서·팀원·대표와 서비스 연동을 관리합니다." />
       <div className="manage-tabs">
-        <button
-          className={activeTab === 'department' ? 'active' : ''}
-          onClick={() => setActiveTab('department')}
-        >
-          부서 관리
-        </button>
-        <button
-          className={activeTab === 'team' ? 'active' : ''}
-          onClick={() => setActiveTab('team')}
-        >
-          팀원 관리
-        </button>
-        <button className={activeTab === 'settings' ? 'active' : ''} onClick={() => setActiveTab('settings')}>매장·주문 안내</button>
-        <button className={activeTab === 'reps' ? 'active' : ''} onClick={() => setActiveTab('reps')}>대표 관리</button>
-        <button className={activeTab === 'admin' ? 'active' : ''} onClick={() => setActiveTab('admin')}>관리자</button>
+        <TabList value={activeTab} onChange={setActiveTab} hasDivider aria-label="설정 구역">
+          <Tab value="department" label="부서 관리" />
+          <Tab value="team" label="팀원 관리" />
+          <Tab value="settings" label="매장·주문 안내" />
+          <Tab value="reps" label="대표 관리" />
+          <Tab value="admin" label="관리자" />
+        </TabList>
       </div>
 
       <div className="manage-content">
@@ -458,14 +453,24 @@ const ManagePage = ({ initialTab }) => {
           <div className="admin-login-card">
             <h2>관리자 로그인</h2>
             <p className="admin-login-desc">투썸 연동은 관리자만 설정할 수 있습니다. 업데이트 작성과 수정은 건의 게시판에서 할 수 있습니다.</p>
-            <input type="password" value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} onKeyDown={(event) => event.key === 'Enter' && handleAdminLogin()} placeholder="관리자 비밀번호 : admin1234" autoFocus />
-            <button className="admin-btn primary" onClick={handleAdminLogin} disabled={adminLoginLoading}>{adminLoginLoading ? '로그인 중...' : '로그인'}</button>
+            <TextInput
+              label="관리자 비밀번호"
+              type="password"
+              value={adminPassword}
+              onChange={setAdminPassword}
+              onEnter={handleAdminLogin}
+              placeholder="관리자 비밀번호 : admin1234"
+              autoComplete="current-password"
+              hasAutoFocus
+              width="100%"
+            />
+            <Button label="로그인" variant="primary" onClick={handleAdminLogin} isLoading={adminLoginLoading} isDisabled={adminLoginLoading} />
           </div>
         )}
         {activeTab === 'admin' && adminToken && (
           <div className="admin-tools-header">
             <h2>관리자 설정</h2>
-            <button className="admin-btn" onClick={handleAdminLogout}>관리자 로그아웃</button>
+            <Button label="관리자 로그아웃" variant="secondary" onClick={handleAdminLogout} />
           </div>
         )}
 

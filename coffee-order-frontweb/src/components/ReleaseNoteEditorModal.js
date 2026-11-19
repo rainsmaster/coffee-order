@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { CheckboxInput } from '@astryxdesign/core/CheckboxInput';
+import { HStack } from '@astryxdesign/core/HStack';
+import { Text } from '@astryxdesign/core/Text';
+import { TextArea } from '@astryxdesign/core/TextArea';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { VStack } from '@astryxdesign/core/VStack';
 import { adminAPI } from '../services/api';
 import Modal from './Modal';
-import './ReleaseNoteEditorModal.css';
 
-const emptyForm = {
-  version: '',
-  title: '',
-  summary: '',
-  content: '',
-  published: false,
-};
+const emptyForm = { version: '', title: '', summary: '', content: '', published: false };
 
 const ReleaseNoteEditorModal = ({ isOpen, note, onClose, onSaved, onAdminToken }) => {
   const [adminToken, setAdminToken] = useState(localStorage.getItem('adminToken'));
@@ -23,11 +24,8 @@ const ReleaseNoteEditorModal = ({ isOpen, note, onClose, onSaved, onAdminToken }
     if (!isOpen) return;
     setAdminToken(localStorage.getItem('adminToken'));
     setForm(note ? {
-      version: note.version || '',
-      title: note.title || '',
-      summary: note.summary || '',
-      content: note.content || '',
-      published: Boolean(note.published),
+      version: note.version || '', title: note.title || '', summary: note.summary || '',
+      content: note.content || '', published: Boolean(note.published),
     } : emptyForm);
     setPassword('');
     setError('');
@@ -79,48 +77,63 @@ const ReleaseNoteEditorModal = ({ isOpen, note, onClose, onSaved, onAdminToken }
     }
   };
 
+  const actions = (
+    <HStack gap={2} justify="end" width="100%">
+      <Button label="취소" variant="secondary" onClick={onClose} />
+      <Button
+        label={adminToken ? '저장' : '로그인'}
+        variant="primary"
+        onClick={adminToken ? handleSave : handleLogin}
+        isLoading={adminToken ? saving : loginLoading}
+        isDisabled={adminToken ? saving : loginLoading}
+      />
+    </HStack>
+  );
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={note ? '업데이트 수정' : '업데이트 작성'}>
       {!adminToken ? (
-        <div className="release-editor-login">
-          <p>업데이트 작성과 수정은 관리자만 할 수 있습니다.</p>
-          <label htmlFor="release-admin-password">관리자 비밀번호</label>
-          <input
-            id="release-admin-password"
+        <VStack gap={3} width="100%">
+          <Text type="supporting">업데이트 작성과 수정은 관리자만 할 수 있습니다.</Text>
+          <TextInput
+            label="관리자 비밀번호"
             type="password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            onKeyDown={(event) => event.key === 'Enter' && handleLogin()}
+            onChange={setPassword}
+            onEnter={handleLogin}
             placeholder="관리자 비밀번호"
-            autoFocus
+            autoComplete="current-password"
+            hasAutoFocus
+            width="100%"
           />
-          {error && <p className="release-editor-error" role="alert">{error}</p>}
-          <div className="form-actions">
-            <button className="cancel-btn" onClick={onClose}>취소</button>
-            <button className="submit-btn" onClick={handleLogin} disabled={loginLoading}>
-              {loginLoading ? '로그인 중...' : '로그인'}
-            </button>
-          </div>
-        </div>
+          {error && <Banner status="error" title="로그인 실패" description={error} />}
+          {actions}
+        </VStack>
       ) : (
-        <div className="release-editor-form">
-          <div className="release-editor-grid">
-            <label>버전<input value={form.version} onChange={(event) => change('version', event.target.value)} placeholder="예: 2026.11.1" maxLength={50} /></label>
-            <label>제목<input value={form.title} onChange={(event) => change('title', event.target.value)} maxLength={200} /></label>
-          </div>
-          <label>팝업 요약<textarea value={form.summary} onChange={(event) => change('summary', event.target.value)} rows={3} maxLength={1000} /></label>
-          <label>상세 내용<textarea value={form.content} onChange={(event) => change('content', event.target.value)} rows={10} maxLength={10000} placeholder="새 기능, 개선 사항, 제거된 기능을 구분해 입력하세요." /></label>
-          <label className="release-editor-publish">
-            <input type="checkbox" checked={form.published} onChange={(event) => change('published', event.target.checked)} />
-            게시판에 고정하고 최신 공개 버전으로 안내
-          </label>
-          <p className="release-editor-guide">공개된 업데이트는 건의 게시판에 항상 보관되며, 가장 최신 공개 글이 팝업에 표시됩니다.</p>
-          {error && <p className="release-editor-error" role="alert">{error}</p>}
-          <div className="form-actions">
-            <button className="cancel-btn" onClick={onClose}>취소</button>
-            <button className="submit-btn" onClick={handleSave} disabled={saving}>{saving ? '저장 중...' : '저장'}</button>
-          </div>
-        </div>
+        <VStack gap={3} width="100%">
+          <HStack gap={2} wrap="wrap" width="100%">
+            <TextInput label="버전" value={form.version} onChange={(value) => change('version', value)} placeholder="예: 2026.11.1" />
+            <TextInput label="제목" value={form.title} onChange={(value) => change('title', value)} />
+          </HStack>
+          <TextArea label="팝업 요약" value={form.summary} onChange={(value) => change('summary', value)} rows={3} htmlMaxLength={1000} width="100%" />
+          <TextArea
+            label="상세 내용"
+            value={form.content}
+            onChange={(value) => change('content', value)}
+            rows={10}
+            htmlMaxLength={10000}
+            placeholder="새 기능, 개선 사항, 제거된 기능을 구분해 입력하세요."
+            width="100%"
+          />
+          <CheckboxInput
+            label="게시판에 고정하고 최신 공개 버전으로 안내"
+            value={form.published}
+            onChange={(checked) => change('published', checked)}
+          />
+          <Text type="supporting">공개된 업데이트는 건의 게시판에 항상 보관되며, 가장 최신 공개 글이 팝업에 표시됩니다.</Text>
+          {error && <Banner status="error" title="저장 실패" description={error} />}
+          {actions}
+        </VStack>
       )}
     </Modal>
   );

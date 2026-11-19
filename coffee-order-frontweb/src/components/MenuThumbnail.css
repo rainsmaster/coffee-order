@@ -3,14 +3,14 @@
   width: 100%;
   aspect-ratio: 1;
   overflow: hidden;
-  border-radius: 6px;
-  background: #ecefed;
+  border-radius: var(--radius-inner);
+  background: var(--color-background-muted);
 }
 
 .menu-thumbnail-skeleton {
   position: absolute;
   inset: 0;
-  background: linear-gradient(100deg, #e5e9e6 20%, #f5f7f5 42%, #e5e9e6 64%);
+  background: linear-gradient(100deg, var(--color-background-gray) 20%, var(--color-background-surface) 42%, var(--color-background-gray) 64%);
   background-size: 220% 100%;
   animation: menu-thumbnail-shimmer 1.35s ease-in-out infinite;
 }
@@ -33,8 +33,8 @@
   place-items: center;
   width: 100%;
   height: 100%;
-  color: #8a928d;
-  background: #f0f2f0;
+  color: var(--color-text-secondary);
+  background: var(--color-background-body);
 }
 
 .menu-thumbnail-fallback svg {

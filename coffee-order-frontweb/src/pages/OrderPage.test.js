@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import OrderPage from './OrderPage';
 import { orderAPI, repAPI, teamAPI, twosomeMenuAPI, twosomeStoreAPI } from '../services/api';
 
@@ -82,9 +82,14 @@ const legacyOrder = {
   variantOpts: null,
 };
 
+const selectMember = async (name = '박성훈') => {
+  fireEvent.click(await screen.findByRole('combobox', { name: '주문자 이름 선택' }));
+  fireEvent.click(await screen.findByRole('option', { name }));
+};
+
 const openLegacyReorder = async () => {
   render(<OrderPage />);
-  fireEvent.change(await screen.findByRole('combobox'), { target: { value: '128' } });
+  await selectMember();
   fireEvent.click(await screen.findByRole('button', { name: '다시 주문' }));
   expect(screen.getByText('이전 주문에 일부 옵션 정보가 없습니다. 현재 메뉴에서 옵션을 확인한 후 주문해주세요.')).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '옵션 확인' }));
@@ -194,12 +199,12 @@ test('체크한 퍼스널 옵션의 기본값과 코드가 주문서와 장바�
   });
 
   render(<OrderPage />);
-  fireEvent.change(await screen.findByRole('combobox'), { target: { value: '128' } });
+  await selectMember();
   await screen.findByText('최근 주문');
   fireEvent.change(screen.getByPlaceholderText(/메뉴 검색/), {
     target: { value: '디카페인' },
   });
-  fireEvent.click(await screen.findByRole('button', { name: /디카페인 콜드브루/ }));
+  fireEvent.click(await screen.findByRole('radio', { name: /디카페인 콜드브루/ }));
   fireEvent.click(await screen.findByRole('button', { name: '일회용컵' }));
   fireEvent.click(await screen.findByRole('button', { name: /퍼스널 옵션 \(선택\)/ }));
   fireEvent.click(screen.getByRole('button', { name: '드리즐' }));
@@ -253,10 +258,10 @@ test('퍼스널 옵션 로딩과 빈 상태가 주문 버튼 앞의 같은 영�
   }));
 
   render(<OrderPage />);
-  fireEvent.change(await screen.findByRole('combobox'), { target: { value: '128' } });
+  await selectMember();
   await screen.findByText('최근 주문');
   fireEvent.change(screen.getByPlaceholderText(/메뉴 검색/), { target: { value: '디카페인' } });
-  fireEvent.click(await screen.findByRole('button', { name: /디카페인 콜드브루/ }));
+  fireEvent.click(await screen.findByRole('radio', { name: /디카페인 콜드브루/ }));
   fireEvent.click(await screen.findByRole('button', { name: '일회용컵' }));
 
   const loading = await screen.findByText('퍼스널 옵션을 불러오는 중…');
@@ -277,10 +282,10 @@ test('퍼스널 옵션 조회 실패 후 재시도하면 정상 옵션으로 전
     .mockResolvedValueOnce({ menuCd: '10191496', hasCustom: true, qtyItems: [], choiceGroups: [], categories: [] });
 
   render(<OrderPage />);
-  fireEvent.change(await screen.findByRole('combobox'), { target: { value: '128' } });
+  await selectMember();
   await screen.findByText('최근 주문');
   fireEvent.change(screen.getByPlaceholderText(/메뉴 검색/), { target: { value: '디카페인' } });
-  fireEvent.click(await screen.findByRole('button', { name: /디카페인 콜드브루/ }));
+  fireEvent.click(await screen.findByRole('radio', { name: /디카페인 콜드브루/ }));
   fireEvent.click(await screen.findByRole('button', { name: '일회용컵' }));
 
   expect(await screen.findByText('퍼스널 옵션을 불러오지 못했습니다.')).toBeInTheDocument();
@@ -295,7 +300,7 @@ const openNoOptionMenu = async (item) => {
   twosomeStoreAPI.getMenuOptions.mockResolvedValue({ menuCd: item.menuCd, parsed: true, groups: [] });
   render(<OrderPage />);
   fireEvent.click(await screen.findByRole('button', { name: '음료 (1)' }));
-  fireEvent.click(await screen.findByRole('button', { name: new RegExp(item.menuNm) }));
+  fireEvent.click(await screen.findByRole('radio', { name: new RegExp(item.menuNm) }));
 };
 
 test.each([
@@ -332,24 +337,39 @@ test.each(['아메리칸노', '아메리칸호'])('공식 메뉴 이름과 다�
   fireEvent.change(await screen.findByPlaceholderText(/메뉴 검색/), { target: { value: query } });
 
   expect(await screen.findByText('검색 결과 (2건)')).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /아메리칸노 이미지 없음 아메리칸노 커피/ })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: /디카페인 아메리칸노 이미지 없음 디카페인 아메리칸노 디카페인 커피/ })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: '아메리칸노' })).toBeInTheDocument();
+  expect(screen.getByRole('radio', { name: '디카페인 아메리칸노' })).toBeInTheDocument();
 });
 
-test('카테고리 메뉴는 처음 12개만 표시하고 더보기로 나머지를 연다', async () => {
-  const menus = Array.from({ length: 15 }, (_, index) => ({
-    ...menu,
-    id: 200 + index,
-    menuCd: `TEST-${index}`,
-    menuNm: `테스트 메뉴 ${index + 1}`,
-  }));
-  twosomeMenuAPI.getAll.mockResolvedValue({ 커피: menus });
-  const { container } = render(<OrderPage />);
+test('카테고리 메뉴는 스크롤 감지 지점에서 다음 묶음을 자동으로 연다', async () => {
+  const originalObserver = global.IntersectionObserver;
+  let onIntersection;
+  global.IntersectionObserver = jest.fn((callback) => {
+    onIntersection = callback;
+    return { observe: jest.fn(), disconnect: jest.fn() };
+  });
 
-  fireEvent.click(await screen.findByRole('button', { name: '커피 (15)' }));
-  await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(12));
-  fireEvent.click(screen.getByRole('button', { name: '메뉴 더보기 (12/15)' }));
+  try {
+    const menus = Array.from({ length: 15 }, (_, index) => ({
+      ...menu,
+      id: 200 + index,
+      menuCd: `TEST-${index}`,
+      menuNm: `테스트 메뉴 ${index + 1}`,
+    }));
+    twosomeMenuAPI.getAll.mockResolvedValue({ 커피: menus });
+    const { container } = render(<OrderPage />);
 
-  await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(15));
-  expect(screen.queryByRole('button', { name: /메뉴 더보기/ })).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByRole('button', { name: '커피 (15)' }));
+    await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(12));
+    expect(screen.queryByRole('button', { name: /메뉴 더보기/ })).not.toBeInTheDocument();
+    await screen.findByTestId('menu-scroll-sentinel');
+    await waitFor(() => expect(onIntersection).toBeDefined());
+
+    act(() => onIntersection([{ isIntersecting: true }]));
+
+    await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(15));
+    expect(screen.queryByTestId('menu-scroll-sentinel')).not.toBeInTheDocument();
+  } finally {
+    global.IntersectionObserver = originalObserver;
+  }
 });

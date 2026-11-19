@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { Selector } from '@astryxdesign/core/Selector';
 import { orderAPI, repAPI, twosomeStoreAPI } from '../services/api';
 import AlertModal from './AlertModal';
 import Modal from './Modal';
@@ -300,13 +302,26 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
           )}
         </div>
         <div className="live-cart-toolbar">
-          <label>장바구니 대표
-            <select value={selectedRepId || ''} onChange={(event) => setSelectedRepId(Number(event.target.value) || null)}>
-              {reps.length === 0 && <option value="">등록된 대표 없음</option>}
-              {reps.map((rep) => <option key={rep.id} value={rep.id} disabled={rep.twosomeStatus !== 'ACTIVE'}>{rep.name} · {rep.statusReason}</option>)}
-            </select>
-          </label>
-          <button className="today-button" onClick={() => { loadReps(); loadCart(selectedRep); loadOrders(); }} disabled={loading}>지금 새로고침</button>
+          <Selector
+            label="장바구니 대표"
+            value={selectedRepId ? String(selectedRepId) : ''}
+            onChange={(value) => setSelectedRepId(Number(value) || null)}
+            options={reps.map((rep) => ({
+              value: String(rep.id),
+              label: `${rep.name} · ${rep.statusReason}`,
+              disabled: rep.twosomeStatus !== 'ACTIVE',
+            }))}
+            placeholder={reps.length === 0 ? '등록된 대표 없음' : '대표 선택'}
+            presentation="adaptive"
+            isDisabled={reps.length === 0}
+          />
+          <Button
+            label="지금 새로고침"
+            variant="secondary"
+            onClick={() => { loadReps(); loadCart(selectedRep); loadOrders(); }}
+            isDisabled={loading}
+            isLoading={loading}
+          />
         </div>
         {reps.length === 0 && <div className="no-data">등록된 대표가 없습니다. 주문 화면에서 본인 팀원을 선택하고 대표로 등록할 수 있습니다.</div>}
         {selectedRep && !isActive && <div className="cart-status-message"><strong>{selectedRep.name}</strong> · {selectedRep.statusReason}<p>주문 화면에서 해당 대표로 로그인하면 실시간 장바구니를 조회할 수 있습니다.</p></div>}
@@ -350,16 +365,17 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
             <div className="local-cart-section">
               <h3>오늘의 팀 주문서 (로컬)</h3>
               <p>외부 장바구니와 별도로 저장된 기록입니다. 미반영 {pendingOrders.length}건 · {selectedRep.name}에게 반영됨 {reflectedForRep.length}건{paymentLinkedForRep.length > 0 ? ` · 실제 주문 연결 ${paymentLinkedForRep.length}건` : ''}</p>
-              <button
+              <Button
                 className="btn-bulk-add"
+                variant="primary"
                 onClick={handleBulkAdd}
-                disabled={bulkLoading || !storeOpen || (pendingOrders.length === 0 && !canReaddReflected)}
+                isDisabled={bulkLoading || !storeOpen || (pendingOrders.length === 0 && !canReaddReflected)}
+                isLoading={bulkLoading}
                 title={!storeOpen ? '매장 개장 후 이용할 수 있습니다' : ''}
-              >
-                {bulkLoading ? '담는 중...' : canReaddReflected
+                label={canReaddReflected
                   ? `반영 완료 ${readdableReflectedForRep.length}건 다시 담기`
                   : `미반영 주문을 ${selectedRep.name} 장바구니에 일괄 담기`}
-              </button>
+              />
             </div>
           </>
         )}
@@ -376,8 +392,8 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
             <p><strong>결제가 완료된 주문이 아니라 장바구니를 비운 경우에만 다시 담아주세요.</strong></p>
             <ul className="bulk-add-reflected-list">{bulkDialog.reflected.map((order) => <li key={order.id}>{order.menuName} · {order.teamName}</li>)}</ul>
             <div className="bulk-add-buttons">
-              <button className="bulk-add-btn primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets, { requireEmptyCart: true }); }}>장바구니에 {bulkDialog.targets.length}건 다시 담기</button>
-              <button className="bulk-add-btn" onClick={() => setBulkDialog(null)}>취소</button>
+              <Button variant="primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets, { requireEmptyCart: true }); }} label={`장바구니에 ${bulkDialog.targets.length}건 다시 담기`} />
+              <Button variant="secondary" onClick={() => setBulkDialog(null)} label="취소" />
             </div>
           </div>
         ) : (
@@ -386,9 +402,9 @@ const LiveCartPanel = ({ departmentId, onOrderClick, orders: externalOrders, rep
             <ul className="bulk-add-reflected-list">{bulkDialog.reflected.map((order) => <li key={order.id}>{order.menuName} · {order.teamName}</li>)}</ul>
             <p>미반영 {bulkDialog.targets.length}건을 담거나, 기존 항목도 한 번 더 담을 수 있습니다.</p>
             <div className="bulk-add-buttons">
-              <button className="bulk-add-btn primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets); }} disabled={bulkDialog.targets.length === 0}>미반영 항목만 담기</button>
-              <button className="bulk-add-btn" onClick={() => { const targets = [...bulkDialog.targets, ...bulkDialog.reflected]; setBulkDialog(null); executeBulkAdd(targets); }}>기존 항목도 한 번 더 담기</button>
-              <button className="bulk-add-btn" onClick={() => setBulkDialog(null)}>취소</button>
+              <Button variant="primary" onClick={() => { const targets = bulkDialog.targets; setBulkDialog(null); executeBulkAdd(targets); }} isDisabled={bulkDialog.targets.length === 0} label="미반영 항목만 담기" />
+              <Button variant="secondary" onClick={() => { const targets = [...bulkDialog.targets, ...bulkDialog.reflected]; setBulkDialog(null); executeBulkAdd(targets); }} label="기존 항목도 한 번 더 담기" />
+              <Button variant="ghost" onClick={() => setBulkDialog(null)} label="취소" />
             </div>
           </div>
         ))}

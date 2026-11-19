@@ -1,31 +1,25 @@
 import React from 'react';
-import './AlertModal.css';
+import { Button } from '@astryxdesign/core/Button';
+import { Dialog, DialogHeader } from '@astryxdesign/core/Dialog';
+import { HStack } from '@astryxdesign/core/HStack';
+import { Text } from '@astryxdesign/core/Text';
+import { VStack } from '@astryxdesign/core/VStack';
 
 const AlertModal = ({ isOpen, onClose, message, title = '알림' }) => {
-  if (!isOpen) return null;
-
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) onClose();
   };
 
   return (
-    <div className="alert-modal-overlay" onClick={handleBackdropClick}>
-      <div className="alert-modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="alert-modal-header">
-          <h3>{title}</h3>
-        </div>
-        <div className="alert-modal-body">
-          <p>{message}</p>
-        </div>
-        <div className="alert-modal-footer">
-          <button className="alert-modal-btn alert-modal-btn-confirm" onClick={onClose}>
-            확인
-          </button>
-        </div>
-      </div>
-    </div>
+    <Dialog isOpen={isOpen} onOpenChange={handleOpenChange} width={400} purpose="info">
+      <DialogHeader title={title} />
+      <VStack gap={4} width="100%">
+        <Text as="p" style={{ whiteSpace: 'pre-wrap' }}>{message}</Text>
+        <HStack justify="end" width="100%">
+          <Button label="확인" variant="primary" onClick={onClose} />
+        </HStack>
+      </VStack>
+    </Dialog>
   );
 };
 

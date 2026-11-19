@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { Button } from '@astryxdesign/core/Button';
 import { suggestionAPI, releaseNoteAPI, adminAPI } from '../services/api';
 import Modal from '../components/Modal';
 import AlertModal from '../components/AlertModal';
@@ -406,47 +407,24 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
 
     for (let i = start; i < end; i++) {
       pages.push(
-        <button
+        <Button
           key={i}
           className={`page-btn ${i === currentPage ? 'active' : ''}`}
+          label={String(i + 1)}
+          variant={i === currentPage ? 'primary' : 'secondary'}
+          size="sm"
           onClick={() => handlePageChange(i)}
-        >
-          {i + 1}
-        </button>
+        />
       );
     }
 
     return (
       <div className="pagination">
-        <button
-          className="page-btn"
-          onClick={() => handlePageChange(0)}
-          disabled={currentPage === 0}
-        >
-          {'<<'}
-        </button>
-        <button
-          className="page-btn"
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 0}
-        >
-          {'<'}
-        </button>
+        <Button className="page-btn" label="<<" aria-label="첫 페이지" size="sm" onClick={() => handlePageChange(0)} isDisabled={currentPage === 0} />
+        <Button className="page-btn" label="<" aria-label="이전 페이지" size="sm" onClick={() => handlePageChange(currentPage - 1)} isDisabled={currentPage === 0} />
         {pages}
-        <button
-          className="page-btn"
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage >= totalPages - 1}
-        >
-          {'>'}
-        </button>
-        <button
-          className="page-btn"
-          onClick={() => handlePageChange(totalPages - 1)}
-          disabled={currentPage >= totalPages - 1}
-        >
-          {'>>'}
-        </button>
+        <Button className="page-btn" label=">" aria-label="다음 페이지" size="sm" onClick={() => handlePageChange(currentPage + 1)} isDisabled={currentPage >= totalPages - 1} />
+        <Button className="page-btn" label=">>" aria-label="마지막 페이지" size="sm" onClick={() => handlePageChange(totalPages - 1)} isDisabled={currentPage >= totalPages - 1} />
       </div>
     );
   };
@@ -456,16 +434,15 @@ function SuggestionPage({ releaseNoteId, onReleaseNoteClosed }) {
       <div className="page-header">
         <PageHeader title="건의와 업데이트" description="팀의 의견과 허다방 개선 소식을 확인하세요." />
         <div className="page-header-actions">
-          <button className="release-write-btn" onClick={() => openReleaseEditor()}>업데이트 작성</button>
-          <button
-            className="write-btn"
+          <Button label="업데이트 작성" variant="secondary" onClick={() => openReleaseEditor()} />
+          <Button
+            label="글쓰기"
+            variant="primary"
             onClick={() => {
               resetForm();
               setShowWriteModal(true);
             }}
-          >
-            글쓰기
-          </button>
+          />
         </div>
       </div>
 

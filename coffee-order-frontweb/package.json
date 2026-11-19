@@ -4,6 +4,10 @@
   "private": true,
   "proxy": "http://localhost:8080",
   "dependencies": {
+    "@astryxdesign/cli": "0.7.16",
+    "@astryxdesign/core": "0.7.16",
+    "@astryxdesign/theme-neutral": "0.7.16",
+    "@stylexjs/stylex": "0.19.2",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -18,6 +22,7 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "astryx": "node node_modules/@astryxdesign/cli/clients/cli/bin/astryx.mjs",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
@@ -25,6 +30,18 @@
       "react-app",
       "react-app/jest"
     ]
+  },
+  "jest": {
+    "moduleNameMapper": {
+      "^@astryxdesign/core/locales/(.*)$": "<rootDir>/node_modules/@astryxdesign/core/dist/i18n/generated-locales/$1",
+      "^@astryxdesign/core/(.*)$": "<rootDir>/node_modules/@astryxdesign/core/dist/$1"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(@astryxdesign|@stylexjs|@formatjs|intl-messageformat)/)"
+    ],
+    "transform": {
+      "^.+\\.(js|jsx|mjs|cjs|ts|tsx)$": "<rootDir>/jest.transform.js"
+    }
   },
   "browserslist": {
     "production": [
@@ -37,5 +54,12 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "@babel/plugin-transform-class-static-block": "^7.28.3"
+  },
+  "overrides": {
+    "css-minimizer-webpack-plugin": "7.0.4",
+    "postcss-calc": "11.3.0"
   }
 }

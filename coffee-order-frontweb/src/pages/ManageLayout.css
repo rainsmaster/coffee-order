@@ -1,11 +1,8 @@
 .manage-page .manage-tabs {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.35rem;
-  padding: 0.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-control);
-  background: var(--color-surface);
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -25,16 +22,16 @@
   color: var(--color-brand);
 }
 
-.manage-page .manage-tabs button.active {
-  background: var(--color-brand);
-  color: #fff;
+.manage-page .manage-tabs button[aria-current="true"] {
+  background: transparent;
+  color: var(--color-brand);
+  font-weight: var(--font-weight-semibold);
 }
 
 .manage-page .manage-content {
-  padding: 1.25rem;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  padding: var(--spacing-4) 0;
+  border: 0;
+  background: transparent;
   box-shadow: none;
 }
 

@@ -9,10 +9,8 @@
 .history-overview {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  overflow: hidden;
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  border-block: var(--border-width) solid var(--color-line);
+  background: transparent;
 }
 
 .history-overview a {
@@ -66,16 +64,16 @@
 
 .live-cart-card,
 .team-history-section {
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .live-cart-card {
   display: flex;
-  padding: 1.25rem;
+  padding: var(--spacing-4) 0;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: var(--spacing-4);
 }
 
 .live-cart-heading,

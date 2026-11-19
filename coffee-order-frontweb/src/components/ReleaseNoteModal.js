@@ -1,22 +1,23 @@
 import React from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack } from '@astryxdesign/core/HStack';
+import { Text } from '@astryxdesign/core/Text';
 import Modal from './Modal';
-import './ReleaseNoteModal.css';
 
-const ReleaseNoteModal = ({ note, onClose, onDismissToday, onDetail }) => {
-  if (!note) return null;
-  return (
-    <Modal isOpen={Boolean(note)} onClose={onClose} title={note.title}>
-      <div className="release-note-version">{note.version}</div>
-      <p className="release-note-summary">{note.summary}</p>
-      <button type="button" className="btn-link release-note-detail" onClick={onDetail}>
-        자세히 보기
-      </button>
-      <div className="release-note-actions">
-        <button type="button" className="btn-secondary" onClick={onClose}>닫기</button>
-        <button type="button" className="btn-primary" onClick={onDismissToday}>오늘 하루 보지 않기</button>
-      </div>
-    </Modal>
-  );
-};
+const ReleaseNoteModal = ({ note, onClose, onDismissToday, onDetail }) => (
+  <Modal isOpen={Boolean(note)} onClose={onClose} title={note?.title || '업데이트'}>
+    {note && (
+      <>
+        <Text type="supporting">{note.version}</Text>
+        <Text as="p" style={{ whiteSpace: 'pre-line' }}>{note.summary}</Text>
+        <Button label="자세히 보기" variant="secondary" onClick={onDetail} width="100%" />
+        <HStack gap={2} justify="end" wrap="wrap" width="100%">
+          <Button label="닫기" variant="ghost" onClick={onClose} />
+          <Button label="오늘 하루 보지 않기" variant="primary" onClick={onDismissToday} />
+        </HStack>
+      </>
+    )}
+  </Modal>
+);
 
 export default ReleaseNoteModal;

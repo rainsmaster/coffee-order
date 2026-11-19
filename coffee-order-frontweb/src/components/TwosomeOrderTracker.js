@@ -1,4 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Collapsible } from '@astryxdesign/core/Collapsible';
+import { Stepper, Step } from '@astryxdesign/core/Stepper';
 import { repAPI } from '../services/api';
 import createVisiblePolling from '../utils/polling';
 import './TwosomeOrderTracker.css';
@@ -17,6 +21,15 @@ const statusClass = (order) => {
   if (order.statusCode === '60') return 'completed';
   if (order.displayStatus === '준비완료') return 'ready';
   return 'progress';
+};
+
+const getActiveStep = (order) => {
+  const currentIndex = PROGRESS_STEPS.findIndex((name) =>
+    order.steps.some((step) => step.name === name && step.state === 'CURRENT') || order.currentStep === name);
+  if (currentIndex >= 0) return currentIndex;
+  const lastEndedIndex = PROGRESS_STEPS.findLastIndex((name) =>
+    order.steps.some((step) => step.name === name && step.state === 'ENDED'));
+  return lastEndedIndex < 0 ? 0 : lastEndedIndex + 1;
 };
 
 const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => {
@@ -176,9 +189,14 @@ const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => 
           <p>장바구니 반영 후 실제 주문과 결제 상태를 자동으로 연결합니다.</p>
         </div>
         {canView && isActive && !sessionBlocked && (
-          <button type="button" className="order-tracker-refresh" onClick={() => refresh(false)} disabled={refreshing || resetting}>
-            {refreshing ? '확인 중...' : '지금 확인'}
-          </button>
+          <Button
+            className="order-tracker-refresh"
+            label="지금 확인"
+            variant="secondary"
+            onClick={() => refresh(false)}
+            isDisabled={refreshing || resetting}
+            isLoading={refreshing}
+          />
         )}
       </div>
 
@@ -187,7 +205,7 @@ const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => 
         <div className="order-tracker-login-guide">
           <strong>{selectedRep.name} 대표의 주문은 본인만 조회할 수 있습니다.</strong>
           <p>대표 본인 PIN 로그인 후 실제 주문번호와 준비 상태를 확인할 수 있습니다.</p>
-          <button type="button" className="order-tracker-login-button" onClick={onNeedLogin}>주문 화면에서 대표 로그인</button>
+          <Button label="주문 화면에서 대표 로그인" variant="primary" onClick={onNeedLogin} />
         </div>
       )}
 
@@ -201,15 +219,19 @@ const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => 
               {lastCheckedAt && ` · 마지막 확인 ${lastCheckedAt.toLocaleTimeString('ko-KR')}`}
             </span>
           </div>
-          {error && <div className="order-tracker-error" role="alert">{error}</div>}
-          {sessionBlocked && <button type="button" className="order-tracker-login-button" onClick={onNeedLogin}>주문 화면에서 대표 로그인</button>}
+          {error && <Banner status="error" title="주문 상태 확인 실패" description={error} />}
+          {sessionBlocked && <Button label="주문 화면에서 대표 로그인" variant="primary" onClick={onNeedLogin} />}
           {(view?.observation?.holdReason || view?.status === 'EXPIRED') && (
             <div className="order-tracker-hold">
               <strong>{view?.status === 'EXPIRED' ? '결제 관찰 종료' : '자동 연결 보류'}</strong>
               <span>{view?.observation?.holdReason || view?.message}</span>
-              <button type="button" className="order-tracker-login-button" onClick={resetObservation} disabled={resetting || refreshing}>
-                {resetting ? '기준점 저장 중...' : '현재 장바구니로 다시 관찰'}
-              </button>
+              <Button
+                label="현재 장바구니로 다시 관찰"
+                variant="secondary"
+                onClick={resetObservation}
+                isDisabled={resetting || refreshing}
+                isLoading={resetting}
+              />
             </div>
           )}
           {view?.message && !error && <p className="order-tracker-message">{view.message}</p>}
@@ -240,13 +262,14 @@ const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => 
                     <span>{quantity}개</span>
                   </div>
                   {order.statusCode !== '80' && order.steps.length > 0 && (
-                    <ol className="twosome-order-progress" aria-label="주문 진행 단계">
-                      {PROGRESS_STEPS.map((name) => {
-                        const step = order.steps.find((candidate) => candidate.name === name);
-                        const state = step?.state || 'PENDING';
-                        return <li key={name} className={state.toLowerCase()}><span />{name}</li>;
-                      })}
-                    </ol>
+                    <Stepper
+                      activeStep={getActiveStep(order)}
+                      label="주문 진행 단계"
+                      density="compact"
+                      horizontalOptions={{ minimumStepWidth: 112, collapsedVariant: 'withLabel' }}
+                    >
+                      {PROGRESS_STEPS.map((name, index) => <Step key={name} step={index} label={name} />)}
+                    </Stepper>
                   )}
                   <div className="twosome-order-payment-line">
                     {order.finalPaymentAmount !== null && (
@@ -257,10 +280,12 @@ const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => 
                       : order.receiptAvailable ? '전자영수증 승인 정보 확인 대기' : '주문 상태 동기화 기준'}</span>
                   </div>
                   {order.pickupAt && <div className="twosome-order-pickup">실제 수령 · {formatDateTime(order.pickupAt)}</div>}
-                  <button type="button" className="twosome-order-detail-toggle" onClick={() => toggleDetails(order.id)} aria-expanded={expanded}>
-                    {expanded ? '주문 상세 닫기' : '메뉴·결제 상세 보기'}
-                  </button>
-                  {expanded && (
+                  <Collapsible
+                    trigger={expanded ? '주문 상세 닫기' : '메뉴·결제 상세 보기'}
+                    isOpen={expanded}
+                    onOpenChange={() => toggleDetails(order.id)}
+                    className="twosome-order-detail-collapsible"
+                  >
                     <div className="twosome-order-detail">
                       <ul className="twosome-order-item-list">
                         {order.items.map((item) => (
@@ -284,7 +309,7 @@ const TwosomeOrderTracker = ({ selectedRep, onNeedLogin, refreshNonce = 0 }) => 
                         {order.linkedAt && <div><dt>자동 연결 시각</dt><dd>{formatDateTime(order.linkedAt)}</dd></div>}
                       </dl>
                     </div>
-                  )}
+                  </Collapsible>
                 </article>
               );
             })}

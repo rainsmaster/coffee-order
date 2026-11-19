@@ -1,4 +1,9 @@
 import React, { useState } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack } from '@astryxdesign/core/HStack';
+import { Text } from '@astryxdesign/core/Text';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { VStack } from '@astryxdesign/core/VStack';
 import Modal from './Modal';
 import { repAPI } from '../services/api';
 import './RepLoginModal.css';
@@ -65,8 +70,7 @@ const RepLoginModal = ({ rep, onClose, onSuccess }) => {
     setLoading(true);
     setError('');
     try {
-      const result = await repAPI.twosomeLogin(
-        captcha.contextId, captchaAnswer, loginId.trim(), loginPwd);
+      const result = await repAPI.twosomeLogin(captcha.contextId, captchaAnswer, loginId.trim(), loginPwd);
       if (result.status !== 'SUCCESS') {
         setError(result.message || '투썸 로그인에 실패했습니다.');
         await requestCaptcha();
@@ -84,78 +88,75 @@ const RepLoginModal = ({ rep, onClose, onSuccess }) => {
   return (
     <Modal isOpen onClose={onClose} title={`대표 투썸 로그인 · ${rep.name}`}>
       {step === 'pin' ? (
-        <form className="rep-login-form" onSubmit={handlePinSubmit}>
-          <p className="rep-login-guide">{rep.name} 대표 본인 확인을 위해 PIN을 입력해주세요.</p>
-          <label htmlFor="rep-pin">PIN (숫자 6자리)</label>
-          <input
-            id="rep-pin"
+        <VStack as="form" gap={3} onSubmit={handlePinSubmit}>
+          <Text type="supporting">{rep.name} 대표 본인 확인을 위해 PIN을 입력해주세요.</Text>
+          <TextInput
+            label="PIN (숫자 6자리)"
             type="password"
             inputMode="numeric"
             value={pin}
-            onChange={(event) => setPin(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+            onChange={(value) => setPin(value.replace(/[^0-9]/g, '').slice(0, 6))}
             placeholder="PIN 입력"
-            maxLength={6}
-            autoFocus
-          />
-          {error && <div className="rep-login-error" role="alert">{error}</div>}
-          <div className="rep-login-actions">
-            <button type="submit" className="admin-btn primary" disabled={loading}>
-              {loading ? '확인 중...' : '다음'}
-            </button>
-            <button type="button" className="admin-btn" onClick={onClose} disabled={loading}>취소</button>
-          </div>
-        </form>
-      ) : (
-        <form className="rep-login-form" onSubmit={handleTwosomeSubmit}>
-          <p className="rep-login-guide">
-            {account?.name || rep.name} 대표의 투썸 계정으로 로그인합니다. 새 로그인으로 인해 투썸하트 앱이 로그아웃될 수 있습니다.
-          </p>
-          <label htmlFor="twosome-login-id">투썸 아이디</label>
-          <input
-            id="twosome-login-id"
-            type="text"
-            value={loginId}
-            onChange={(event) => setLoginId(event.target.value)}
-            placeholder="투썸하트 아이디"
+            hasAutoFocus
             autoComplete="off"
+            width="100%"
           />
-          <label htmlFor="twosome-login-pw">패스워드</label>
-          <input
-            id="twosome-login-pw"
+          {error && <Text as="p" className="rep-login-error" role="alert">{error}</Text>}
+          <HStack gap={2} width="100%">
+            <Button type="submit" label="다음" variant="primary" isLoading={loading} isDisabled={loading} width="100%" />
+            <Button label="취소" variant="secondary" onClick={onClose} isDisabled={loading} width="100%" />
+          </HStack>
+        </VStack>
+      ) : (
+        <VStack as="form" gap={3} onSubmit={handleTwosomeSubmit}>
+          <Text type="supporting">
+            {account?.name || rep.name} 대표의 투썸 계정으로 로그인합니다. 새 로그인으로 인해 투썸하트 앱이 로그아웃될 수 있습니다.
+          </Text>
+          <TextInput
+            label="투썸 아이디"
+            value={loginId}
+            onChange={setLoginId}
+            placeholder="투썸하트 아이디"
+            autoComplete="username"
+            hasAutoCorrect={false}
+            hasSpellCheck={false}
+            width="100%"
+          />
+          <TextInput
+            label="패스워드"
             type="password"
             value={loginPwd}
-            onChange={(event) => setLoginPwd(event.target.value)}
+            onChange={setLoginPwd}
             placeholder="패스워드"
-            autoComplete="off"
+            autoComplete="current-password"
+            width="100%"
           />
-          <div className="rep-login-captcha">
-            {captcha ? (
-              <img src={captcha.imageBase64} alt="자동 입력 방지 문자" />
-            ) : (
-              <span>{captchaLoading ? '캡차 로딩 중...' : '캡차를 불러오지 못했습니다.'}</span>
-            )}
-            <button type="button" className="admin-btn" onClick={requestCaptcha} disabled={captchaLoading || loading}>
-              캡차 새로고침
-            </button>
-          </div>
-          <label htmlFor="twosome-captcha-answer">캡차 입력 (6자리 숫자)</label>
-          <input
-            id="twosome-captcha-answer"
-            type="text"
+          <HStack gap={2} align="center" className="rep-login-captcha" width="100%">
+            {captcha ? <img src={captcha.imageBase64} alt="자동 입력 방지 문자" /> : <Text type="supporting">{captchaLoading ? '캡차 로딩 중...' : '캡차를 불러오지 못했습니다.'}</Text>}
+            <Button label="캡차 새로고침" variant="secondary" onClick={requestCaptcha} isDisabled={captchaLoading || loading} isLoading={captchaLoading} />
+          </HStack>
+          <TextInput
+            label="캡차 입력 (6자리 숫자)"
             inputMode="numeric"
             value={captchaAnswer}
-            onChange={(event) => setCaptchaAnswer(event.target.value.replace(/[^0-9]/g, '').slice(0, 6))}
+            onChange={(value) => setCaptchaAnswer(value.replace(/[^0-9]/g, '').slice(0, 6))}
             placeholder="이미지의 숫자 6자리 입력"
-            maxLength={6}
+            autoComplete="off"
+            width="100%"
           />
-          {error && <div className="rep-login-error" role="alert">{error}</div>}
-          <div className="rep-login-actions">
-            <button type="submit" className="admin-btn primary" disabled={loading || !captcha || !loginId.trim() || !loginPwd}>
-              {loading ? '로그인 중...' : '로그인'}
-            </button>
-            <button type="button" className="admin-btn" onClick={onClose} disabled={loading}>취소</button>
-          </div>
-        </form>
+          {error && <Text as="p" className="rep-login-error" role="alert">{error}</Text>}
+          <HStack gap={2} width="100%">
+            <Button
+              type="submit"
+              label="로그인"
+              variant="primary"
+              isLoading={loading}
+              isDisabled={loading || !captcha || !loginId.trim() || !loginPwd}
+              width="100%"
+            />
+            <Button label="취소" variant="secondary" onClick={onClose} isDisabled={loading} width="100%" />
+          </HStack>
+        </VStack>
       )}
     </Modal>
   );

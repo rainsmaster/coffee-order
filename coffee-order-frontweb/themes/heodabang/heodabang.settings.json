@@ -1,0 +1,35 @@
+{
+  "name": "heodabang",
+  "like": "neutral",
+  "mode": "both",
+  "settings": [
+    {
+      "thing": "accent",
+      "value": "#304c40",
+      "source": "dial"
+    },
+    {
+      "thing": "font",
+      "value": "Pretendard Variable, Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif",
+      "source": "dial"
+    },
+    {
+      "thing": "corners",
+      "value": "medium",
+      "source": "dial"
+    },
+    {
+      "thing": "neutral",
+      "value": "#78716c",
+      "source": "dial"
+    },
+    {
+      "thing": "--color-background-body",
+      "value": "#f7f5f1",
+      "source": "token",
+      "mode": "light"
+    }
+  ],
+  "lifted": [],
+  "palette": "7b8b8b01e3a36ca8918dc2a19981e849591ca116a1035b53f8d4fcf2afcd1330"
+}

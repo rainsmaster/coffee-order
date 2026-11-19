@@ -16,7 +16,7 @@ const getImageUrls = (menu) => {
   const webpPath = menu.localImgPath.toLowerCase().endsWith('.webp')
     ? menu.localImgPath
     : `${menu.localImgPath}.webp`;
-  return [...new Set([withVersion(webpPath), withVersion(menu.localImgPath)])];
+  return [...new Set([withVersion(webpPath), withVersion(menu.localImgPath), remoteUrl].filter(Boolean))];
 };
 
 const loadedImageUrls = new Set();

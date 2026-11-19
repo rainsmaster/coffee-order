@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button } from '@astryxdesign/core/Button';
+import { DateInput } from '@astryxdesign/core/DateInput';
 import { orderAPI, teamAPI, repAPI } from '../services/api';
 import { useDepartment } from '../context/DepartmentContext';
 import AlertModal from '../components/AlertModal';
@@ -166,9 +168,16 @@ const HistoryPage = ({ onOrderClick }) => {
             <p className="history-description">실제 투썸 결제 완료가 아닌 허다방 주문 기록입니다.</p>
           </div>
           <div className="date-selector">
-            <label htmlFor="history-date">날짜 선택</label>
-            <input id="history-date" type="date" value={selectedDate} onChange={(event) => setSelectedDate(event.target.value)} />
-            <button className="today-button" onClick={() => setSelectedDate(today())}>오늘</button>
+            <DateInput
+              id="history-date"
+              label="날짜 선택"
+              value={selectedDate}
+              onChange={(value) => value && setSelectedDate(value)}
+              format="system_date"
+              presentation="adaptive-native"
+              weekStartsOn="mon"
+            />
+            <Button label="오늘" variant="secondary" onClick={() => setSelectedDate(today())} />
           </div>
         </div>
         <div className="history-content">
@@ -190,7 +199,15 @@ const HistoryPage = ({ onOrderClick }) => {
                             <span className="cart-reflect-badge reflected">{repName(order.cartReflectedBy)} 장바구니 반영 · {new Date(order.cartReflectedAt).toLocaleString('ko-KR')}</span>
                           ) : <span className="cart-reflect-badge">투썸 장바구니 미반영</span>}
                         </div>
-                        <button className="btn-cancel" onClick={() => handleCancelOrder(order)} disabled={!isToday} title={!isToday ? '당일 주문만 취소할 수 있습니다' : ''}>주문 취소</button>
+                        <Button
+                          className="btn-cancel"
+                          label="주문 취소"
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleCancelOrder(order)}
+                          isDisabled={!isToday}
+                          title={!isToday ? '당일 주문만 취소할 수 있습니다' : ''}
+                        />
                       </div>
                     ))}
                   </article>

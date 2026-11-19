@@ -35,7 +35,8 @@ describe('대표별 실시간 장바구니', () => {
     expect(await screen.findByText('현재는 홍길동의 장바구니가 비어 있습니다.')).toBeInTheDocument();
     expect(screen.getByText(/마지막 확인:/)).toBeInTheDocument();
     expect(repAPI.repGetCart).toHaveBeenCalledWith(1, { signal: undefined });
-    expect(screen.getByRole('option', { name: /박주임/ })).toBeDisabled();
+    fireEvent.click(screen.getByRole('combobox', { name: '장바구니 대표' }));
+    expect(screen.getByRole('option', { name: /박주임/ })).toHaveAttribute('aria-disabled', 'true');
   });
 
   test('대표 전환 시 이전 장바구니 항목을 섞지 않는다', async () => {
@@ -45,7 +46,8 @@ describe('대표별 실시간 장바구니', () => {
     render(<LiveCartPanel departmentId={1} onOrderClick={jest.fn()} />);
     expect(await screen.findByText('Americano')).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText('장바구니 대표'), { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('combobox', { name: '장바구니 대표' }));
+    fireEvent.click(await screen.findByRole('option', { name: /김대리/ }));
 
     expect(await screen.findByText('현재는 김대리의 장바구니가 비어 있습니다.')).toBeInTheDocument();
     expect(screen.queryByText('Americano')).not.toBeInTheDocument();

@@ -61,5 +61,7 @@ test('날짜를 바꿔도 두 기록 영역이 유지되고 과거 주문은 취
   expect(screen.getByRole('heading', { name: '개인별 주문 내역 (2건)' })).toBeInTheDocument();
   expect(screen.getByRole('heading', { name: '메뉴·옵션별 주문 집계' })).toBeInTheDocument();
   const cancelButtons = await screen.findAllByRole('button', { name: '주문 취소' });
-  expect(cancelButtons[0]).toBeDisabled();
+  expect(cancelButtons[0]).toHaveAttribute('aria-disabled', 'true');
+  fireEvent.click(cancelButtons[0]);
+  expect(orderAPI.delete).not.toHaveBeenCalled();
 });

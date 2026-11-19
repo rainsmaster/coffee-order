@@ -1,41 +1,84 @@
 import React, { useEffect, useState } from 'react';
-import OrderPage from './pages/OrderPage';
-import ManagePage from './pages/ManagePage';
-import HistoryPage from './pages/HistoryPage';
-import SuggestionPage from './pages/SuggestionPage';
+import { AppShell } from '@astryxdesign/core/AppShell';
+import { Button } from '@astryxdesign/core/Button';
+import { HStack } from '@astryxdesign/core/HStack';
+import { RadioList, RadioListItem } from '@astryxdesign/core/RadioList';
+import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { Text } from '@astryxdesign/core/Text';
+import { TopNav, TopNavHeading, TopNavItem } from '@astryxdesign/core/TopNav';
+import { VStack } from '@astryxdesign/core/VStack';
 import { DepartmentProvider, useDepartment } from './context/DepartmentContext';
 import BottomSheet from './components/BottomSheet';
 import ReleaseNoteModal from './components/ReleaseNoteModal';
 import { releaseNoteAPI } from './services/api';
 import { dismissReleaseForToday, shouldShowRelease } from './utils/releaseNotice';
 import './App.css';
-import './AppLayout.css';
 
-function HeaderTitle({ onTap }) {
+const OrderPage = React.lazy(() => import('./pages/OrderPage'));
+const ManagePage = React.lazy(() => import('./pages/ManagePage'));
+const HistoryPage = React.lazy(() => import('./pages/HistoryPage'));
+const SuggestionPage = React.lazy(() => import('./pages/SuggestionPage'));
+
+const pages = [
+  { id: 'order', label: '주문' },
+  { id: 'history', label: '내역' },
+  { id: 'suggestion', label: '건의' },
+  { id: 'manage', label: '설정' },
+];
+
+function AppNavigation({ currentPage, onNavigate, onDepartment, onAddDepartment }) {
   const { selectedDepartment, loading } = useDepartment();
-  if (loading) return <h1 className="header-title">허다방</h1>;
   return (
-    <button className="header-title-button" onClick={onTap} aria-label={`부서 선택: ${selectedDepartment?.name || ''}`}>
-      <span className="header-brand">허다방</span>
-      <span className="header-title-text">{selectedDepartment?.name || ''}</span>
-      <svg className="header-title-arrow" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-    </button>
+    <TopNav
+      label="주요 메뉴"
+      heading={<TopNavHeading heading="허다방" superheading="COFFEE CLUB" />}
+      startContent={(
+        <HStack gap={1} className="app-top-nav-links">
+          {pages.map((page) => (
+            <TopNavItem
+              key={page.id}
+              label={page.label}
+              href={`#${page.id}`}
+              isSelected={currentPage === page.id}
+              onClick={(event) => {
+                event.preventDefault();
+                onNavigate(page.id);
+              }}
+            />
+          ))}
+        </HStack>
+      )}
+      endContent={(
+        <HStack gap={1}>
+          <Button
+            label={loading ? '부서 확인 중' : selectedDepartment?.name || '부서 선택'}
+            variant="secondary"
+            size="sm"
+            onClick={onDepartment}
+          />
+          <Button className="app-add-department" label="부서 추가" variant="ghost" size="sm" onClick={onAddDepartment} />
+        </HStack>
+      )}
+    />
   );
 }
 
-function DepartmentList({ onSelect, onAddTeam }) {
+function DepartmentList({ onSelect }) {
   const { departments, selectedDepartment } = useDepartment();
   return (
-    <>
-      {departments.map((dept) => (
-        <button key={dept.id} className={`department-list-item ${selectedDepartment?.id === dept.id ? 'selected' : ''}`} onClick={() => onSelect(dept)}>
-          <span>{dept.name}</span>{selectedDepartment?.id === dept.id && <span className="check-icon">선택됨</span>}
-        </button>
+    <RadioList
+      label="부서"
+      isLabelHidden
+      value={String(selectedDepartment?.id || '')}
+      onChange={(value) => {
+        const department = departments.find((item) => item.id === Number(value));
+        if (department) onSelect(department);
+      }}
+    >
+      {departments.map((department) => (
+        <RadioListItem key={department.id} value={String(department.id)} label={department.name} />
       ))}
-      <button className="department-list-item add-team" onClick={onAddTeam}>
-        <span className="add-team-content"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="add-icon"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>부서 추가하기</span>
-      </button>
-    </>
+    </RadioList>
   );
 }
 
@@ -73,8 +116,8 @@ function AppContent() {
     setReleaseNote(null);
   };
 
-  const handleDepartmentSelect = (dept) => {
-    setSelectedDepartment(dept);
+  const handleDepartmentSelect = (department) => {
+    setSelectedDepartment(department);
     setIsDepartmentSheetOpen(false);
   };
 
@@ -82,6 +125,11 @@ function AppContent() {
     setIsDepartmentSheetOpen(false);
     setManageInitialTab(tab);
     setCurrentPage('manage');
+  };
+
+  const navigate = (page) => {
+    if (page === 'manage') setManageInitialTab(null);
+    setCurrentPage(page);
   };
 
   const renderPage = () => {
@@ -95,29 +143,54 @@ function AppContent() {
   };
 
   return (
-    <div className="App">
-      <a className="skip-link" href="#main-content">본문으로 바로가기</a>
-      <header className="App-header"><HeaderTitle onTap={() => setIsDepartmentSheetOpen(true)} /></header>
-      <main id="main-content" className="App-main">{renderPage()}</main>
+    <>
+      <AppShell
+        height="auto"
+        variant="surface"
+        contentPadding={4}
+        mobileNav={false}
+        topNav={(
+          <AppNavigation
+            currentPage={currentPage}
+            onNavigate={navigate}
+            onDepartment={() => setIsDepartmentSheetOpen(true)}
+            onAddDepartment={() => openManageTab('department')}
+          />
+        )}
+      >
+        <VStack gap={0} width="100%" maxWidth={1200} className="app-page-content">
+          <React.Suspense fallback={(
+            <VStack gap={2} padding={4} role="status" aria-live="polite">
+              <Text type="supporting">화면을 불러오는 중...</Text>
+              <Skeleton height={160} />
+            </VStack>
+          )}>
+            {renderPage()}
+          </React.Suspense>
+        </VStack>
+      </AppShell>
       <BottomSheet isOpen={isDepartmentSheetOpen} onClose={() => setIsDepartmentSheetOpen(false)} title="부서 선택">
-        <DepartmentList onSelect={handleDepartmentSelect} onAddTeam={() => openManageTab('department')} />
+        <VStack gap={3} padding={3}>
+          <DepartmentList onSelect={handleDepartmentSelect} />
+          <Button label="부서 추가하기" variant="secondary" onClick={() => openManageTab('department')} width="100%" />
+        </VStack>
       </BottomSheet>
       <ReleaseNoteModal note={releaseNote} onClose={() => setReleaseNote(null)} onDismissToday={dismissReleaseToday} onDetail={handleReleaseDetail} />
       <nav className="bottom-nav" aria-label="주요 메뉴">
-        <button className={`nav-item ${currentPage === 'order' ? 'active' : ''}`} onClick={() => setCurrentPage('order')}>
+        <button className={`nav-item ${currentPage === 'order' ? 'active' : ''}`} onClick={() => navigate('order')}>
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 8h1a4 4 0 010 8h-1M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M6 1v3M10 1v3M14 1v3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>주문</span>
         </button>
-        <button className={`nav-item ${currentPage === 'history' ? 'active' : ''}`} onClick={() => setCurrentPage('history')}>
+        <button className={`nav-item ${currentPage === 'history' ? 'active' : ''}`} onClick={() => navigate('history')}>
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>내역</span>
         </button>
-        <button className={`nav-item ${currentPage === 'suggestion' ? 'active' : ''}`} onClick={() => setCurrentPage('suggestion')}>
+        <button className={`nav-item ${currentPage === 'suggestion' ? 'active' : ''}`} onClick={() => navigate('suggestion')}>
           <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>건의</span>
         </button>
-        <button className={`nav-item ${currentPage === 'manage' ? 'active' : ''}`} onClick={() => { setManageInitialTab(null); setCurrentPage('manage'); }}>
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>설정</span>
+        <button className={`nav-item ${currentPage === 'manage' ? 'active' : ''}`} onClick={() => navigate('manage')}>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.6a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg><span>설정</span>
         </button>
       </nav>
-    </div>
+    </>
   );
 }
 

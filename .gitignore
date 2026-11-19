@@ -64,6 +64,11 @@ coffee-order-frontweb/.env.test.local
 coffee-order-frontweb/.env.production.local
 coffee-order-frontweb/npm-debug.log*
 coffee-order-frontweb/yarn-debug.log*
+coffee-order-frontweb/themes/*/preview.html
+coffee-order-frontweb/themes/*/preview*.png
+coffee-order-frontweb/themes/*/sheet.html
+coffee-order-frontweb/themes/*/sheet*.png
+coffee-order-frontweb/themes/*/*.pictures.json
 
 ### Docker ###
 *.tar

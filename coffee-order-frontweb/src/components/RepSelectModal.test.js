@@ -11,11 +11,13 @@ describe('대표 선택 모달', () => {
   test('활성 대표만 선택하고 확정할 수 있다', () => {
     const onSelect = jest.fn();
     const onConfirm = jest.fn();
-    render(<RepSelectModal isOpen reps={reps} selectedId={1} onSelect={onSelect} onConfirm={onConfirm} onCancel={jest.fn()} />);
+    const props = { isOpen: true, reps, onSelect, onConfirm, onCancel: jest.fn() };
+    const { rerender } = render(<RepSelectModal {...props} selectedId={null} />);
 
-    expect(screen.getByText('세션 만료 · 다시 로그인 필요').closest('button')).toBeDisabled();
-    fireEvent.click(screen.getByText('홍길동').closest('button'));
+    expect(screen.getByRole('radio', { name: '김대리' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('radio', { name: '홍길동' }));
     expect(onSelect).toHaveBeenCalledWith(1);
+    rerender(<RepSelectModal {...props} selectedId={1} />);
     fireEvent.click(screen.getByRole('button', { name: '선택한 대표 장바구니에 담기' }));
     expect(onConfirm).toHaveBeenCalledWith(reps[0]);
   });

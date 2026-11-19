@@ -1,9 +1,9 @@
 .custom-categories {
-  border-top: 1px solid #e5e5e5;
+  border-top: var(--border-width) solid var(--color-border);
 }
 
 .custom-category {
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .custom-category-header {
@@ -11,32 +11,32 @@
   align-items: center;
   width: 100%;
   min-height: 48px;
-  padding: 0.75rem 0.2rem;
+  padding: var(--spacing-3) var(--spacing-1);
   border: 0;
-  background: #fff;
-  color: #222;
+  background: var(--color-background-surface);
+  color: var(--color-text-primary);
   text-align: left;
   cursor: pointer;
 }
 
 .custom-category-name {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: var(--text-body-size);
+  font-weight: var(--font-weight-semibold);
 }
 
 .custom-category-price {
   margin-left: auto;
-  padding-right: 0.75rem;
-  color: #555;
-  font-size: 0.85rem;
+  padding-right: var(--spacing-3);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
 }
 
 .custom-category-chevron {
   width: 8px;
   height: 8px;
-  margin: -4px 0.35rem 0 auto;
-  border-right: 1.5px solid #666;
-  border-bottom: 1.5px solid #666;
+  margin: -4px var(--spacing-1) 0 auto;
+  border-right: 1.5px solid var(--color-text-secondary);
+  border-bottom: 1.5px solid var(--color-text-secondary);
   transform: rotate(45deg);
   transition: transform 0.15s ease;
 }
@@ -51,12 +51,12 @@
 }
 
 .custom-category-body {
-  padding: 0.15rem 0 0.75rem;
+  padding: var(--spacing-0-5) 0 var(--spacing-3);
 }
 
 .custom-choice-item {
-  padding: 0.6rem 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: var(--spacing-2) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .custom-choice-item:last-child {
@@ -68,19 +68,19 @@
   align-items: center;
   justify-content: space-between;
   min-height: 32px;
-  gap: 0.75rem;
+  gap: var(--spacing-3);
 }
 
 .form-group .custom-choice-toggle,
 .form-group .custom-choice-option {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--spacing-2);
   margin: 0;
-  color: #333;
-  font-size: 0.88rem;
-  font-weight: 400;
-  line-height: 1.4;
+  color: var(--color-text-primary);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--text-supporting-leading);
   cursor: pointer;
 }
 
@@ -91,7 +91,7 @@
   height: 17px;
   margin: 0;
   padding: 0;
-  accent-color: #333;
+  accent-color: var(--color-accent);
   vertical-align: middle;
   cursor: pointer;
 }
@@ -99,28 +99,28 @@
 .custom-choice-toggle > span,
 .custom-choice-option > span {
   display: inline-block;
-  line-height: 1.4;
+  line-height: var(--text-supporting-leading);
 }
 
 .custom-choice-price {
   margin-left: auto;
-  color: #666;
-  font-size: 0.83rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
   white-space: nowrap;
 }
 
 .custom-choice-title {
-  color: #333;
-  font-size: 0.88rem;
-  font-weight: 500;
+  color: var(--color-text-primary);
+  font-size: var(--text-supporting-size);
+  font-weight: var(--font-weight-medium);
 }
 
 .custom-choice-options {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.6rem 1.25rem;
-  margin: 0.65rem 0 0.15rem 1.55rem;
+  gap: var(--spacing-2) var(--spacing-5);
+  margin: var(--spacing-2) 0 var(--spacing-0-5) var(--spacing-6);
 }
 
 .form-group .custom-choice-option {
@@ -136,15 +136,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: var(--spacing-3);
 }
 
 .custom-choice-clear {
-  padding: 0.15rem 0;
+  padding: var(--spacing-0-5) 0;
   border: 0;
   background: none;
-  color: #666;
-  font-size: 0.78rem;
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
   text-decoration: underline;
   cursor: pointer;
 }
@@ -152,21 +152,21 @@
 .custom-accordion-actions {
   display: flex;
   justify-content: center;
-  gap: 0.5rem;
+  gap: var(--spacing-2);
 }
 
 .custom-accordion-actions .custom-accordion-reset,
 .custom-accordion-actions .custom-accordion-close {
-  margin: 0.75rem 0 0;
+  margin: var(--spacing-3) 0 0;
 }
 
 .custom-accordion-reset {
-  padding: 0.3rem 1.2rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  background-color: #fff;
-  color: #555;
-  font-size: 0.82rem;
+  padding: var(--spacing-1) var(--spacing-5);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-inner);
+  background-color: var(--color-background-surface);
+  color: var(--color-text-secondary);
+  font-size: var(--text-supporting-size);
   cursor: pointer;
 }
 
@@ -177,8 +177,8 @@
 
 @media (max-width: 480px) {
   .custom-choice-options {
-    gap: 0.5rem 1rem;
-    margin-left: 1.55rem;
+    gap: var(--spacing-2) var(--spacing-4);
+    margin-left: var(--spacing-6);
   }
 }
 

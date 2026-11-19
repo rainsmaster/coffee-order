@@ -59,7 +59,7 @@ test('캐시되어 이미 완료된 이미지는 첫 화멶부터 스켈레톤 �
   expect(container.querySelector('.menu-thumbnail')).toHaveClass('is-loaded');
 });
 
-test('WebP 실패 시 원본을 사용하고 원본도 실패하면 외부 요청 없이 대체 아이콘을 표시한다', () => {
+test('로컬 WebP·원본·원격 이미지를 순서대로 시도하고 모두 실패하면 대체 아이콘을 표시한다', () => {
   const { container } = render(<MenuThumbnail menu={menu} />);
 
   fireEvent.error(screen.getByRole('img', { name: '카페 라떼' }));
@@ -67,9 +67,12 @@ test('WebP 실패 시 원본을 사용하고 원본도 실패하면 외부 요�
   const original = screen.getByRole('img', { name: '카페 라떼' });
   expect(original.src).toContain('/images/twosome/10100002.jpg?imageVersion=');
   expect(original.src).not.toContain('.webp');
-  expect(original.src).not.toContain('mcdn.twosome.co.kr');
 
   fireEvent.error(original);
+
+  const remote = screen.getByRole('img', { name: '카페 라떼' });
+  expect(remote.src).toContain('https://mcdn.twosome.co.kr/menu_image/10100002_20260608055115.jpg');
+  fireEvent.error(remote);
 
   expect(screen.getByRole('img', { name: '카페 라떼 이미지 없음' })).toBeInTheDocument();
   expect(container.querySelector('.menu-thumbnail-skeleton')).not.toBeInTheDocument();

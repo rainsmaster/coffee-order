@@ -1,4 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Banner } from '@astryxdesign/core/Banner';
+import { Button } from '@astryxdesign/core/Button';
+import { Card } from '@astryxdesign/core/Card';
+import { Collapsible } from '@astryxdesign/core/Collapsible';
+import { Grid } from '@astryxdesign/core/Grid';
+import { Heading } from '@astryxdesign/core/Heading';
+import { HStack } from '@astryxdesign/core/HStack';
+import { ClickableCard } from '@astryxdesign/core/ClickableCard';
+import { Selector } from '@astryxdesign/core/Selector';
+import { StatusDot } from '@astryxdesign/core/StatusDot';
+import { Stepper, Step } from '@astryxdesign/core/Stepper';
+import { Text } from '@astryxdesign/core/Text';
+import { TextInput } from '@astryxdesign/core/TextInput';
+import { ToggleButton, ToggleButtonGroup } from '@astryxdesign/core/ToggleButton';
+import { VStack } from '@astryxdesign/core/VStack';
 import { teamAPI, orderAPI, twosomeMenuAPI, twosomeStoreAPI, repAPI } from '../services/api';
 import { useDepartment } from '../context/DepartmentContext';
 import AlertModal from '../components/AlertModal';
@@ -81,6 +96,7 @@ const OrderPage = ({ onAddTeamMember }) => {
 
   // 주문 폼 ref (수정 모드 시 스크롤용)
   const orderFormRef = useRef(null);
+  const menuSentinelRef = useRef(null);
 
   // 커스텀 모달 훅
   const {
@@ -542,6 +558,23 @@ const OrderPage = ({ onAddTeamMember }) => {
 
   const visibleMenus = menuSearchQuery.trim() ? getSearchedMenus() : getCurrentMenus();
   const hasMoreMenus = visibleMenus.length > visibleMenuCount;
+
+  useEffect(() => {
+    if (!hasMoreMenus) return undefined;
+    const target = menuSentinelRef.current;
+    if (!target) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      setVisibleMenuCount(visibleMenus.length);
+      return undefined;
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        setVisibleMenuCount((count) => Math.min(count + MENU_BATCH_SIZE, visibleMenus.length));
+      }
+    }, { rootMargin: '160px 0px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreMenus, visibleMenus.length]);
 
   // 카테고리 목록 (투썸 메뉴만 사용) - 순서 정렬
   const getCategories = () => {
@@ -1168,44 +1201,100 @@ const OrderPage = ({ onAddTeamMember }) => {
     }
   };
 
+  const activeOrderStep = !selectedTeam ? 0 : !selectedTwosomeMenu ? 1 : 2;
+
+  const renderMenuCard = (menu) => (
+    <ClickableCard
+      key={menu.id}
+      label={`${menu.menuNm}${menu.salesPsblQty === 0 ? ' 품절' : ''}`}
+      role="radio"
+      aria-label={`${menu.menuNm}${menu.salesPsblQty === 0 ? ' 품절' : ''}`}
+      aria-checked={selectedTwosomeMenu === menu.id.toString()}
+      className={`twosome-card ${selectedTwosomeMenu === menu.id.toString() ? 'selected' : ''} ${menu.salesPsblQty === 0 ? 'sold-out' : ''}`}
+      onClick={() => handleTwosomeMenuCardClick(menu)}
+      isDisabled={!orderAvailable}
+      padding={2}
+      width="100%"
+    >
+      <VStack gap={2} hAlign="center" width="100%">
+        <MenuThumbnail menu={menu} />
+        <Text weight="semibold" justify="center" className="twosome-card-name">{menu.menuNm}</Text>
+        {menu.category && <Text type="supporting" justify="center">{menu.category}</Text>}
+        {menu.salesPsblQty === 0 && (
+          <HStack gap={1} align="center">
+            <StatusDot variant="error" label="품절" />
+            <Text type="supporting">품절</Text>
+          </HStack>
+        )}
+      </VStack>
+    </ClickableCard>
+  );
+
   return (
     <div className="order-page">
-      {error && <div className="error-message">{error}</div>}
+      {error && <Banner status="error" title="주문 정보 확인 실패" description={error} />}
 
       {/* 주문 폼 */}
       <div className="order-form-card" ref={orderFormRef}>
-        <h2>오늘의 커피 주문</h2>
-        <p className="date-info">{new Date().toLocaleDateString('ko-KR')}</p>
-
-        <div className="rep-team-summary">
-          <strong>이 팀의 대표: {repList.length}명 · 장바구니 사용 가능 {repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length}명</strong>
-          <span>{repList.length > 0 ? repList.map((rep) => `${rep.name}(${rep.statusReason})`).join(', ') : '주문 후 대표 등록과 투썸 로그인을 진행할 수 있습니다.'}</span>
-          <span>매장 상태: {isStoreOpen ? '영업 중 · 실제 장바구니 담기 가능' : '매장 닫힘 또는 확인 불가 · 로컬 주문서만 저장'}</span>
-        </div>
+        <VStack gap={4} width="100%">
+          <HStack justify="between" align="end" wrap="wrap" gap={3} width="100%">
+            <VStack gap={1}>
+              <Text type="supporting" color="accent">CJENM커머스부문점</Text>
+              <Heading level={1}>오늘의 커피 주문</Heading>
+              <Text as="p" type="supporting">{new Date().toLocaleDateString('ko-KR')}</Text>
+            </VStack>
+            <HStack align="center" gap={2}>
+              <StatusDot
+                variant={isStoreOpen ? 'success' : 'warning'}
+                label={isStoreOpen ? '매장 영업 중' : '매장 닫힘 또는 확인 불가'}
+                isPulsing={isStoreOpen}
+              />
+              <Text weight="medium">{isStoreOpen ? '영업 중 · 실제 장바구니 담기 가능' : '매장 닫힘 · 로컬 주문서만 저장'}</Text>
+            </HStack>
+          </HStack>
+          <Stepper
+            activeStep={activeOrderStep}
+            label="주문 진행"
+            density="compact"
+            horizontalOptions={{ minimumStepWidth: 80, collapsedVariant: 'withLabel' }}
+          >
+            <Step step={0} label="주문자" />
+            <Step step={1} label="메뉴" />
+            <Step step={2} label="옵션·담기" />
+          </Stepper>
+          <Collapsible
+            className="rep-team-summary"
+            trigger={`대표·장바구니 정보 (${repList.length}명)`}
+            defaultIsOpen={false}
+          >
+            <VStack gap={1} paddingBlock={2}>
+              <Text weight="semibold">장바구니 사용 가능 {repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length}명</Text>
+              <Text type="supporting">{repList.length > 0 ? repList.map((rep) => `${rep.name}(${rep.statusReason})`).join(', ') : '주문 후 대표 등록과 투썸 로그인을 진행할 수 있습니다.'}</Text>
+            </VStack>
+          </Collapsible>
+        </VStack>
         <div className="order-layout">
           <div className="order-main">
         <div className="form-group">
-          <label>이름 선택</label>
-          <select
-            aria-label="주문자 이름 선택"
+          <Selector
+            label="주문자 이름 선택"
             value={selectedTeam}
-            onChange={(e) => {
-              if (e.target.value === 'ADD_TEAM_MEMBER') {
+            onChange={(value) => {
+              if (value === 'ADD_TEAM_MEMBER') {
                 if (onAddTeamMember) onAddTeamMember();
               } else {
-                handleTeamSelect(e.target.value);
+                handleTeamSelect(value);
               }
             }}
-            disabled={!orderAvailable}
-          >
-            <option value="">선택하세요</option>
-            {teams.map((team) => (
-              <option key={team.id} value={team.id}>
-                {team.name}
-              </option>
-            ))}
-            <option value="ADD_TEAM_MEMBER" className="add-team-option">+ 팀원 추가하기</option>
-          </select>
+            options={[
+              ...teams.map((team) => ({ value: String(team.id), label: team.name })),
+              { value: 'ADD_TEAM_MEMBER', label: '+ 팀원 추가하기' },
+            ]}
+            placeholder="선택하세요"
+            presentation="adaptive"
+            isDisabled={!orderAvailable}
+            width="100%"
+          />
         </div>
 
         {/* 최근 주문 표시 (레거시 CUSTOM 주문은 투썸 메뉴가 아니므로 재주문 불가) */}
@@ -1214,38 +1303,32 @@ const OrderPage = ({ onAddTeamMember }) => {
           const isModeMatch = latestMode === 'TWOSOME';
 
           return (
-            <div className={`latest-order-box ${!isModeMatch ? 'disabled' : ''}`}>
-              <div className="latest-order-info">
-                <span className="latest-order-label">최근 주문</span>
-                <span className={`latest-order-mode-badge ${latestMode === 'TWOSOME' ? 'twosome' : 'custom'}`}>
-                  {latestMode === 'TWOSOME' ? '투썸' : '커스텀'}
-                </span>
-                <span className="latest-order-date">
-                  {(() => {
-                    const date = new Date(latestOrder.orderDate);
-                    const month = date.getMonth() + 1;
-                    const day = date.getDate();
-                    return `${month}/${day}`;
-                  })()}
-                </span>
-                <span className="latest-order-menu">
-                  {latestOrder.menuName}
-                </span>
-                {latestOrder.personalOption && (
-                  <span className="latest-order-option">
-                    ({latestOrder.personalOption})
-                  </span>
-                )}
-              </div>
-              <button
-                className={`reorder-button ${!isModeMatch ? 'disabled' : ''}`}
-                onClick={handleReorderClick}
-                disabled={!isModeMatch}
-                title={!isModeMatch ? '투썸 메뉴 기준 주문만 다시 주문할 수 있습니다' : ''}
-              >
-                다시 주문
-              </button>
-            </div>
+            <Card className={`latest-order-box ${!isModeMatch ? 'disabled' : ''}`} variant="muted" padding={3}>
+              <HStack justify="between" align="center" wrap="wrap" gap={3} width="100%">
+                <VStack gap={1}>
+                  <HStack gap={2}>
+                    <Text type="supporting" color="accent">최근 주문</Text>
+                    <Text type="supporting">{latestMode === 'TWOSOME' ? '투썸 메뉴' : '커스텀'}</Text>
+                    <Text type="supporting">
+                      {(() => {
+                        const date = new Date(latestOrder.orderDate);
+                        return `${date.getMonth() + 1}/${date.getDate()}`;
+                      })()}
+                    </Text>
+                  </HStack>
+                  <Text weight="semibold">{latestOrder.menuName}</Text>
+                  {latestOrder.personalOption && <Text type="supporting">{latestOrder.personalOption}</Text>}
+                </VStack>
+                <Button
+                  label="다시 주문"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleReorderClick}
+                  isDisabled={!isModeMatch}
+                  title={!isModeMatch ? '투썸 메뉴 기준 주문만 다시 주문할 수 있습니다' : ''}
+                />
+              </HStack>
+            </Card>
           );
         })()}
 
@@ -1258,45 +1341,39 @@ const OrderPage = ({ onAddTeamMember }) => {
 
             {/* 메뉴 검색 입력 */}
             <div className="menu-search-container">
-              <input
-                type="text"
-                name="menuSearch"
+              <TextInput
+                type="search"
+                label="메뉴 검색"
+                isLabelHidden
+                htmlName="menuSearch"
                 autoComplete="off"
-                aria-label="메뉴 검색"
-                className="menu-search-input"
                 placeholder="메뉴 검색 (예: 아메리카노, 라떼)"
                 value={menuSearchQuery}
-                onChange={(e) => handleMenuSearch(e.target.value)}
-                disabled={!orderAvailable}
+                onChange={handleMenuSearch}
+                isDisabled={!orderAvailable}
+                hasClear
+                width="100%"
               />
-              {menuSearchQuery && (
-                <button
-                  className="menu-search-clear"
-                  aria-label="메뉴 검색어 지우기"
-                  onClick={() => setMenuSearchQuery('')}
-                  type="button"
-                >
-                  ✕
-                </button>
-              )}
             </div>
 
             {/* 카테고리 버튼 (검색 중이 아닐 때만 표시) */}
             {!menuSearchQuery && (
               <div className="category-buttons">
-                {getCategories().map((category) => (
-                  <button
-                    key={category}
-                    className={`category-btn ${selectedCategory === category ? 'selected' : ''}`}
-                    onClick={() => handleCategorySelect(category)}
-                    disabled={!orderAvailable}
-                  >
-                    {category}
-                    {twosomeMenus[category] && (
-                      <span className="category-count">({twosomeMenus[category].length})</span>
-                    )}
-                  </button>
-                ))}
+                <ToggleButtonGroup
+                  label="메뉴 카테고리"
+                  type="single"
+                  value={selectedCategory || null}
+                  onChange={(value) => value && handleCategorySelect(value)}
+                  isDisabled={!orderAvailable}
+                >
+                  {getCategories().map((category) => (
+                    <ToggleButton
+                      key={category}
+                      value={category}
+                      label={`${category} (${twosomeMenus[category]?.length || 0})`}
+                    />
+                  ))}
+                </ToggleButtonGroup>
               </div>
             )}
           </div>
@@ -1311,23 +1388,9 @@ const OrderPage = ({ onAddTeamMember }) => {
                 '{menuSearchQuery}'에 대한 검색 결과가 없습니다.
               </div>
             ) : (
-              <div className="twosome-card-grid">
-                {visibleMenus.slice(0, visibleMenuCount).map((menu) => (
-                  <button
-                    key={menu.id}
-                    className={`twosome-card ${
-                      selectedTwosomeMenu === menu.id.toString() ? 'selected' : ''
-                    } ${menu.salesPsblQty === 0 ? 'sold-out' : ''}`}
-                    onClick={() => handleTwosomeMenuCardClick(menu)}
-                    disabled={!orderAvailable}
-                  >
-                    <MenuThumbnail menu={menu} />
-                    <span className="twosome-card-name">{menu.menuNm}</span>
-                    <span className="twosome-card-category">{menu.category}</span>
-                    {menu.salesPsblQty === 0 && <span className="sold-out-badge">품절</span>}
-                  </button>
-                ))}
-              </div>
+              <Grid className="twosome-card-grid" role="radiogroup" aria-label="메뉴 선택" columns={{ minWidth: 140, max: 4, repeat: 'fit' }} gap={3}>
+                {visibleMenus.slice(0, visibleMenuCount).map(renderMenuCard)}
+              </Grid>
             )}
           </div>
         )}
@@ -1335,29 +1398,14 @@ const OrderPage = ({ onAddTeamMember }) => {
         {/* 투썸 메뉴 2단계: 메뉴 선택 (카테고리 선택 후 표시) */}
         {selectedCategory && (
           <div className="form-group">
-            <label>{selectedCategory} 메뉴</label>
-            <div className="twosome-card-grid">
-              {visibleMenus.slice(0, visibleMenuCount).map((menu) => (
-                <button
-                  key={menu.id}
-                  className={`twosome-card ${
-                    selectedTwosomeMenu === menu.id.toString() ? 'selected' : ''
-                  } ${menu.salesPsblQty === 0 ? 'sold-out' : ''}`}
-                  onClick={() => handleTwosomeMenuCardClick(menu)}
-                  disabled={!orderAvailable}
-                >
-                  <MenuThumbnail menu={menu} />
-                  <span className="twosome-card-name">{menu.menuNm}</span>
-                  {menu.salesPsblQty === 0 && <span className="sold-out-badge">품절</span>}
-                </button>
-              ))}
-            </div>
+            <Heading level={2}>{selectedCategory} 메뉴</Heading>
+            <Grid className="twosome-card-grid" role="radiogroup" aria-label="메뉴 선택" columns={{ minWidth: 140, max: 4, repeat: 'fit' }} gap={3}>
+              {visibleMenus.slice(0, visibleMenuCount).map(renderMenuCard)}
+            </Grid>
           </div>
         )}
         {hasMoreMenus && !loading && (
-          <button type="button" className="menu-load-more" onClick={() => setVisibleMenuCount((count) => count + MENU_BATCH_SIZE)}>
-            메뉴 더보기 ({Math.min(visibleMenuCount, visibleMenus.length)}/{visibleMenus.length})
-          </button>
+          <div ref={menuSentinelRef} className="menu-scroll-sentinel" data-testid="menu-scroll-sentinel" aria-hidden="true" />
         )}
 
         {/* 투썸 메뉴 옵션 그룹 선택 (서버 기반, 그룹 순서대로) */}
@@ -1365,37 +1413,40 @@ const OrderPage = ({ onAddTeamMember }) => {
           && menuOptions.groups.length > 0 && (
           <div className="form-group twosome-options">
             {menuOptions.groups.map((group) => (
-              <div key={group.grpCd} style={{ marginTop: '0.5rem' }}>
-                <label>
+              <VStack key={group.grpCd} gap={2} className="option-group">
+                <Text as="div" weight="semibold">
                   {group.grpNm} 선택
                   {group.required && !selectedOpts[group.grpCd] && (
-                    <span className="option-required-mark"> (필수)</span>
+                    <Text className="option-required-mark"> (필수)</Text>
                   )}
-                </label>
-                <div className="option-buttons-grid">
+                </Text>
+                <ToggleButtonGroup
+                  label={`${group.grpNm} 선택`}
+                  type="single"
+                  value={selectedOpts[group.grpCd] || null}
+                  isDisabled={!orderAvailable}
+                  onChange={(value) => {
+                    if (!value) return;
+                    const next = { ...selectedOpts, [group.grpCd]: value };
+                    const groupIdx = (menuOptions.groups || []).findIndex((item) => item.grpCd === group.grpCd);
+                    (menuOptions.groups || []).slice(groupIdx + 1).forEach((item) => {
+                      next[item.grpCd] = resolveAutoSelectOpt(item, next);
+                    });
+                    setSelectedOpts(next);
+                    setVariantInfo(null);
+                    setVariantFailed(false);
+                  }}
+                >
                   {getVisibleOptions(group).map((option) => (
-                    <button
+                    <ToggleButton
                       key={option.opts}
+                      value={option.opts}
                       className={`option-chip ${selectedOpts[group.grpCd] === option.opts ? 'selected' : ''}`}
-                      onClick={() => {
-                        // 그룹 의존성: 현재 그룹 이후는 초기화 후 기본값 자동 선택 (앱 동작과 동일)
-                        // 서버 available-options 조회로 불가능한 자동값은 이후 effect에서 교정
-                        const next = { ...selectedOpts, [group.grpCd]: option.opts };
-                        const groupIdx = (menuOptions.groups || []).findIndex((g) => g.grpCd === group.grpCd);
-                        (menuOptions.groups || []).slice(groupIdx + 1).forEach((g) => {
-                          next[g.grpCd] = resolveAutoSelectOpt(g, next);
-                        });
-                        setSelectedOpts(next);
-                        setVariantInfo(null);
-                        setVariantFailed(false);
-                      }}
-                      disabled={!orderAvailable}
-                    >
-                      {option.optNm || option.opts}
-                    </button>
+                      label={option.optNm || option.opts}
+                    />
                   ))}
-                </div>
-              </div>
+                </ToggleButtonGroup>
+              </VStack>
             ))}
 
             {/* 선택 옵션 표시 + 예상 가격 (변형 코드 조회 결과) */}
@@ -1457,26 +1508,23 @@ const OrderPage = ({ onAddTeamMember }) => {
 
         {selectedTwosomeMenu && customOptionsStatus === 'success' && variantInfo && customOptions?.hasCustom && (
           <div className="form-group twosome-options custom-accordion">
-            <button
-              type="button"
-              className="custom-accordion-header"
-              onClick={() => setCustomOptionsOpen(!customOptionsOpen)}
+            <Collapsible
+              trigger={getCustomSummaryText()
+                ? `퍼스널 옵션 — ${getCustomSummaryText()} (+${getCustomTotalPrice().toLocaleString()}원)`
+                : '퍼스널 옵션 (선택)'}
+              isOpen={customOptionsOpen}
+              onOpenChange={setCustomOptionsOpen}
             >
-              {getCustomSummaryText()
-                ? `퍼스널 옵션 — ${getCustomSummaryText()} ${customOptionsOpen ? '▾' : '▸'} (+${getCustomTotalPrice().toLocaleString()}원)`
-                : `퍼스널 옵션 (선택) ${customOptionsOpen ? '▾' : '▸'}`}
-            </button>
-            {customOptionsOpen && (
-            <div className="custom-accordion-body">
-              <CustomOptionsPanel
-                customOptions={customOptions}
-                selectedCustom={selectedCustom}
-                onChange={setSelectedCustom}
-                onClose={() => setCustomOptionsOpen(false)}
-                disabled={!orderAvailable}
-              />
-            </div>
-            )}
+              <div className="custom-accordion-body">
+                <CustomOptionsPanel
+                  customOptions={customOptions}
+                  selectedCustom={selectedCustom}
+                  onChange={setSelectedCustom}
+                  onClose={() => setCustomOptionsOpen(false)}
+                  disabled={!orderAvailable}
+                />
+              </div>
+            </Collapsible>
           </div>
         )}
 
@@ -1486,34 +1534,45 @@ const OrderPage = ({ onAddTeamMember }) => {
         )}
 
         {/* 주문 버튼 (저장 + 투썸 장바구니 담기 통합) */}
-        <button
-          className={`order-button ${!orderAvailable ? 'disabled' : ''}`}
+        <Button
+          className="order-button"
+          variant="primary"
           onClick={handleOrder}
-          disabled={!orderAvailable || isCartLoading}
-        >
-          {isCartLoading ? '처리 중...' : !isStoreOpen
+          isDisabled={!orderAvailable || isCartLoading}
+          isLoading={isCartLoading}
+          width="100%"
+          label={!isStoreOpen
             ? '팀 주문서에 담기 (매장 닫힘)'
             : repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length === 1
               ? `투썸 장바구니 담기 (${repList.find((rep) => rep.twosomeStatus === 'ACTIVE').name} 계정)`
               : repList.some((rep) => rep.twosomeStatus === 'ACTIVE')
                 ? '대표 선택 후 투썸 장바구니 담기'
                 : '팀 주문서에 담기'}
-        </button>
+        />
           </div>
-          <aside className={`order-summary ${!selectedTwosomeMenu ? 'is-empty' : ''}`} aria-label="주문 요약">
-            <div className="order-summary-heading">
-              <h3>주문 요약</h3>
-              <span className="order-summary-caption">총 예상 금액</span>
-            </div>
-            <div className="order-summary-menu">
-              {selectedTwosomeMenu ? getSelectedMenuName() : '메뉴를 선택해주세요'}
-            </div>
-            {selectedTwosomeMenu && (
-              <>
-                <p className="order-summary-options">
-                  {[getTwosomeOptionString(), getCustomOptionString()].filter(Boolean).join(' | ') || '기본 옵션을 선택해주세요.'}
-                </p>
-                <div className="order-summary-price">
+          <Card
+            className={`order-summary ${!selectedTwosomeMenu ? 'is-empty' : ''}`}
+            aria-label="주문 요약"
+            padding={4}
+            elevation="low"
+          >
+            <VStack gap={3} width="100%">
+              <HStack justify="between" align="center" width="100%">
+                <Heading level={2}>주문 요약</Heading>
+                <Text type="supporting">총 예상 금액</Text>
+              </HStack>
+              <VStack gap={1} width="100%">
+                <Text size="lg" weight="semibold" className="order-summary-menu">
+                  {selectedTwosomeMenu ? getSelectedMenuName() : '메뉴를 선택해주세요'}
+                </Text>
+                {selectedTwosomeMenu && (
+                  <Text as="p" type="supporting" className="order-summary-options">
+                    {[getTwosomeOptionString(), getCustomOptionString()].filter(Boolean).join(' | ') || '기본 옵션을 선택해주세요.'}
+                  </Text>
+                )}
+              </VStack>
+              {selectedTwosomeMenu && (
+                <Text size="2xl" weight="bold" color="accent" hasTabularNumbers className="order-summary-price">
                   {optionsLoading
                     ? '옵션 정보 로딩 중'
                     : variantLoading
@@ -1527,22 +1586,22 @@ const OrderPage = ({ onAddTeamMember }) => {
                           : (menuOptions?.groups || []).length > 0 && !isAllGroupsSelected()
                             ? '옵션 선택 후 가격 확인'
                             : '가격 정보 없음'}
-                </div>
-              </>
-            )}
-            <div className="order-summary-destination">
-              {!isStoreOpen
-                ? '매장 닫힘 · 팀 주문서만 저장'
-                : repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length === 1
-                  ? `${repList.find((rep) => rep.twosomeStatus === 'ACTIVE').name} 대표의 투썸 장바구니`
-                  : repList.some((rep) => rep.twosomeStatus === 'ACTIVE')
-                    ? '대표를 선택해 투썸 장바구니에 담기'
-                    : '팀 주문서만 저장'}
-            </div>
-            <div className="order-summary-caption">
-              {getSelectedTeamName() || '주문자를 선택해주세요'}
-            </div>
-          </aside>
+                </Text>
+              )}
+              <VStack gap={1} className="order-summary-destination" width="100%">
+                <Text type="supporting">
+                  {!isStoreOpen
+                    ? '매장 닫힘 · 팀 주문서만 저장'
+                    : repList.filter((rep) => rep.twosomeStatus === 'ACTIVE').length === 1
+                      ? `${repList.find((rep) => rep.twosomeStatus === 'ACTIVE').name} 대표의 투썸 장바구니`
+                      : repList.some((rep) => rep.twosomeStatus === 'ACTIVE')
+                        ? '대표를 선택해 투썸 장바구니에 담기'
+                        : '팀 주문서만 저장'}
+                </Text>
+                <Text type="supporting">{getSelectedTeamName() || '주문자를 선택해주세요'}</Text>
+              </VStack>
+            </VStack>
+          </Card>
         </div>
       </div>
 

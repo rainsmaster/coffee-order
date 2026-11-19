@@ -1,43 +1,27 @@
 import React from 'react';
-import './ConfirmModal.css';
+import { AlertDialog } from '@astryxdesign/core/AlertDialog';
 
 const ConfirmModal = ({ isOpen, onClose, onConfirm, message, title = '확인' }) => {
-  if (!isOpen) return null;
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) onClose();
+  };
 
   const handleConfirm = () => {
     onConfirm();
     onClose();
   };
 
-  const handleCancel = () => {
-    onClose();
-  };
-
-  const handleBackdropClick = (e) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   return (
-    <div className="confirm-modal-overlay" onClick={handleBackdropClick}>
-      <div className="confirm-modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="confirm-modal-header">
-          <h3>{title}</h3>
-        </div>
-        <div className="confirm-modal-body">
-          <p>{message}</p>
-        </div>
-        <div className="confirm-modal-footer">
-          <button className="confirm-modal-btn confirm-modal-btn-cancel" onClick={handleCancel}>
-            취소
-          </button>
-          <button className="confirm-modal-btn confirm-modal-btn-confirm" onClick={handleConfirm}>
-            확인
-          </button>
-        </div>
-      </div>
-    </div>
+    <AlertDialog
+      isOpen={isOpen}
+      onOpenChange={handleOpenChange}
+      title={title}
+      description={message}
+      actionLabel="확인"
+      cancelLabel="취소"
+      actionVariant="primary"
+      onAction={handleConfirm}
+    />
   );
 };
 

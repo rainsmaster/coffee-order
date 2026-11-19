@@ -1,52 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import './BottomSheet.css';
+import React from 'react';
+import { BottomSheet as AstryxBottomSheet } from '@astryxdesign/core/BottomSheet';
+import { Heading } from '@astryxdesign/core/Heading';
+import { Layout, LayoutContent, LayoutHeader } from '@astryxdesign/core/Layout';
 
 const BottomSheet = ({ isOpen, onClose, title, children }) => {
-  const [isClosing, setIsClosing] = useState(false);
-  const [shouldRender, setShouldRender] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      setShouldRender(true);
-      setIsClosing(false);
-      document.body.style.overflow = 'hidden';
-    } else if (shouldRender) {
-      setIsClosing(true);
-      const timer = setTimeout(() => {
-        setShouldRender(false);
-        setIsClosing(false);
-      }, 300); // 애니메이션 시간과 동일
-      document.body.style.overflow = '';
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, shouldRender]);
-
-  useEffect(() => {
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
-
-  if (!shouldRender) return null;
-
-  const handleClose = () => {
-    onClose();
+  const handleOpenChange = (nextOpen) => {
+    if (!nextOpen) onClose();
   };
 
   return (
-    <div
-      className={`bottom-sheet-overlay ${isClosing ? 'closing' : ''}`}
-      onClick={handleClose}
+    <AstryxBottomSheet
+      isOpen={isOpen}
+      onOpenChange={handleOpenChange}
+      label={title || '옵션 선택'}
+      purpose="info"
+      height="capped"
+      padding={0}
     >
-      <div
-        className={`bottom-sheet-content ${isClosing ? 'closing' : ''}`}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="bottom-sheet-handle" />
-        {title && <div className="bottom-sheet-title">{title}</div>}
-        <div className="bottom-sheet-body">{children}</div>
-      </div>
-    </div>
+      <Layout
+        height="fill"
+        padding={0}
+        header={title ? (
+          <LayoutHeader padding={3} hasDivider>
+            <Heading level={2}>{title}</Heading>
+          </LayoutHeader>
+        ) : undefined}
+        content={<LayoutContent padding={0}>{children}</LayoutContent>}
+      />
+    </AstryxBottomSheet>
   );
 };
 

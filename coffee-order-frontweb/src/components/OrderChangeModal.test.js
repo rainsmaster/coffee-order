@@ -16,7 +16,7 @@ test('여러 기존 주문 중 변경 대상을 고르거나 새 메뉴를 추�
     onSelectExisting={onSelectExisting} newOrder={{ menuName: '바닐라 라떼', option: '아이스' }} />);
 
   expect(screen.getByText('메뉴를 변경하시겠습니까? 아니면 메뉴를 추가하시겠습니까?')).toBeInTheDocument();
-  fireEvent.change(screen.getByRole('combobox'), { target: { value: '11' } });
+  fireEvent.click(screen.getByRole('radio', { name: '카페 라떼' }));
   expect(onSelectExisting).toHaveBeenCalledWith(11);
   fireEvent.click(screen.getByRole('button', { name: '메뉴 변경' }));
   expect(onConfirm).toHaveBeenCalledWith(existingOrders[0]);
