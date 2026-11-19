@@ -574,7 +574,7 @@ const OrderPage = ({ onAddTeamMember }) => {
     }, { rootMargin: '160px 0px' });
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMoreMenus, visibleMenus.length]);
+  }, [hasMoreMenus, visibleMenuCount, visibleMenus.length]);
 
   // 카테고리 목록 (투썸 메뉴만 사용) - 순서 정렬
   const getCategories = () => {

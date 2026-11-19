@@ -341,16 +341,17 @@ test.each(['아메리칸노', '아메리칸호'])('공식 메뉴 이름과 다�
   expect(screen.getByRole('radio', { name: '디카페인 아메리칸노' })).toBeInTheDocument();
 });
 
-test('카테고리 메뉴는 스크롤 감지 지점에서 다음 묶음을 자동으로 연다', async () => {
+test('카테고리 메뉴는 스크롤 감지 지점에 머물러도 다음 묶음을 계속 연다', async () => {
   const originalObserver = global.IntersectionObserver;
-  let onIntersection;
+  const observers = [];
   global.IntersectionObserver = jest.fn((callback) => {
-    onIntersection = callback;
-    return { observe: jest.fn(), disconnect: jest.fn() };
+    const observer = { callback, observe: jest.fn(), disconnect: jest.fn() };
+    observers.push(observer);
+    return observer;
   });
 
   try {
-    const menus = Array.from({ length: 15 }, (_, index) => ({
+    const menus = Array.from({ length: 30 }, (_, index) => ({
       ...menu,
       id: 200 + index,
       menuCd: `TEST-${index}`,
@@ -359,15 +360,21 @@ test('카테고리 메뉴는 스크롤 감지 지점에서 다음 묶음을 자�
     twosomeMenuAPI.getAll.mockResolvedValue({ 커피: menus });
     const { container } = render(<OrderPage />);
 
-    fireEvent.click(await screen.findByRole('button', { name: '커피 (15)' }));
+    fireEvent.click(await screen.findByRole('button', { name: '커피 (30)' }));
     await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(12));
     expect(screen.queryByRole('button', { name: /메뉴 더보기/ })).not.toBeInTheDocument();
     await screen.findByTestId('menu-scroll-sentinel');
-    await waitFor(() => expect(onIntersection).toBeDefined());
+    await waitFor(() => expect(observers).toHaveLength(1));
 
-    act(() => onIntersection([{ isIntersecting: true }]));
+    act(() => observers[0].callback([{ isIntersecting: true }]));
 
-    await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(15));
+    await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(24));
+    await waitFor(() => expect(observers).toHaveLength(2));
+    expect(observers[0].disconnect).toHaveBeenCalled();
+
+    act(() => observers[1].callback([{ isIntersecting: true }]));
+
+    await waitFor(() => expect(container.querySelectorAll('.twosome-card')).toHaveLength(30));
     expect(screen.queryByTestId('menu-scroll-sentinel')).not.toBeInTheDocument();
   } finally {
     global.IntersectionObserver = originalObserver;
